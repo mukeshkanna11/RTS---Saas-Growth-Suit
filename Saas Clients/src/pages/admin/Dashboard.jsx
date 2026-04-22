@@ -117,12 +117,12 @@ export default function AdminDashboard() {
 
           <nav className="space-y-2">
             <NavItem icon={<Home size={18} />} label="Dashboard" path="/admin" />
-            <NavItem icon={<Users size={18} />} label="Users" path="/admin/users" />
             <NavItem icon={<Target size={18} />} label="Leads" path="/admin/leads" />
             <NavItem icon={<Briefcase size={18} />} label="CRM" path="/admin/crm" />
+             <NavItem icon={<Activity size={18} />} label="Campaigns" path="/admin/campaigns" />
             <NavItem icon={<Layers size={18} />} label="Automation" path="/admin/automation" />
             <NavItem icon={<BarChart3 size={18} />} label="Analytics" path="/admin/analytics" />
-            <NavItem icon={<Activity size={18} />} label="Campaigns" path="/admin/campaigns" />
+           
             <NavItem icon={<Settings size={18} />} label="Settings" path="/admin/settings" />
           </nav>
         </div>

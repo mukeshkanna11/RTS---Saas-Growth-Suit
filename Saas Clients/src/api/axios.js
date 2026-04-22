@@ -23,43 +23,17 @@ API.interceptors.request.use((config) => {
 });
 
 /* =========================
-   REFRESH STATE
-========================= */
-let isRefreshing = false;
-let queue = [];
-
-const processQueue = (error, token = null) => {
-  queue.forEach((p) => {
-    if (error) p.reject(error);
-    else p.resolve(token);
-  });
-
-  queue = [];
-};
-
-/* =========================
-   RESPONSE INTERCEPTOR (FIXED)
+   RESPONSE INTERCEPTOR (SAAS SAFE)
 ========================= */
 API.interceptors.response.use(
   (res) => res,
-
   async (error) => {
-    const originalRequest = error.config;
+    const original = error.config;
     const status = error.response?.status;
 
-    if (status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          queue.push({ resolve, reject });
-        }).then((token) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          return API(originalRequest);
-        });
-      }
-
-      isRefreshing = true;
+    // 🔥 ONLY HANDLE TOKEN EXPIRY
+    if (status === 401 && !original._retry) {
+      original._retry = true;
 
       try {
         const res = await axios.post(
@@ -73,23 +47,19 @@ API.interceptors.response.use(
         if (!newToken) throw new Error("No token received");
 
         localStorage.setItem("accessToken", newToken);
+
         API.defaults.headers.Authorization = `Bearer ${newToken}`;
+        original.headers.Authorization = `Bearer ${newToken}`;
 
-        processQueue(null, newToken);
-
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        return API(originalRequest);
-
+        return API(original);
       } catch (err) {
-        processQueue(err, null);
+        // 🔥 SAFE LOGOUT (NO CRASH)
+        localStorage.removeItem("accessToken");
 
-        // 🚨 CLEAN LOGOUT (NO PAGE RELOAD)
         const auth = useAuthStore.getState();
         auth.logout();
 
         return Promise.reject(err);
-      } finally {
-        isRefreshing = false;
       }
     }
 

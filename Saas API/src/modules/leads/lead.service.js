@@ -20,7 +20,7 @@ exports.createLead = async (data, tenantId) => {
 };
 
 // -------------------------------
-// GET ALL (ADVANCED FILTER + PAGINATION)
+// GET ALL (OPTIMIZED)
 // -------------------------------
 exports.getLeads = async (query, tenantId) => {
   const {
@@ -54,13 +54,16 @@ exports.getLeads = async (query, tenantId) => {
     ];
   }
 
-  const leads = await Lead.find(filter)
-    .populate("assignedTo", "name email")
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(Number(limit));
+  const [leads, total] = await Promise.all([
+    Lead.find(filter)
+      .populate("assignedTo", "name email")
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit))
+      .lean(), // 🔥 performance
 
-  const total = await Lead.countDocuments(filter);
+    Lead.countDocuments(filter),
+  ]);
 
   return {
     leads,
@@ -74,27 +77,31 @@ exports.getLeads = async (query, tenantId) => {
 };
 
 // -------------------------------
-// GET ONE (WITH ACTIVITIES + NOTES)
+// GET ONE (WITH ACTIVITIES)
 // -------------------------------
 exports.getLeadById = async (id, tenantId) => {
   const lead = await Lead.findOne({
     _id: id,
     tenantId,
     isDeleted: false,
-  }).populate("assignedTo", "name email");
+  })
+    .populate("assignedTo", "name email")
+    .lean();
 
   if (!lead) return null;
 
   const activities = await LeadActivity.find({
     leadId: id,
     tenantId,
-  }).sort({ createdAt: -1 });
+  })
+    .sort({ createdAt: -1 })
+    .lean();
 
-  return { ...lead.toObject(), activities };
+  return { ...lead, activities };
 };
 
 // -------------------------------
-// UPDATE LEAD (SAFE UPDATE)
+// UPDATE LEAD
 // -------------------------------
 exports.updateLead = async (leadId, data, tenantId, actorId) => {
   const lead = await Lead.findOneAndUpdate(
@@ -166,7 +173,7 @@ exports.updateStatus = async (leadId, status, tenantId, actorId) => {
 };
 
 // -------------------------------
-// FOLLOW-UP SYSTEM 🔥
+// FOLLOW-UP
 // -------------------------------
 exports.addFollowUp = async (
   leadId,
@@ -177,10 +184,7 @@ exports.addFollowUp = async (
 ) => {
   const lead = await Lead.findOneAndUpdate(
     { _id: leadId, tenantId },
-    {
-      followUpDate,
-      nextAction,
-    },
+    { followUpDate, nextAction },
     { new: true }
   );
 
@@ -198,7 +202,7 @@ exports.addFollowUp = async (
 };
 
 // -------------------------------
-// TODAY FOLLOW-UPS
+// TODAY FOLLOWUPS
 // -------------------------------
 exports.getTodayFollowUps = async (tenantId) => {
   const today = new Date();
@@ -214,7 +218,9 @@ exports.getTodayFollowUps = async (tenantId) => {
       $gte: today,
       $lt: tomorrow,
     },
-  }).populate("assignedTo", "name email");
+  })
+    .populate("assignedTo", "name email")
+    .lean();
 };
 
 // -------------------------------
@@ -315,7 +321,7 @@ exports.deleteLead = async (leadId, tenantId) => {
 };
 
 // -------------------------------
-// PIPELINE STATS (ENHANCED)
+// PIPELINE STATS
 // -------------------------------
 exports.getPipelineStats = async (tenantId) => {
   return await Lead.aggregate([
@@ -331,7 +337,7 @@ exports.getPipelineStats = async (tenantId) => {
 };
 
 // -------------------------------
-// CSV IMPORT (IMPROVED)
+// CSV IMPORT (🔥 FIXED + SAAS READY)
 // -------------------------------
 exports.importCSV = async (filePath, tenantId) => {
   return new Promise((resolve, reject) => {
@@ -351,13 +357,16 @@ exports.importCSV = async (filePath, tenantId) => {
         });
       })
       .on("end", async () => {
+        let insertedLeads = [];
+
         if (results.length) {
-          await Lead.insertMany(results);
+          insertedLeads = await Lead.insertMany(results);
         }
 
         fs.unlinkSync(filePath);
 
-        resolve(results.length);
+        // 🔥 IMPORTANT: return full leads (for automation trigger)
+        resolve(insertedLeads);
       })
       .on("error", reject);
   });

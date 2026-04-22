@@ -1,6 +1,9 @@
 const jwt = require("jsonwebtoken");
 const User = require("../modules/user/user.model");
 
+// ===============================
+// PROTECT
+// ===============================
 const protect = async (req, res, next) => {
   try {
     let token;
@@ -21,7 +24,7 @@ const protect = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findById(decoded.id).select("-password");
+    const user = await User.findById(decoded.id);
 
     if (!user) {
       return res.status(401).json({
@@ -30,28 +33,16 @@ const protect = async (req, res, next) => {
       });
     }
 
-    // ✅ CLEAN SAAS USER OBJECT
     req.user = {
       _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
-
-      // 🔥 SAAS TENANT (IMPORTANT)
-      tenantId: decoded.tenantId || user.tenantId,
+      tenantId: user.tenantId,
     };
-
-    if (!req.user.tenantId) {
-      return res.status(403).json({
-        success: false,
-        message: "tenantId missing for SaaS access",
-      });
-    }
 
     next();
   } catch (err) {
-    console.error("Auth error:", err.message);
-
     return res.status(401).json({
       success: false,
       message: "Invalid token",
@@ -59,14 +50,25 @@ const protect = async (req, res, next) => {
   }
 };
 
+// ===============================
+// AUTHORIZE (THIS WAS MISSING)
+// ===============================
 const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
+    }
+
+    if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
       });
     }
+
     next();
   };
 };

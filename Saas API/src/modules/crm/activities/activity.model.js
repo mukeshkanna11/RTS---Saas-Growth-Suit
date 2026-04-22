@@ -76,7 +76,7 @@ const schema = new mongoose.Schema(
 
     completedAt: Date,
 
-    // 🧠 CRM TRACKING (IMPORTANT UPGRADE)
+    // 🧠 CRM TRACKING
     isOverdue: {
       type: Boolean,
       default: false,
@@ -102,4 +102,10 @@ schema.index({ tenantId: 1, type: 1 });
 schema.index({ tenantId: 1, dueDate: 1 });
 schema.index({ tenantId: 1, createdAt: -1 });
 
-module.exports = mongoose.model("Activity", schema);
+/**
+ * 🔥 IMPORTANT FIX (NO MORE OVERWRITE ERROR)
+ * Rename model + safe check
+ */
+module.exports =
+  mongoose.models.CRMActivity ||
+  mongoose.model("CRMActivity", schema);
