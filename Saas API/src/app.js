@@ -8,19 +8,19 @@ const { ipKeyGenerator } = require("express-rate-limit");
 
 const app = express();
 
-// -------------------------------
+// =======================================================
 // 🌐 TRUST PROXY (IMPORTANT FOR DEPLOYMENT)
-// -------------------------------
+// =======================================================
 app.set("trust proxy", 1);
 
-// -------------------------------
-// 🔐 SECURITY HEADERS
-// -------------------------------
+// =======================================================
+// 🔐 SECURITY
+// =======================================================
 app.use(helmet());
 
-// -------------------------------
+// =======================================================
 // 🌍 CORS CONFIG
-// -------------------------------
+// =======================================================
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:5173",
@@ -28,69 +28,68 @@ app.use(
   })
 );
 
-// -------------------------------
+// =======================================================
 // 📦 BODY PARSER
-// -------------------------------
-app.use(express.json({ limit: "10kb" }));
+// =======================================================
+app.use(express.json({ limit: "20kb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// -------------------------------
-// 🧾 LOGGER (DEV ONLY)
-// -------------------------------
+// =======================================================
+// 🔍 DEV LOGGER
+// =======================================================
 if (process.env.NODE_ENV === "development") {
+  app.use((req, res, next) => {
+    console.log(`➡️ ${req.method} ${req.originalUrl}`);
+    next();
+  });
+
   app.use(morgan("dev"));
 }
 
-// -------------------------------
-// ⚡ COMPRESSION
-// -------------------------------
+// =======================================================
+// ⚡ PERFORMANCE
+// =======================================================
 app.use(compression());
 
 // =======================================================
-// 🚨 RATE LIMITERS (FIXED v7+)
+// 🚨 RATE LIMITERS
 // =======================================================
 
-// 🔐 LOGIN LIMITER (strict protection)
+// 🔐 LOGIN LIMIT
 const loginLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 10, // login attempts
-
-  keyGenerator: ipKeyGenerator, // ✅ FIX FOR IPv6
-
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  keyGenerator: ipKeyGenerator,
   standardHeaders: true,
   legacyHeaders: false,
-
   message: {
     success: false,
-    message: "Too many login attempts. Please try again later.",
+    message: "Too many login attempts. Try again later.",
   },
 });
 
-// ⚡ GENERAL API LIMITER
+// ⚡ GENERAL API LIMIT
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-
   max: process.env.NODE_ENV === "development" ? 10000 : 300,
-
-  keyGenerator: ipKeyGenerator, // ✅ FIX
-
+  keyGenerator: ipKeyGenerator,
   standardHeaders: true,
   legacyHeaders: false,
-
   message: {
     success: false,
-    message: "Too many requests, slow down.",
+    message: "Too many requests. Please slow down.",
   },
 });
 
 // =======================================================
-// 🧠 HEALTH CHECK
+// ❤️ HEALTH CHECK
 // =======================================================
 app.get("/api/v1/health", (req, res) => {
   res.json({
     success: true,
     message: "🚀 ReadyTech API Running",
     uptime: process.uptime(),
+    env: process.env.NODE_ENV,
   });
 });
 
@@ -102,28 +101,34 @@ const userRoutes = require("./modules/user/user.routes");
 const companyRoutes = require("./modules/company/company.routes");
 const leadRoutes = require("./modules/leads/lead.routes");
 const crmRoutes = require("./modules/crm/crm.routes");
+const marketingRoutes = require("./modules/marketing/marketing.routes");
+const automationRoutes = require("./modules/automation/automation.routes");
 
 // =======================================================
-// 🚀 ROUTES SETUP
+// 🔐 AUTH ROUTES
 // =======================================================
-
-// 🔐 AUTH (apply limiter ONLY on login)
 app.use("/api/v1/auth/login", loginLimiter);
 app.use("/api/v1/auth", authRoutes);
 
-// 🚀 OTHER ROUTES
-if (process.env.NODE_ENV === "production") {
-  app.use("/api/v1/users", apiLimiter, userRoutes);
-  app.use("/api/v1/company", apiLimiter, companyRoutes);
-  app.use("/api/v1/leads", apiLimiter, leadRoutes);
-  app.use("/api/v1/crm", apiLimiter, crmRoutes);
-} else {
-  // 🔥 NO LIMITS IN DEV (prevents your 429 issue)
-  app.use("/api/v1/users", userRoutes);
-  app.use("/api/v1/company", companyRoutes);
-  app.use("/api/v1/leads", leadRoutes);
-  app.use("/api/v1/crm", crmRoutes);
-}
+// =======================================================
+// 🚀 LIMITER WRAPPER
+// =======================================================
+const applyLimiter = (route) =>
+  process.env.NODE_ENV === "production"
+    ? [apiLimiter, route]
+    : route;
+
+// =======================================================
+// 🚀 MAIN MODULE ROUTES (SaaS CORE)
+// =======================================================
+app.use("/api/v1/users", applyLimiter(userRoutes));
+app.use("/api/v1/company", applyLimiter(companyRoutes));
+app.use("/api/v1/leads", applyLimiter(leadRoutes));
+app.use("/api/v1/crm", applyLimiter(crmRoutes));
+app.use("/api/v1/marketing", applyLimiter(marketingRoutes));
+
+// ✅ FIXED HERE
+app.use("/api/v1/automation", applyLimiter(automationRoutes));
 
 // =======================================================
 // 🧪 TEST ROUTE
@@ -149,7 +154,7 @@ app.use((req, res) => {
 // ❌ GLOBAL ERROR HANDLER
 // =======================================================
 app.use((err, req, res, next) => {
-  console.error("🔥 ERROR:", err);
+  console.error("🔥 ERROR:", err.message);
 
   res.status(err.status || 500).json({
     success: false,

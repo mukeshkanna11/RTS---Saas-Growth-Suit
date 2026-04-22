@@ -1,6 +1,9 @@
 const Lead = require("./lead.model");
 const leadService = require("./lead.service");
 
+// 🔥 MARKETING AUTOMATION
+const { runLeadAutomation } = require("../marketing/automation.engine");
+
 // ---------------- COMMON RESPONSE ----------------
 const success = (res, data, message = "Success") =>
   res.json({ success: true, message, data });
@@ -16,22 +19,29 @@ exports.createLead = async (req, res, next) => {
     const tenantId = req.user.tenantId;
 
     if (!req.body.name) {
-      return res.status(400).json({
-        success: false,
-        message: "Name is required",
-      });
+      return fail(res, "Name is required", 400);
     }
 
     const lead = await leadService.createLead(req.body, tenantId);
 
-    res.json({ success: true, message: "Lead created", data: lead });
+    // 🔥 Trigger automation (NON-BLOCKING)
+    setImmediate(() => {
+      runLeadAutomation(
+        { ...lead.toObject(), trigger: "lead_created" },
+        req.user
+      ).catch((err) =>
+        console.error("Automation Error:", err.message)
+      );
+    });
+
+    success(res, lead, "Lead created");
   } catch (err) {
-    next(err); // ✅ IMPORTANT FIX
+    next(err);
   }
 };
 
 // -------------------------------
-// 📥 GET ALL LEADS (WITH PAGINATION 🔥)
+// 📥 GET ALL LEADS (WITH PAGINATION)
 // -------------------------------
 exports.getLeads = async (req, res) => {
   try {
@@ -39,7 +49,7 @@ exports.getLeads = async (req, res) => {
 
     const result = await leadService.getLeads(req.query, tenantId);
 
-    success(res, result); // should include: leads, page, totalPages
+    success(res, result);
   } catch (err) {
     fail(res, err.message);
   }
@@ -86,7 +96,7 @@ exports.assignLead = async (req, res) => {
 };
 
 // -------------------------------
-// ✏️ UPDATE LEAD (FIXED - SERVICE BASED)
+// ✏️ UPDATE LEAD
 // -------------------------------
 exports.updateLead = async (req, res) => {
   try {
@@ -108,7 +118,7 @@ exports.updateLead = async (req, res) => {
 };
 
 // -------------------------------
-// 🔄 UPDATE STATUS + ACTIVITY LOG 🔥
+// 🔄 UPDATE STATUS + AUTOMATION
 // -------------------------------
 exports.updateStatus = async (req, res) => {
   try {
@@ -123,6 +133,16 @@ exports.updateStatus = async (req, res) => {
       tenantId,
       req.user.id
     );
+
+    // 🔥 Trigger automation (status-based)
+    setImmediate(() => {
+      runLeadAutomation(
+        { ...lead.toObject(), trigger: "status_changed", status },
+        req.user
+      ).catch((err) =>
+        console.error("Automation Error:", err.message)
+      );
+    });
 
     success(res, lead, "Status updated");
   } catch (err) {
@@ -210,6 +230,14 @@ exports.convertLead = async (req, res) => {
       req.user.id
     );
 
+    // 🔥 Trigger conversion automation
+    setImmediate(() => {
+      runLeadAutomation(
+        { ...lead.toObject(), trigger: "lead_converted" },
+        req.user
+      ).catch(() => {});
+    });
+
     success(res, lead, "Lead converted 🎉");
   } catch (err) {
     fail(res, err.message);
@@ -247,7 +275,7 @@ exports.getPipelineStats = async (req, res) => {
 };
 
 // -------------------------------
-// 📅 TODAY FOLLOW-UPS 🔥 (NEW)
+// 📅 TODAY FOLLOW-UPS
 // -------------------------------
 exports.getTodayFollowUps = async (req, res) => {
   try {
@@ -262,7 +290,7 @@ exports.getTodayFollowUps = async (req, res) => {
 };
 
 // -------------------------------
-// 📂 CSV IMPORT
+// 📂 CSV IMPORT + AUTOMATION
 // -------------------------------
 exports.importCSV = async (req, res) => {
   try {
@@ -270,9 +298,19 @@ exports.importCSV = async (req, res) => {
 
     if (!req.file) return fail(res, "CSV file required", 400);
 
-    const count = await leadService.importCSV(req.file.path, tenantId);
+    const leads = await leadService.importCSV(req.file.path, tenantId);
 
-    success(res, { count }, "CSV imported");
+    // 🔥 Bulk automation (non-blocking)
+    setImmediate(() => {
+      leads.forEach((lead) => {
+        runLeadAutomation(
+          { ...lead.toObject(), trigger: "lead_imported" },
+          req.user
+        ).catch(() => {});
+      });
+    });
+
+    success(res, { count: leads.length }, "CSV imported");
   } catch (err) {
     fail(res, err.message);
   }

@@ -1,10 +1,14 @@
-const Activity = require("./activity.model");
+const CRMActivity = require("./activity.model");
 
 // ===============================
 // ➕ CREATE ACTIVITY
 // ===============================
 exports.create = async (data, user) => {
-  return await Activity.create({
+  if (!user || !user.tenantId) {
+    throw new Error("Unauthorized: tenant missing");
+  }
+
+  const activity = await CRMActivity.create({
     type: data.type,
     title: data.title,
     description: data.description,
@@ -22,22 +26,30 @@ exports.create = async (data, user) => {
 
     dueDate: data.dueDate,
   });
+
+  return activity;
 };
 
 // ===============================
 // 📥 GET ALL ACTIVITIES
 // ===============================
 exports.getAll = async (user, query) => {
+  if (!user || !user.tenantId) {
+    throw new Error("Unauthorized");
+  }
+
   const filter = {
     tenantId: user.tenantId,
     isDeleted: false,
   };
 
+  // 🔎 Filters
   if (query.status) filter.status = query.status;
   if (query.type) filter.type = query.type;
   if (query.priority) filter.priority = query.priority;
   if (query.assignedTo) filter.assignedTo = query.assignedTo;
 
+  // ⏰ Overdue filter
   if (query.overdue === "true") {
     filter.dueDate = { $lt: new Date() };
     filter.status = "pending";
@@ -48,7 +60,7 @@ exports.getAll = async (user, query) => {
   const skip = (page - 1) * limit;
 
   const [activities, total] = await Promise.all([
-    Activity.find(filter)
+    CRMActivity.find(filter)
       .populate("contactId")
       .populate("dealId")
       .populate("leadId")
@@ -57,7 +69,7 @@ exports.getAll = async (user, query) => {
       .skip(skip)
       .limit(limit),
 
-    Activity.countDocuments(filter),
+    CRMActivity.countDocuments(filter),
   ]);
 
   return {
@@ -74,7 +86,7 @@ exports.getAll = async (user, query) => {
 // ✏️ UPDATE ACTIVITY
 // ===============================
 exports.update = async (id, data, user) => {
-  const activity = await Activity.findOne({
+  const activity = await CRMActivity.findOne({
     _id: id,
     tenantId: user.tenantId,
     isDeleted: false,
@@ -84,13 +96,18 @@ exports.update = async (id, data, user) => {
 
   Object.assign(activity, data);
 
-  // auto complete logic
+  // ✅ Auto complete
   if (data.status === "completed") {
     activity.completedAt = new Date();
+    activity.isOverdue = false;
   }
 
-  // overdue detection
-  if (activity.dueDate && activity.dueDate < new Date() && activity.status !== "completed") {
+  // ⏰ Overdue detection
+  if (
+    activity.dueDate &&
+    activity.dueDate < new Date() &&
+    activity.status !== "completed"
+  ) {
     activity.isOverdue = true;
   }
 
@@ -102,10 +119,11 @@ exports.update = async (id, data, user) => {
 // 🗑 SOFT DELETE
 // ===============================
 exports.delete = async (id, user) => {
-  return await Activity.findOneAndUpdate(
+  const activity = await CRMActivity.findOneAndUpdate(
     {
       _id: id,
       tenantId: user.tenantId,
+      isDeleted: false,
     },
     {
       isDeleted: true,
@@ -113,4 +131,8 @@ exports.delete = async (id, user) => {
     },
     { new: true }
   );
+
+  if (!activity) throw new Error("Activity not found");
+
+  return activity;
 };

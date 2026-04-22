@@ -1,22 +1,18 @@
 const express = require("express");
 const router = express.Router();
 
-const ctrl = require("./activity.controller");
+const controller = require("./activity.controller");
 
-// 🔐 CORRECT WAY (IMPORTANT FIX)
-const { protect } = require("../../../middleware/auth.middleware");
+// 🔥 IMPORTANT → must be POST
+router.post("/", controller.create);
 
-// -------------------------------
-// 🔐 MIDDLEWARE
-// -------------------------------
-router.use(protect);
+// GET all
+router.get("/", controller.getAll);
 
-// -------------------------------
-// 📦 ROUTES
-// -------------------------------
-router.post("/", ctrl.create);
-router.get("/", ctrl.getAll);
-router.put("/:id", ctrl.update);
-router.delete("/:id", ctrl.remove);
+// UPDATE
+router.put("/:id", controller.update);
+
+// DELETE
+router.delete("/:id", controller.remove);
 
 module.exports = router;

@@ -10,160 +10,132 @@ import EmployeeDashboard from "./pages/employee/Dashboard";
 
 import Leads from "./pages/Leads";
 import CRM from "./pages/CRM";
+import Campaigns from "./pages/Campaigns";
+import Automation from "./pages/Automation";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuthStore } from "./store/authStore";
+
+// ================= DASHBOARD MAP =================
+const dashboards = {
+  admin: <AdminDashboard />,
+  manager: <ManagerDashboard />,
+  employee: <EmployeeDashboard />,
+};
+
+// ================= ROLE REDIRECT =================
+const RoleRedirect = ({ user }) => {
+  if (!user?.role) return <Navigate to="/login" replace />;
+  return <Navigate to={`/${user.role}`} replace />;
+};
+
+// ================= ✅ FIX: FUNCTION (NOT COMPONENT) =================
+const getModuleRoutes = (role) => [
+  <Route
+    key={`${role}-leads`}
+    path={`/${role}/leads`}
+    element={
+      <ProtectedRoute role={role}>
+        <Leads />
+      </ProtectedRoute>
+    }
+  />,
+  <Route
+    key={`${role}-crm`}
+    path={`/${role}/crm`}
+    element={
+      <ProtectedRoute role={role}>
+        <CRM />
+      </ProtectedRoute>
+    }
+  />,
+  <Route
+    key={`${role}-campaigns`}
+    path={`/${role}/campaigns`}
+    element={
+      <ProtectedRoute role={role}>
+        <Campaigns />
+      </ProtectedRoute>
+    }
+  />,
+  <Route
+    key={`${role}-automation`}
+    path={`/${role}/automation`}
+    element={
+      <ProtectedRoute role={role}>
+        <Automation />
+      </ProtectedRoute>
+    }
+  />,
+];
 
 export default function App() {
   const user = useAuthStore((s) => s.user);
   const loading = useAuthStore((s) => s.loading);
   const init = useAuthStore((s) => s.init);
 
-  // =========================
-  // INIT AUTH ONCE
-  // =========================
   useEffect(() => {
     init();
   }, [init]);
 
+  if (loading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center text-white bg-black">
+        <div className="animate-pulse">🚀 Loading ReadyTech SaaS...</div>
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
-
-      {/* =========================
-          GLOBAL NON-BLOCKING LOADER
-          (prevents blank screen flicker)
-      ========================= */}
-      {loading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center text-white bg-black/70 backdrop-blur-sm">
-          <div className="text-sm animate-pulse">
-            Loading...
-          </div>
-        </div>
-      )}
-
       <Routes>
 
-        {/* ================= PUBLIC ROUTES ================= */}
-
+        {/* PUBLIC */}
         <Route
           path="/login"
           element={
-            user?.role
-              ? <Navigate to={`/${user.role}`} replace />
-              : <Login />
+            user?.role ? <Navigate to={`/${user.role}`} replace /> : <Login />
           }
         />
 
         <Route
           path="/register"
           element={
-            user?.role
-              ? <Navigate to={`/${user.role}`} replace />
-              : <Register />
+            user?.role ? <Navigate to={`/${user.role}`} replace /> : <Register />
           }
         />
 
-        {/* ================= ADMIN ================= */}
+        {/* DASHBOARDS */}
+        {Object.keys(dashboards).map((role) => (
+          <Route
+            key={role}
+            path={`/${role}`}
+            element={
+              <ProtectedRoute role={role}>
+                {dashboards[role]}
+              </ProtectedRoute>
+            }
+          />
+        ))}
 
+        {/* ✅ MODULE ROUTES (FIXED) */}
+        {["admin", "manager", "employee"].flatMap((role) =>
+          getModuleRoutes(role)
+        )}
+
+        {/* ROOT */}
+        <Route path="/" element={<RoleRedirect user={user} />} />
+
+        {/* 404 */}
         <Route
-          path="/admin"
+          path="*"
           element={
-            <ProtectedRoute role="admin">
-              <AdminDashboard />
-            </ProtectedRoute>
+            <div className="flex flex-col items-center justify-center min-h-screen text-white bg-black">
+              <h1 className="text-4xl font-bold">404</h1>
+              <p className="text-gray-400">Page not found</p>
+            </div>
           }
         />
-
-        <Route
-          path="/admin/leads"
-          element={
-            <ProtectedRoute role="admin">
-              <Leads />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/crm"
-          element={
-            <ProtectedRoute role="admin">
-              <CRM />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* ================= MANAGER ================= */}
-
-        <Route
-          path="/manager"
-          element={
-            <ProtectedRoute role="manager">
-              <ManagerDashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/manager/leads"
-          element={
-            <ProtectedRoute role="manager">
-              <Leads />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/manager/crm"
-          element={
-            <ProtectedRoute role="manager">
-              <CRM />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* ================= EMPLOYEE ================= */}
-
-        <Route
-          path="/employee"
-          element={
-            <ProtectedRoute role="employee">
-              <EmployeeDashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/employee/leads"
-          element={
-            <ProtectedRoute role="employee">
-              <Leads />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/employee/crm"
-          element={
-            <ProtectedRoute role="employee">
-              <CRM />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* ================= ROOT REDIRECT ================= */}
-
-        <Route
-          path="/"
-          element={
-            user?.role
-              ? <Navigate to={`/${user.role}`} replace />
-              : <Navigate to="/login" replace />
-          }
-        />
-
-        {/* ================= 404 ================= */}
-
-        <Route path="*" element={<Navigate to="/" replace />} />
 
       </Routes>
     </BrowserRouter>
