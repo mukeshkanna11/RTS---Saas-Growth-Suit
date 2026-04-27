@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../../api/axios";
 import { logoutUser } from "../../api/auth";
 import { useNavigate, useLocation } from "react-router-dom";
-
+import { CreditCard } from "lucide-react";
 import {
   Home,
   Users,
@@ -123,7 +123,11 @@ export default function AdminDashboard() {
             <NavItem icon={<Layers size={18} />} label="Automation" path="/admin/automation" />
             <NavItem icon={<BarChart3 size={18} />} label="Analytics" path="/admin/analytics" />
            
-            <NavItem icon={<Settings size={18} />} label="Settings" path="/admin/settings" />
+            <NavItem
+  icon={<CreditCard size={18} />}
+  label="Subscriptions"
+  path="/admin/subscription"
+/>
           </nav>
         </div>
 

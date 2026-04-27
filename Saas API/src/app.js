@@ -1,3 +1,8 @@
+// =======================================================
+// src/app.js
+// FULL UPDATED SAAS-LEVEL EXPRESS APP
+// =======================================================
+
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -9,12 +14,12 @@ const { ipKeyGenerator } = require("express-rate-limit");
 const app = express();
 
 // =======================================================
-// 🌐 TRUST PROXY (IMPORTANT FOR DEPLOYMENT)
+// 🌐 TRUST PROXY
 // =======================================================
 app.set("trust proxy", 1);
 
 // =======================================================
-// 🔐 SECURITY
+// 🔐 SECURITY MIDDLEWARE
 // =======================================================
 app.use(helmet());
 
@@ -54,8 +59,6 @@ app.use(compression());
 // =======================================================
 // 🚨 RATE LIMITERS
 // =======================================================
-
-// 🔐 LOGIN LIMIT
 const loginLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 10,
@@ -68,7 +71,6 @@ const loginLimiter = rateLimit({
   },
 });
 
-// ⚡ GENERAL API LIMIT
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: process.env.NODE_ENV === "development" ? 10000 : 300,
@@ -82,19 +84,7 @@ const apiLimiter = rateLimit({
 });
 
 // =======================================================
-// ❤️ HEALTH CHECK
-// =======================================================
-app.get("/api/v1/health", (req, res) => {
-  res.json({
-    success: true,
-    message: "🚀 ReadyTech API Running",
-    uptime: process.uptime(),
-    env: process.env.NODE_ENV,
-  });
-});
-
-// =======================================================
-// 📌 ROUTES IMPORT
+// 🚀 ROUTE IMPORTS
 // =======================================================
 const authRoutes = require("./modules/auth/auth.routes");
 const userRoutes = require("./modules/user/user.routes");
@@ -103,6 +93,21 @@ const leadRoutes = require("./modules/leads/lead.routes");
 const crmRoutes = require("./modules/crm/crm.routes");
 const marketingRoutes = require("./modules/marketing/marketing.routes");
 const automationRoutes = require("./modules/automation/automation.routes");
+const analyticsRoutes = require("./modules/analytics/analytics.routes");
+const subscriptionRoutes = require("./modules/subscription/subscription.routes");
+
+// =======================================================
+// ❤️ HEALTH CHECK
+// =======================================================
+app.get("/api/v1/health", (req, res) => {
+  res.json({
+    success: true,
+    message: "ReadyTech API Running",
+    uptime: process.uptime(),
+    env: process.env.NODE_ENV,
+    timestamp: new Date(),
+  });
+});
 
 // =======================================================
 // 🔐 AUTH ROUTES
@@ -111,7 +116,7 @@ app.use("/api/v1/auth/login", loginLimiter);
 app.use("/api/v1/auth", authRoutes);
 
 // =======================================================
-// 🚀 LIMITER WRAPPER
+// 🚀 LIMITER HELPER
 // =======================================================
 const applyLimiter = (route) =>
   process.env.NODE_ENV === "production"
@@ -119,16 +124,18 @@ const applyLimiter = (route) =>
     : route;
 
 // =======================================================
-// 🚀 MAIN MODULE ROUTES (SaaS CORE)
+// 🚀 MAIN MODULE ROUTES
 // =======================================================
 app.use("/api/v1/users", applyLimiter(userRoutes));
 app.use("/api/v1/company", applyLimiter(companyRoutes));
 app.use("/api/v1/leads", applyLimiter(leadRoutes));
 app.use("/api/v1/crm", applyLimiter(crmRoutes));
 app.use("/api/v1/marketing", applyLimiter(marketingRoutes));
-
-// ✅ FIXED HERE
 app.use("/api/v1/automation", applyLimiter(automationRoutes));
+app.use("/api/v1/analytics", applyLimiter(analyticsRoutes));
+
+// IMPORTANT: use ONE consistent route name
+app.use("/api/v1/subscription", applyLimiter(subscriptionRoutes));
 
 // =======================================================
 // 🧪 TEST ROUTE
@@ -136,7 +143,7 @@ app.use("/api/v1/automation", applyLimiter(automationRoutes));
 app.get("/api/v1/test", (req, res) => {
   res.json({
     success: true,
-    message: "API working ✅",
+    message: "API working successfully",
   });
 });
 
@@ -154,7 +161,7 @@ app.use((req, res) => {
 // ❌ GLOBAL ERROR HANDLER
 // =======================================================
 app.use((err, req, res, next) => {
-  console.error("🔥 ERROR:", err.message);
+  console.error("🔥 ERROR:", err);
 
   res.status(err.status || 500).json({
     success: false,

@@ -1,3 +1,8 @@
+// ===============================
+// src/api/axios.js
+// FULL UPDATED / PERMANENT FIX
+// ===============================
+
 import axios from "axios";
 import { useAuthStore } from "../store/authStore";
 
@@ -12,18 +17,26 @@ const API = axios.create({
 /* =========================
    REQUEST INTERCEPTOR
 ========================= */
-API.interceptors.request.use((config) => {
-  const token = localStorage.getItem("accessToken");
+API.interceptors.request.use(
+  (config) => {
+    const rawToken =
+      localStorage.getItem("accessToken") ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("readytech_token");
 
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+    const token = rawToken?.replace(/\"/g, "");
 
-  return config;
-});
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 /* =========================
-   RESPONSE INTERCEPTOR (SAAS SAFE)
+   RESPONSE INTERCEPTOR
 ========================= */
 API.interceptors.response.use(
   (res) => res,
@@ -31,35 +44,34 @@ API.interceptors.response.use(
     const original = error.config;
     const status = error.response?.status;
 
-    // 🔥 ONLY HANDLE TOKEN EXPIRY
     if (status === 401 && !original._retry) {
       original._retry = true;
 
       try {
-        const res = await axios.post(
+        const refreshRes = await axios.post(
           `${BASE_URL}/auth/refresh`,
           {},
           { withCredentials: true }
         );
 
-        const newToken = res.data?.data?.accessToken;
+        const newToken = refreshRes.data?.data?.accessToken;
 
-        if (!newToken) throw new Error("No token received");
+        if (!newToken) throw new Error("Refresh token failed");
 
         localStorage.setItem("accessToken", newToken);
 
-        API.defaults.headers.Authorization = `Bearer ${newToken}`;
         original.headers.Authorization = `Bearer ${newToken}`;
 
         return API(original);
-      } catch (err) {
-        // 🔥 SAFE LOGOUT (NO CRASH)
+      } catch (refreshError) {
         localStorage.removeItem("accessToken");
 
         const auth = useAuthStore.getState();
         auth.logout();
 
-        return Promise.reject(err);
+        window.location.href = "/login";
+
+        return Promise.reject(refreshError);
       }
     }
 
