@@ -12,24 +12,32 @@ import Leads from "./pages/Leads";
 import CRM from "./pages/CRM";
 import Campaigns from "./pages/Campaigns";
 import Automation from "./pages/Automation";
+import Analytics from "./pages/Analytics";
+import Subscription from "./pages/Subscription";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuthStore } from "./store/authStore";
 
-// ================= DASHBOARD MAP =================
+// =====================================
+// DASHBOARD MAP
+// =====================================
 const dashboards = {
   admin: <AdminDashboard />,
   manager: <ManagerDashboard />,
   employee: <EmployeeDashboard />,
 };
 
-// ================= ROLE REDIRECT =================
+// =====================================
+// ROLE REDIRECT
+// =====================================
 const RoleRedirect = ({ user }) => {
   if (!user?.role) return <Navigate to="/login" replace />;
   return <Navigate to={`/${user.role}`} replace />;
 };
 
-// ================= ✅ FIX: FUNCTION (NOT COMPONENT) =================
+// =====================================
+// MODULE ROUTES
+// =====================================
 const getModuleRoutes = (role) => [
   <Route
     key={`${role}-leads`}
@@ -40,6 +48,7 @@ const getModuleRoutes = (role) => [
       </ProtectedRoute>
     }
   />,
+
   <Route
     key={`${role}-crm`}
     path={`/${role}/crm`}
@@ -49,6 +58,7 @@ const getModuleRoutes = (role) => [
       </ProtectedRoute>
     }
   />,
+
   <Route
     key={`${role}-campaigns`}
     path={`/${role}/campaigns`}
@@ -58,6 +68,7 @@ const getModuleRoutes = (role) => [
       </ProtectedRoute>
     }
   />,
+
   <Route
     key={`${role}-automation`}
     path={`/${role}/automation`}
@@ -67,8 +78,31 @@ const getModuleRoutes = (role) => [
       </ProtectedRoute>
     }
   />,
+
+  <Route
+    key={`${role}-analytics`}
+    path={`/${role}/analytics`}
+    element={
+      <ProtectedRoute role={role}>
+        <Analytics />
+      </ProtectedRoute>
+    }
+  />,
+
+  <Route
+    key={`${role}-subscription`}
+    path={`/${role}/subscription`}
+    element={
+      <ProtectedRoute role={role}>
+        <Subscription />
+      </ProtectedRoute>
+    }
+  />,
 ];
 
+// =====================================
+// MAIN APP
+// =====================================
 export default function App() {
   const user = useAuthStore((s) => s.user);
   const loading = useAuthStore((s) => s.loading);
@@ -80,8 +114,14 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center text-white bg-black">
-        <div className="animate-pulse">🚀 Loading ReadyTech SaaS...</div>
+      <div className="fixed inset-0 flex items-center justify-center text-white bg-slate-950">
+        <div className="text-center">
+          <div className="mb-3 text-4xl animate-pulse">🚀</div>
+          <p className="text-lg font-semibold">Loading ReadyTech SaaS...</p>
+          <p className="mt-1 text-sm text-slate-400">
+            Preparing your workspace
+          </p>
+        </div>
       </div>
     );
   }
@@ -89,8 +129,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-
-        {/* PUBLIC */}
+        {/* ================= PUBLIC ================= */}
         <Route
           path="/login"
           element={
@@ -101,11 +140,15 @@ export default function App() {
         <Route
           path="/register"
           element={
-            user?.role ? <Navigate to={`/${user.role}`} replace /> : <Register />
+            user?.role ? (
+              <Navigate to={`/${user.role}`} replace />
+            ) : (
+              <Register />
+            )
           }
         />
 
-        {/* DASHBOARDS */}
+        {/* ================= DASHBOARDS ================= */}
         {Object.keys(dashboards).map((role) => (
           <Route
             key={role}
@@ -118,25 +161,24 @@ export default function App() {
           />
         ))}
 
-        {/* ✅ MODULE ROUTES (FIXED) */}
+        {/* ================= ALL MODULES ================= */}
         {["admin", "manager", "employee"].flatMap((role) =>
           getModuleRoutes(role)
         )}
 
-        {/* ROOT */}
+        {/* ================= ROOT ================= */}
         <Route path="/" element={<RoleRedirect user={user} />} />
 
-        {/* 404 */}
+        {/* ================= 404 ================= */}
         <Route
           path="*"
           element={
-            <div className="flex flex-col items-center justify-center min-h-screen text-white bg-black">
-              <h1 className="text-4xl font-bold">404</h1>
-              <p className="text-gray-400">Page not found</p>
+            <div className="flex flex-col items-center justify-center min-h-screen text-white bg-slate-950">
+              <h1 className="text-6xl font-bold">404</h1>
+              <p className="mt-2 text-slate-400">Page not found</p>
             </div>
           }
         />
-
       </Routes>
     </BrowserRouter>
   );
