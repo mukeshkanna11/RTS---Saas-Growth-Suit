@@ -1,6 +1,6 @@
 // =======================================================
 // src/app.js
-// FULL UPDATED SAAS-LEVEL EXPRESS APP (PRODUCTION READY)
+// FULL UPDATED PRODUCTION-LEVEL EXPRESS APP
 // =======================================================
 
 const express = require("express");
@@ -19,7 +19,7 @@ const app = express();
 app.set("trust proxy", 1);
 
 // =======================================================
-// 🔐 SECURITY MIDDLEWARE
+// 🔐 SECURITY
 // =======================================================
 app.use(helmet());
 
@@ -35,7 +35,6 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow server-to-server / Postman / curl requests
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
@@ -53,27 +52,27 @@ app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
 // =======================================================
-// 📦 BODY PARSER
+// 📦 BODY PARSERS
 // =======================================================
 app.use(express.json({ limit: "20kb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // =======================================================
-// 🔍 LOGGER
+// ⚡ PERFORMANCE
+// =======================================================
+app.use(compression());
+
+// =======================================================
+// 🔍 LOGGER (DEV ONLY)
 // =======================================================
 if (process.env.NODE_ENV !== "production") {
+  app.use(morgan("dev"));
+
   app.use((req, res, next) => {
     console.log(`➡️ ${req.method} ${req.originalUrl}`);
     next();
   });
-
-  app.use(morgan("dev"));
 }
-
-// =======================================================
-// ⚡ PERFORMANCE
-// =======================================================
-app.use(compression());
 
 // =======================================================
 // 🚨 RATE LIMITERS
@@ -119,6 +118,19 @@ const analyticsRoutes = require("./modules/analytics/analytics.routes");
 const subscriptionRoutes = require("./modules/subscription/subscription.routes");
 
 // =======================================================
+// 🌍 ROOT ROUTE
+// =======================================================
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "ReadyTech SaaS API is live 🚀",
+    version: "1.0.0",
+    health: "/api/v1/health",
+    docs: "/api/v1/test",
+  });
+});
+
+// =======================================================
 // ❤️ HEALTH CHECK
 // =======================================================
 app.get("/api/v1/health", (req, res) => {
@@ -128,6 +140,16 @@ app.get("/api/v1/health", (req, res) => {
     uptime: process.uptime(),
     env: process.env.NODE_ENV,
     timestamp: new Date(),
+  });
+});
+
+// =======================================================
+// 🧪 TEST ROUTE
+// =======================================================
+app.get("/api/v1/test", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "API working successfully",
   });
 });
 
@@ -148,16 +170,6 @@ app.use("/api/v1/marketing", ...routeWithLimiter, marketingRoutes);
 app.use("/api/v1/automation", ...routeWithLimiter, automationRoutes);
 app.use("/api/v1/analytics", ...routeWithLimiter, analyticsRoutes);
 app.use("/api/v1/subscription", ...routeWithLimiter, subscriptionRoutes);
-
-// =======================================================
-// 🧪 TEST ROUTE
-// =======================================================
-app.get("/api/v1/test", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "API working successfully",
-  });
-});
 
 // =======================================================
 // ❌ 404 HANDLER
