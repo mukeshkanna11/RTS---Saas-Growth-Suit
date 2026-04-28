@@ -1,22 +1,18 @@
-// ===============================
-// src/api/axios.js
-// FULL UPDATED / PERMANENT FIX
-// ===============================
-
 import axios from "axios";
 import { useAuthStore } from "../store/authStore";
 
-const BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
+const BASE_URL = import.meta.env.VITE_API_URL;
+
+if (!BASE_URL) {
+  throw new Error("VITE_API_URL is not defined");
+}
 
 const API = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
 });
 
-/* =========================
-   REQUEST INTERCEPTOR
-========================= */
+/* REQUEST INTERCEPTOR */
 API.interceptors.request.use(
   (config) => {
     const rawToken =
@@ -35,9 +31,7 @@ API.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-/* =========================
-   RESPONSE INTERCEPTOR
-========================= */
+/* RESPONSE INTERCEPTOR */
 API.interceptors.response.use(
   (res) => res,
   async (error) => {
