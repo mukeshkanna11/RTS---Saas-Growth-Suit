@@ -1,6 +1,6 @@
 // =======================================================
 // src/app.js
-// FULL UPDATED SAAS-LEVEL EXPRESS APP (CORS FIXED)
+// FULL UPDATED SAAS-LEVEL EXPRESS APP (PRODUCTION READY)
 // =======================================================
 
 const express = require("express");
@@ -24,7 +24,7 @@ app.set("trust proxy", 1);
 app.use(helmet());
 
 // =======================================================
-// 🌍 CORS CONFIG (FIXED)
+// 🌍 CORS CONFIG
 // =======================================================
 const allowedOrigins = [
   "http://localhost:5173",
@@ -33,26 +33,24 @@ const allowedOrigins = [
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // allow server-to-server / postman / no-origin requests
-      if (!origin) return callback(null, true);
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow server-to-server / Postman / curl requests
+    if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
 
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 
-// Handle preflight requests
-app.options("*", cors());
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // =======================================================
 // 📦 BODY PARSER
@@ -61,7 +59,7 @@ app.use(express.json({ limit: "20kb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // =======================================================
-// 🔍 DEV LOGGER
+// 🔍 LOGGER
 // =======================================================
 if (process.env.NODE_ENV !== "production") {
   app.use((req, res, next) => {
@@ -104,6 +102,9 @@ const apiLimiter = rateLimit({
   },
 });
 
+const routeWithLimiter =
+  process.env.NODE_ENV === "production" ? [apiLimiter] : [];
+
 // =======================================================
 // 🚀 ROUTE IMPORTS
 // =======================================================
@@ -121,7 +122,7 @@ const subscriptionRoutes = require("./modules/subscription/subscription.routes")
 // ❤️ HEALTH CHECK
 // =======================================================
 app.get("/api/v1/health", (req, res) => {
-  res.json({
+  res.status(200).json({
     success: true,
     message: "ReadyTech API Running",
     uptime: process.uptime(),
@@ -137,30 +138,22 @@ app.use("/api/v1/auth/login", loginLimiter);
 app.use("/api/v1/auth", authRoutes);
 
 // =======================================================
-// 🚀 LIMITER HELPER
-// =======================================================
-const applyLimiter = (route) =>
-  process.env.NODE_ENV === "production"
-    ? [apiLimiter, route]
-    : route;
-
-// =======================================================
 // 🚀 MAIN MODULE ROUTES
 // =======================================================
-app.use("/api/v1/users", applyLimiter(userRoutes));
-app.use("/api/v1/company", applyLimiter(companyRoutes));
-app.use("/api/v1/leads", applyLimiter(leadRoutes));
-app.use("/api/v1/crm", applyLimiter(crmRoutes));
-app.use("/api/v1/marketing", applyLimiter(marketingRoutes));
-app.use("/api/v1/automation", applyLimiter(automationRoutes));
-app.use("/api/v1/analytics", applyLimiter(analyticsRoutes));
-app.use("/api/v1/subscription", applyLimiter(subscriptionRoutes));
+app.use("/api/v1/users", ...routeWithLimiter, userRoutes);
+app.use("/api/v1/company", ...routeWithLimiter, companyRoutes);
+app.use("/api/v1/leads", ...routeWithLimiter, leadRoutes);
+app.use("/api/v1/crm", ...routeWithLimiter, crmRoutes);
+app.use("/api/v1/marketing", ...routeWithLimiter, marketingRoutes);
+app.use("/api/v1/automation", ...routeWithLimiter, automationRoutes);
+app.use("/api/v1/analytics", ...routeWithLimiter, analyticsRoutes);
+app.use("/api/v1/subscription", ...routeWithLimiter, subscriptionRoutes);
 
 // =======================================================
 // 🧪 TEST ROUTE
 // =======================================================
 app.get("/api/v1/test", (req, res) => {
-  res.json({
+  res.status(200).json({
     success: true,
     message: "API working successfully",
   });
@@ -180,7 +173,7 @@ app.use((req, res) => {
 // ❌ GLOBAL ERROR HANDLER
 // =======================================================
 app.use((err, req, res, next) => {
-  console.error("🔥 ERROR:", err);
+  console.error("🔥 ERROR:", err.message);
 
   res.status(err.status || 500).json({
     success: false,
