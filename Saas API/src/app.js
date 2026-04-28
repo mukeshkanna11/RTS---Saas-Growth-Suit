@@ -1,6 +1,6 @@
 // =======================================================
 // src/app.js
-// FULL UPDATED SAAS-LEVEL EXPRESS APP
+// FULL UPDATED SAAS-LEVEL EXPRESS APP (CORS FIXED)
 // =======================================================
 
 const express = require("express");
@@ -24,14 +24,35 @@ app.set("trust proxy", 1);
 app.use(helmet());
 
 // =======================================================
-// 🌍 CORS CONFIG
+// 🌍 CORS CONFIG (FIXED)
 // =======================================================
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://readytechsaas.netlify.app",
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+      // allow server-to-server / postman / no-origin requests
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// Handle preflight requests
+app.options("*", cors());
 
 // =======================================================
 // 📦 BODY PARSER
@@ -42,7 +63,7 @@ app.use(express.urlencoded({ extended: true }));
 // =======================================================
 // 🔍 DEV LOGGER
 // =======================================================
-if (process.env.NODE_ENV === "development") {
+if (process.env.NODE_ENV !== "production") {
   app.use((req, res, next) => {
     console.log(`➡️ ${req.method} ${req.originalUrl}`);
     next();
@@ -133,8 +154,6 @@ app.use("/api/v1/crm", applyLimiter(crmRoutes));
 app.use("/api/v1/marketing", applyLimiter(marketingRoutes));
 app.use("/api/v1/automation", applyLimiter(automationRoutes));
 app.use("/api/v1/analytics", applyLimiter(analyticsRoutes));
-
-// IMPORTANT: use ONE consistent route name
 app.use("/api/v1/subscription", applyLimiter(subscriptionRoutes));
 
 // =======================================================
@@ -166,7 +185,7 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({
     success: false,
     message: err.message || "Internal Server Error",
-    ...(process.env.NODE_ENV === "development" && {
+    ...(process.env.NODE_ENV !== "production" && {
       stack: err.stack,
     }),
   });
