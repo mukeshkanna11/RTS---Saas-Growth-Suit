@@ -1,8 +1,9 @@
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 const User = require("../modules/user/user.model");
 
 // ==========================================
-// AUTH MIDDLEWARE - SaaS Ready Version
+// AUTH MIDDLEWARE - PRODUCTION READY VERSION
 // ==========================================
 
 // Protect routes
@@ -28,6 +29,13 @@ const protect = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    if (!decoded?.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token payload.",
+      });
+    }
+
     // Fetch user
     const user = await User.findById(decoded.id).select("-password");
 
@@ -38,13 +46,30 @@ const protect = async (req, res, next) => {
       });
     }
 
+    if (user.isDeleted || user.isActive === false) {
+      return res.status(403).json({
+        success: false,
+        message: "User account is inactive.",
+      });
+    }
+
+    // Validate company mapping
+    let resolvedCompanyId = null;
+
+    if (
+      user.companyId &&
+      mongoose.Types.ObjectId.isValid(user.companyId)
+    ) {
+      resolvedCompanyId = user.companyId;
+    }
+
     // Attach clean user object
     req.user = {
       id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
-      companyId: user.companyId || user.tenantId || null,
+      companyId: resolvedCompanyId,
       tenantId: user.tenantId || null,
     };
 
@@ -59,7 +84,9 @@ const protect = async (req, res, next) => {
   }
 };
 
-// Role-based authorization
+// ==========================================
+// ROLE-BASED AUTHORIZATION
+// ==========================================
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
@@ -80,15 +107,31 @@ const authorize = (...roles) => {
   };
 };
 
-// Optional middleware for analytics/admin access
+// ==========================================
+// ADMIN ONLY ACCESS
+// ==========================================
 const adminOnly = authorize("admin", "superadmin");
 
 // ==========================================
-// EXPORTS
-// IMPORTANT: direct function export support
+// OPTIONAL COMPANY CHECK
+// Use this for routes that REQUIRE company mapping
 // ==========================================
+const requireCompany = (req, res, next) => {
+  if (!req.user?.companyId) {
+    return res.status(400).json({
+      success: false,
+      message: "Company not linked.",
+    });
+  }
 
+  next();
+};
+
+// ==========================================
+// EXPORTS
+// ==========================================
 module.exports = protect;
 module.exports.protect = protect;
 module.exports.authorize = authorize;
 module.exports.adminOnly = adminOnly;
+module.exports.requireCompany = requireCompany;

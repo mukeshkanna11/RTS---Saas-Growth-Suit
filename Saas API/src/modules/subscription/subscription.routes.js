@@ -1,27 +1,21 @@
-// ======================================================
-// src/modules/subscription/subscription.routes.js
-// FULL UPDATED ROUTES
-// ======================================================
-
-const express = require("express");
-const router = express.Router();
-
-const controller = require("./subscription.controller");
+const router = require("express").Router();
+const ctrl = require("./subscription.controller");
 const { protect } = require("../../middleware/auth.middleware");
 
-// IMPORTANT: specific routes first
-router.post("/create", protect, controller.createSubscription);
-router.get("/all", protect, controller.getAllSubscriptions);
-router.get("/me", protect, controller.getMySubscription);
-router.get("/analytics/overview", protect, controller.subscriptionAnalytics);
+// 🔥 NEW SAAS FLOW
+router.post("/intent", protect, ctrl.createIntent);
+router.post("/confirm-payment", protect, ctrl.confirmPayment);
 
-// dynamic routes after
-router.get("/:id", protect, controller.getSubscriptionById);
-router.put("/:id", protect, controller.updateSubscription);
-router.delete("/:id", protect, controller.deleteSubscription);
+// 🔥 BASIC
+router.get("/me", protect, ctrl.getMySubscription);
+router.get("/all", protect, ctrl.getAll);
 
-router.patch("/:id/change-plan", protect, controller.changePlan);
-router.patch("/:id/cancel", protect, controller.cancelSubscription);
-router.patch("/:id/reactivate", protect, controller.reactivateSubscription);
+// 🔥 LIFECYCLE
+router.patch("/:id/change-plan", protect, ctrl.changePlan);
+router.patch("/:id/cancel", protect, ctrl.cancel);
+
+// 🔥 ANALYTICS
+router.get("/analytics/overview", protect, ctrl.analytics);
+router.post("/upgrade-request", ctrl.upgradeRequest);
 
 module.exports = router;
