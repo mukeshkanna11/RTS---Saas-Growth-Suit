@@ -273,58 +273,48 @@ exports.upgradeRequest = async (req, res) => {
       billingCycle,
     } = req.body;
 
-    // ---------------- VALIDATION ----------------
-    if (!name || !email || !plan) {
+    if (!name || !email || !phone || !company || !address || !plan) {
       return res.status(400).json({
         success: false,
-        message: "Name, email, and plan are required",
+        message: "All required fields must be provided",
       });
     }
 
-    // ---------------- INSTANT RESPONSE ----------------
-    res.status(200).json({
+    const adminMail = await EmailService.sendSubscriptionLead({
+      name,
+      email,
+      phone,
+      company,
+      address,
+      notes: notes || "N/A",
+      plan,
+      billingCycle: billingCycle || "monthly",
+    });
+
+    const customerMail = await EmailService.sendCustomerConfirmation({
+      email,
+      name,
+      plan,
+    });
+
+    if (!adminMail.success || !customerMail.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Email sending failed",
+      });
+    }
+
+    return res.status(200).json({
       success: true,
       message: "Upgrade request submitted successfully",
     });
-
-    // ---------------- BACKGROUND TASK ----------------
-    process.nextTick(async () => {
-      try {
-        const safePayload = {
-          name,
-          email,
-          phone: phone || "N/A",
-          company: company || "N/A",
-          address: address || "N/A",
-          notes: notes || "N/A",
-          plan,
-          billingCycle: billingCycle || "monthly",
-        };
-
-        // Run both emails in parallel
-        await Promise.allSettled([
-          EmailService.sendSubscriptionLead(safePayload),
-          EmailService.sendCustomerConfirmation({
-            email,
-            name,
-            plan,
-          }),
-        ]);
-
-        console.log("✅ Background emails processed");
-      } catch (err) {
-        console.error("❌ Background email task failed:", err.message);
-      }
-    });
   } catch (err) {
-    console.error("❌ Upgrade request failed:", err.message);
+    console.error(err);
 
-    if (!res.headersSent) {
-      return res.status(500).json({
-        success: false,
-        message: "Internal server error",
-      });
-    }
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
