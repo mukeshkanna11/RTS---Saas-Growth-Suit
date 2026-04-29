@@ -4,7 +4,7 @@ class EmailService {
   constructor() {
     this.transporter = null;
     this.ready = false;
-    this.initPromise = this.init(); // ✅ IMPORTANT FIX
+    this.initPromise = this.init(); // important
   }
 
   async init() {
@@ -18,8 +18,8 @@ class EmailService {
       }
 
       this.transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT),
+        host: process.env.SMTP_HOST || "smtp.gmail.com",
+        port: Number(process.env.SMTP_PORT || 587),
         secure: false,
 
         auth: { user, pass },
@@ -27,6 +27,10 @@ class EmailService {
         tls: {
           rejectUnauthorized: false,
         },
+
+        pool: true,
+        maxConnections: 3,
+        maxMessages: 100,
       });
 
       await this.transporter.verify();
@@ -39,17 +43,16 @@ class EmailService {
     }
   }
 
-  async waitReady() {
-    if (this.initPromise) {
-      await this.initPromise;
-    }
+  async ensureReady() {
+    await this.initPromise; // 🔥 guarantees init completed
   }
 
   async sendMail({ to, subject, html }) {
-    await this.waitReady();
+    await this.ensureReady();
 
+    // 🔥 NEVER block API even if email fails
     if (!this.ready) {
-      console.log("⚠ Email not ready");
+      console.log("⚠ Email skipped (not ready)");
       return { success: false, error: "not ready" };
     }
 
@@ -62,10 +65,9 @@ class EmailService {
       });
 
       console.log("📩 EMAIL SENT →", to);
-
       return { success: true, messageId: info.messageId };
     } catch (err) {
-      console.error("❌ EMAIL ERROR →", to, err.message);
+      console.error("❌ EMAIL ERROR:", err.message);
       return { success: false, error: err.message };
     }
   }
@@ -73,16 +75,17 @@ class EmailService {
   async sendSubscriptionLead(data) {
     return this.sendMail({
       to: process.env.COMPANY_MAIL,
-      subject: `New Upgrade Request - ${data.plan}`,
+      subject: `🚀 New Upgrade Request - ${data.plan}`,
       html: `
-        <h2>New Lead</h2>
-        <p>Name: ${data.name}</p>
-        <p>Email: ${data.email}</p>
-        <p>Phone: ${data.phone}</p>
-        <p>Company: ${data.company}</p>
-        <p>Address: ${data.address}</p>
-        <p>Notes: ${data.notes}</p>
-        <p>Plan: ${data.plan}</p>
+        <h2>New Subscription Lead</h2>
+        <p><b>Name:</b> ${data.name}</p>
+        <p><b>Email:</b> ${data.email}</p>
+        <p><b>Phone:</b> ${data.phone}</p>
+        <p><b>Company:</b> ${data.company}</p>
+        <p><b>Address:</b> ${data.address}</p>
+        <p><b>Notes:</b> ${data.notes || "N/A"}</p>
+        <p><b>Plan:</b> ${data.plan}</p>
+        <p><b>Billing:</b> ${data.billingCycle}</p>
       `,
     });
   }
@@ -90,10 +93,11 @@ class EmailService {
   async sendCustomerConfirmation({ email, name, plan }) {
     return this.sendMail({
       to: email,
-      subject: "Request Received",
+      subject: "✅ Request Received",
       html: `
         <h2>Hello ${name}</h2>
         <p>Your request for <b>${plan}</b> is received.</p>
+        <p>Our team will contact you shortly.</p>
       `,
     });
   }
