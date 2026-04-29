@@ -1,230 +1,148 @@
-// src/services/email.service.js
-
 const nodemailer = require("nodemailer");
-
-/**
- * =========================================================
- * ReadyTech Solutions - Enterprise Email Service
- * Fully Updated Production Version
- *
- * Features:
- * - Reliable SMTP transport
- * - Retry handling
- * - Safe HTML escaping
- * - Subscription / Helpdesk / Notifications
- * - Render / Cloud deployment ready
- * =========================================================
- */
 
 class EmailService {
   constructor() {
     this.transporter = null;
     this.ready = false;
-    this.initPromise = this.initialize();
+
+    // IMPORTANT: initialize async but safe
+    this.init();
   }
 
   // ======================================================
-  // INITIALIZE TRANSPORTER
+  // INIT TRANSPORTER (Render-safe)
   // ======================================================
-  async initialize() {
+  async init() {
     try {
       const user = process.env.SMTP_USER;
       const pass = process.env.SMTP_PASS;
 
       if (!user || !pass) {
-        console.warn("⚠ Email service disabled: missing SMTP credentials");
+        console.warn("⚠ SMTP credentials missing → Email disabled");
         return;
       }
 
       this.transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST || "smtp.gmail.com",
         port: Number(process.env.SMTP_PORT || 587),
-        secure: Number(process.env.SMTP_PORT || 587) === 465,
+        secure: false, // IMPORTANT for Gmail + Render
+
         auth: {
           user,
           pass,
         },
 
-        // Production-safe settings
+        // REMOVE pooling (causes Render issues)
         connectionTimeout: 15000,
-        greetingTimeout: 10000,
         socketTimeout: 20000,
-
-        pool: true,
-        maxConnections: 5,
-        maxMessages: 100,
       });
 
       await this.transporter.verify();
 
       this.ready = true;
-      console.log("✅ Email service initialized and verified");
-    } catch (error) {
-      console.error("❌ Email initialization failed:", error.message);
+      console.log("✅ Email service ready (SMTP verified)");
+    } catch (err) {
+      console.error("❌ Email init failed:", err.message);
       this.ready = false;
     }
   }
 
   // ======================================================
-  // HELPERS
+  // SAFE HTML
   // ======================================================
-  async ensureReady() {
-    if (this.initPromise) {
-      await this.initPromise;
-    }
-  }
-
-  escapeHtml(str = "") {
-    return String(str)
+  escape(text = "") {
+    return String(text)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-  buildWrapper(content) {
-    return `
-      <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:30px;">
-        <div style="max-width:700px;margin:auto;background:#ffffff;border-radius:12px;padding:30px;box-shadow:0 4px 14px rgba(0,0,0,0.08);">
-          ${content}
-          <hr style="margin:30px 0;" />
-          <p style="font-size:12px;color:#666;">
-            ReadyTech Solutions • Enterprise SaaS Platform
-          </p>
-        </div>
-      </div>
-    `;
+      .replace(/>/g, "&gt;");
   }
 
   // ======================================================
-  // SEND EMAIL CORE
+  // CORE SEND (NON-BLOCKING SAFE)
   // ======================================================
-  async sendEmail({ to, subject, html, text }, retries = 2) {
-    await this.ensureReady();
-
-    if (!this.transporter || !this.ready) {
-      console.warn("⚠ Email skipped: transporter unavailable");
-      return {
-        success: false,
-        error: "Transport unavailable",
-      };
-    }
-
+  async sendEmail({ to, subject, html }, retry = 1) {
     try {
+      if (!this.transporter || !this.ready) {
+        console.warn("⚠ Email skipped (not ready)");
+        return { success: false };
+      }
+
       const info = await this.transporter.sendMail({
-        from:
-          process.env.SMTP_FROM ||
-          `ReadyTech Solutions <${process.env.SMTP_USER}>`,
+        from: process.env.SMTP_FROM,
         to,
         subject,
-        text,
         html,
       });
 
-      console.log(`📩 Email sent successfully → ${to}`);
+      console.log("📩 EMAIL SENT →", to);
+      return { success: true, messageId: info.messageId };
+    } catch (err) {
+      console.error("❌ Email failed:", err.message);
 
-      return {
-        success: true,
-        messageId: info.messageId,
-      };
-    } catch (error) {
-      console.error(`❌ Email send failed (${to}):`, error.message);
-
-      if (retries > 0) {
-        console.log(`🔁 Retrying email... attempts left: ${retries}`);
-        return this.sendEmail({ to, subject, html, text }, retries - 1);
+      if (retry > 0) {
+        console.log("🔁 retrying email...");
+        return this.sendEmail({ to, subject, html }, retry - 1);
       }
 
-      return {
-        success: false,
-        error: error.message,
-      };
+      return { success: false, error: err.message };
     }
   }
 
   // ======================================================
-  // SUBSCRIPTION LEAD MAIL
+  // SUBSCRIPTION LEAD (ADMIN MAIL)
   // ======================================================
   async sendSubscriptionLead(data) {
-    const subject = `🚀 New Subscription Upgrade Request - ${data.plan}`;
-
-    const html = this.buildWrapper(`
-      <h2>New Subscription Request</h2>
-      <p><strong>Name:</strong> ${this.escapeHtml(data.name)}</p>
-      <p><strong>Email:</strong> ${this.escapeHtml(data.email)}</p>
-      <p><strong>Phone:</strong> ${this.escapeHtml(data.phone || "N/A")}</p>
-      <p><strong>Company:</strong> ${this.escapeHtml(data.company || "N/A")}</p>
-      <p><strong>Address:</strong> ${this.escapeHtml(data.address || "N/A")}</p>
-      <p><strong>Notes:</strong> ${this.escapeHtml(data.notes || "N/A")}</p>
-      <p><strong>Plan:</strong> ${this.escapeHtml(data.plan)}</p>
-      <p><strong>Billing Cycle:</strong> ${this.escapeHtml(data.billingCycle || "monthly")}</p>
-    `);
+    const html = `
+      <h2>New Upgrade Request 🚀</h2>
+      <p><b>Name:</b> ${this.escape(data.name)}</p>
+      <p><b>Email:</b> ${this.escape(data.email)}</p>
+      <p><b>Phone:</b> ${this.escape(data.phone || "-")}</p>
+      <p><b>Company:</b> ${this.escape(data.company || "-")}</p>
+      <p><b>Address:</b> ${this.escape(data.address || "-")}</p>
+      <p><b>Notes:</b> ${this.escape(data.notes || "-")}</p>
+      <p><b>Plan:</b> ${this.escape(data.plan)}</p>
+      <p><b>Billing:</b> ${this.escape(data.billingCycle)}</p>
+    `;
 
     return this.sendEmail({
       to: process.env.COMPANY_MAIL,
-      subject,
+      subject: `New Upgrade Request - ${data.plan}`,
       html,
     });
   }
 
   // ======================================================
-  // CUSTOMER CONFIRMATION
+  // CUSTOMER CONFIRMATION MAIL
   // ======================================================
   async sendCustomerConfirmation({ email, name, plan }) {
-    const subject = "Your Subscription Request Has Been Received";
-
-    const html = this.buildWrapper(`
-      <h2>Hello ${this.escapeHtml(name)},</h2>
-      <p>We’ve successfully received your request for the 
-      <strong>${this.escapeHtml(plan)}</strong> plan.</p>
-      <p>Our team will review it and contact you shortly.</p>
-      <br />
-      <p>Thank you for choosing ReadyTech Solutions.</p>
-    `);
+    const html = `
+      <h2>Hello ${this.escape(name)}</h2>
+      <p>Your request for <b>${this.escape(plan)}</b> plan is received.</p>
+      <p>We will contact you shortly.</p>
+    `;
 
     return this.sendEmail({
       to: email,
-      subject,
+      subject: "Request Received",
       html,
     });
   }
 
   // ======================================================
-  // HELPDESK REQUEST
+  // HELP DESK MAIL
   // ======================================================
   async sendHelpdeskRequest(data) {
-    const subject = `🛠 Helpdesk Request - ${data.subjectLine}`;
-
-    const html = this.buildWrapper(`
-      <h2>Support Ticket</h2>
-      <p><strong>Name:</strong> ${this.escapeHtml(data.name)}</p>
-      <p><strong>Email:</strong> ${this.escapeHtml(data.email)}</p>
-      <p><strong>Issue Type:</strong> ${this.escapeHtml(data.issueType)}</p>
-      <p><strong>Subject:</strong> ${this.escapeHtml(data.subjectLine)}</p>
-      <p><strong>Description:</strong></p>
-      <p>${this.escapeHtml(data.description)}</p>
-    `);
+    const html = `
+      <h2>Helpdesk Ticket</h2>
+      <p><b>Name:</b> ${this.escape(data.name)}</p>
+      <p><b>Email:</b> ${this.escape(data.email)}</p>
+      <p><b>Issue:</b> ${this.escape(data.issueType)}</p>
+      <p><b>Message:</b> ${this.escape(data.description)}</p>
+    `;
 
     return this.sendEmail({
       to: process.env.COMPANY_MAIL,
-      subject,
-      html,
-    });
-  }
-
-  // ======================================================
-  // GENERIC NOTIFICATION
-  // ======================================================
-  async sendNotification({ to, title, message }) {
-    const html = this.buildWrapper(`
-      <h2>${this.escapeHtml(title)}</h2>
-      <p>${this.escapeHtml(message)}</p>
-    `);
-
-    return this.sendEmail({
-      to,
-      subject: title,
+      subject: "Helpdesk Request",
       html,
     });
   }
