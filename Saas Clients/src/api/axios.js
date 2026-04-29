@@ -1,69 +1,105 @@
 import axios from "axios";
 import { useAuthStore } from "../store/authStore";
 
+/* ================= ENV ================= */
 const BASE_URL = import.meta.env.VITE_API_URL;
 
 if (!BASE_URL) {
-  throw new Error("VITE_API_URL is not defined");
+  throw new Error("❌ VITE_API_URL is not defined");
 }
 
+/* ================= AXIOS INSTANCE ================= */
 const API = axios.create({
-  baseURL: BASE_URL,
+  baseURL: `${BASE_URL}/api/v1`,
   withCredentials: true,
+  timeout: 20000,
 });
 
-/* REQUEST INTERCEPTOR */
-API.interceptors.request.use(
-  (config) => {
-    const rawToken =
+/* ================= TOKEN HELPER ================= */
+const getToken = () => {
+  try {
+    const token =
       localStorage.getItem("accessToken") ||
       localStorage.getItem("token") ||
       localStorage.getItem("readytech_token");
 
-    const token = rawToken?.replace(/\"/g, "");
+    return token ? token.replace(/"/g, "") : null;
+  } catch (err) {
+    return null;
+  }
+};
+
+/* ================= REQUEST INTERCEPTOR ================= */
+API.interceptors.request.use(
+  (config) => {
+    const token = getToken();
+
+    config.headers = config.headers || {};
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    config.headers["Content-Type"] =
+      config.headers["Content-Type"] || "application/json";
 
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-/* RESPONSE INTERCEPTOR */
+/* ================= RESPONSE INTERCEPTOR ================= */
 API.interceptors.response.use(
   (res) => res,
   async (error) => {
-    const original = error.config;
-    const status = error.response?.status;
+    const originalRequest = error.config;
 
-    if (status === 401 && !original._retry) {
-      original._retry = true;
+    /* 🌐 NETWORK ERROR */
+    if (!error.response) {
+      console.error("🌐 Network Error - Backend not reachable");
+      return Promise.reject(
+        new Error("Server is not reachable. Check backend or URL.")
+      );
+    }
+
+    const status = error.response.status;
+
+    /* 🔐 TOKEN EXPIRED → REFRESH */
+    if (status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
 
       try {
-        const refreshRes = await axios.post(
-          `${BASE_URL}/auth/refresh`,
+        const { data } = await axios.post(
+          `${BASE_URL}/api/v1/auth/refresh`,
           {},
           { withCredentials: true }
         );
 
-        const newToken = refreshRes.data?.data?.accessToken;
+        const newToken = data?.data?.accessToken;
 
-        if (!newToken) throw new Error("Refresh token failed");
+        if (!newToken) {
+          throw new Error("Refresh token failed");
+        }
 
         localStorage.setItem("accessToken", newToken);
 
-        original.headers.Authorization = `Bearer ${newToken}`;
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
 
-        return API(original);
+        return API(originalRequest);
       } catch (refreshError) {
+        console.error("🔐 Refresh token failed");
+
         localStorage.removeItem("accessToken");
+        localStorage.removeItem("token");
+        localStorage.removeItem("readytech_token");
 
         const auth = useAuthStore.getState();
-        auth.logout();
+        auth?.logout?.();
 
-        window.location.href = "/login";
+        if (window.location.pathname !== "/login") {
+          window.location.replace("/login");
+        }
 
         return Promise.reject(refreshError);
       }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import API from "../api";
 
 export default function useCRM() {
@@ -9,11 +9,13 @@ export default function useCRM() {
     notes: [],
   });
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
 
       const [c, d, a, n] = await Promise.all([
         API.get("/crm/contacts"),
@@ -28,16 +30,19 @@ export default function useCRM() {
         activities: a.data?.data || [],
         notes: n.data?.data || [],
       });
+
     } catch (err) {
-      console.log("CRM load error:", err);
+      console.error("CRM load error:", err);
+      setError(err.message || "Failed to load CRM data");
+
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
-  return { ...state, loading, refresh: load };
+  return { ...state, loading, error, refresh: load };
 }

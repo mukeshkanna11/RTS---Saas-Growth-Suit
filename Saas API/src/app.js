@@ -1,6 +1,6 @@
 // =======================================================
 // src/app.js
-// FULL UPDATED PRODUCTION-LEVEL EXPRESS APP
+// PRODUCTION GRADE EXPRESS APP (UPDATED)
 // =======================================================
 
 const express = require("express");
@@ -14,98 +14,102 @@ const { ipKeyGenerator } = require("express-rate-limit");
 const app = express();
 
 // =======================================================
-// 🌐 TRUST PROXY
+// TRUST PROXY (Render / Nginx / Heroku safe)
 // =======================================================
 app.set("trust proxy", 1);
 
 // =======================================================
-// 🔐 SECURITY
+// SECURITY HEADERS (HARDENED)
 // =======================================================
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 
 // =======================================================
-// 🌍 CORS CONFIG
+// CORS (PRODUCTION SAFE)
 // =======================================================
-const allowedOrigins = [
+const allowedOrigins = new Set([
   "http://localhost:5173",
   "http://localhost:3000",
   "https://readytechsaas.netlify.app",
   process.env.CLIENT_URL,
-].filter(Boolean);
+]);
 
 const corsOptions = {
   origin: (origin, callback) => {
+    // allow server-to-server / mobile apps
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.has(origin)) {
       return callback(null, true);
     }
 
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
+    console.warn("❌ Blocked CORS origin:", origin);
+    return callback(null, false);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 200,
 };
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
 // =======================================================
-// 📦 BODY PARSERS
+// BODY PARSER
 // =======================================================
 app.use(express.json({ limit: "20kb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // =======================================================
-// ⚡ PERFORMANCE
+// PERFORMANCE
 // =======================================================
 app.use(compression());
 
 // =======================================================
-// 🔍 LOGGER (DEV ONLY)
+// LOGGING
 // =======================================================
 if (process.env.NODE_ENV !== "production") {
   app.use(morgan("dev"));
-
-  app.use((req, res, next) => {
-    console.log(`➡️ ${req.method} ${req.originalUrl}`);
-    next();
-  });
+} else {
+  app.use(morgan("combined")); // production logs (important)
 }
 
 // =======================================================
-// 🚨 RATE LIMITERS
+// RATE LIMITING (SAFE CONFIG)
 // =======================================================
-const loginLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 10,
-  keyGenerator: ipKeyGenerator,
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200, // safe production value
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: ipKeyGenerator,
+  message: {
+    success: false,
+    message: "Too many requests. Please try again later.",
+  },
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: ipKeyGenerator,
   message: {
     success: false,
     message: "Too many login attempts. Try again later.",
   },
 });
 
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === "development" ? 10000 : 300,
-  keyGenerator: ipKeyGenerator,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: "Too many requests. Please slow down.",
-  },
-});
-
-const routeWithLimiter =
-  process.env.NODE_ENV === "production" ? [apiLimiter] : [];
+// apply globally (safe)
+app.use(apiLimiter);
 
 // =======================================================
-// 🚀 ROUTE IMPORTS
+// ROUTES
 // =======================================================
 const authRoutes = require("./modules/auth/auth.routes");
 const userRoutes = require("./modules/user/user.routes");
@@ -117,82 +121,57 @@ const automationRoutes = require("./modules/automation/automation.routes");
 const analyticsRoutes = require("./modules/analytics/analytics.routes");
 const subscriptionRoutes = require("./modules/subscription/subscription.routes");
 
-// =======================================================
-// 🌍 ROOT ROUTE
-// =======================================================
+// ROOT
 app.get("/", (req, res) => {
-  res.status(200).json({
+  res.json({
     success: true,
-    message: "ReadyTech SaaS API is live 🚀",
-    version: "1.0.0",
-    health: "/api/v1/health",
-    docs: "/api/v1/test",
+    message: "ReadyTech SaaS API is running 🚀",
   });
 });
 
-// =======================================================
-// ❤️ HEALTH CHECK
-// =======================================================
+// HEALTH
 app.get("/api/v1/health", (req, res) => {
-  res.status(200).json({
+  res.json({
     success: true,
-    message: "ReadyTech API Running",
     uptime: process.uptime(),
     env: process.env.NODE_ENV,
     timestamp: new Date(),
   });
 });
 
-// =======================================================
-// 🧪 TEST ROUTE
-// =======================================================
-app.get("/api/v1/test", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "API working successfully",
-  });
-});
-
-// =======================================================
-// 🔐 AUTH ROUTES
-// =======================================================
+// AUTH
 app.use("/api/v1/auth/login", loginLimiter);
 app.use("/api/v1/auth", authRoutes);
 
-// =======================================================
-// 🚀 MAIN MODULE ROUTES
-// =======================================================
-app.use("/api/v1/users", ...routeWithLimiter, userRoutes);
-app.use("/api/v1/company", ...routeWithLimiter, companyRoutes);
-app.use("/api/v1/leads", ...routeWithLimiter, leadRoutes);
-app.use("/api/v1/crm", ...routeWithLimiter, crmRoutes);
-app.use("/api/v1/marketing", ...routeWithLimiter, marketingRoutes);
-app.use("/api/v1/automation", ...routeWithLimiter, automationRoutes);
-app.use("/api/v1/analytics", ...routeWithLimiter, analyticsRoutes);
-app.use("/api/v1/subscription", ...routeWithLimiter, subscriptionRoutes);
+// MODULES
+app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/company", companyRoutes);
+app.use("/api/v1/leads", leadRoutes);
+app.use("/api/v1/crm", crmRoutes);
+app.use("/api/v1/marketing", marketingRoutes);
+app.use("/api/v1/automation", automationRoutes);
+app.use("/api/v1/analytics", analyticsRoutes);
+app.use("/api/v1/subscription", subscriptionRoutes);
 
 // =======================================================
-// ❌ 404 HANDLER
+// 404 HANDLER
 // =======================================================
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: `Route ${req.originalUrl} not found`,
+    message: `Route not found: ${req.originalUrl}`,
   });
 });
 
 // =======================================================
-// ❌ GLOBAL ERROR HANDLER
+// GLOBAL ERROR HANDLER
 // =======================================================
 app.use((err, req, res, next) => {
-  console.error("🔥 ERROR:", err.message);
+  console.error("🔥 ERROR:", err);
 
   res.status(err.status || 500).json({
     success: false,
     message: err.message || "Internal Server Error",
-    ...(process.env.NODE_ENV !== "production" && {
-      stack: err.stack,
-    }),
   });
 });
 
