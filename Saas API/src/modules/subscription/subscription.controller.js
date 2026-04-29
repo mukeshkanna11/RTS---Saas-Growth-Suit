@@ -280,38 +280,42 @@ exports.upgradeRequest = async (req, res) => {
       });
     }
 
-    // 🚀 send emails parallel (FASTER)
-    const [adminMail, userMail] = await Promise.all([
-      EmailService.sendSubscriptionLead({
-        name,
-        email,
-        phone,
-        company,
-        address,
-        notes,
-        plan,
-        billingCycle,
-      }),
-      EmailService.sendCustomerConfirmation({
-        email,
-        name,
-        plan,
-      }),
-    ]);
+    const adminMail = await EmailService.sendSubscriptionLead({
+      name,
+      email,
+      phone,
+      company,
+      address,
+      notes,
+      plan,
+      billingCycle,
+    });
 
-    if (!adminMail.success || !userMail.success) {
-      console.log("AdminMail:", adminMail);
-      console.log("UserMail:", userMail);
+    const userMail = await EmailService.sendCustomerConfirmation({
+      email,
+      name,
+      plan,
+    });
 
+    console.log("ADMIN MAIL RESULT:", adminMail);
+    console.log("USER MAIL RESULT:", userMail);
+
+    // ⚠ DON'T FAIL ENTIRE REQUEST IF ONE EMAIL FAILS
+    if (!adminMail.success) {
       return res.status(500).json({
         success: false,
-        message: "Email sending failed",
+        message: "Admin email failed",
+        error: adminMail.error,
       });
     }
 
     return res.json({
       success: true,
       message: "Upgrade request submitted successfully",
+      emailStatus: {
+        adminMail: adminMail.success,
+        userMail: userMail.success,
+      },
     });
   } catch (err) {
     console.error(err);
