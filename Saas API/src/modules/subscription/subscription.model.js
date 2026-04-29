@@ -1,8 +1,3 @@
-// ======================================================
-// src/modules/subscription/subscription.model.js
-// FULL UPDATED SAAS-LEVEL SUBSCRIPTION MODEL
-// ======================================================
-
 const mongoose = require("mongoose");
 
 const subscriptionSchema = new mongoose.Schema(
@@ -13,18 +8,8 @@ const subscriptionSchema = new mongoose.Schema(
       required: true,
     },
 
-    clientName: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    clientEmail: {
-      type: String,
-      required: true,
-      lowercase: true,
-      trim: true,
-    },
+    clientName: String,
+    clientEmail: String,
 
     plan: {
       type: String,
@@ -38,40 +23,31 @@ const subscriptionSchema = new mongoose.Schema(
       default: "monthly",
     },
 
-    amount: {
-      type: Number,
-      required: true,
-    },
-
-    projectsIncluded: {
-      type: Number,
-      required: true,
-    },
-
-    teamMembers: {
-      type: Number,
-      required: true,
-    },
-
-    modules: {
-      type: Object,
-      required: true,
-    },
-
-    renewalDate: {
-      type: Date,
-      required: true,
-    },
+    amount: Number,
 
     status: {
       type: String,
-      enum: ["active", "cancelled", "expired"],
-      default: "active",
+      enum: ["pending", "active", "cancelled", "expired"],
+      default: "pending",
     },
+
+    // 🔥 PAYMENT SYSTEM (NEW)
+    paymentStatus: {
+      type: String,
+      enum: ["pending", "paid", "failed"],
+      default: "pending",
+    },
+
+    transactionId: String,
+
+    renewalDate: Date,
+
+    // limits snapshot
+    projectsIncluded: Number,
+    teamMembers: Number,
+    modules: Object,
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 module.exports = mongoose.model("Subscription", subscriptionSchema);
