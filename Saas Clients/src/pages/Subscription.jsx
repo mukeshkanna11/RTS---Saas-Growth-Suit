@@ -136,32 +136,55 @@ export default function Subscription() {
   );
 
   const fetchData = useCallback(async () => {
-    if (!token) {
+  if (!token) {
+    console.warn("No auth token found. Redirecting to login...");
+    window.location.href = "/login";
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    console.log("Fetching subscription data...");
+
+    const [subRes, analyticsRes] = await Promise.all([
+      api.get("/subscription/me"),
+      api.get("/subscription/analytics/overview"),
+    ]);
+
+    console.log("Subscription Response:", subRes?.data);
+    console.log("Analytics Response:", analyticsRes?.data);
+
+    setCurrentPlan(subRes?.data?.data || null);
+    setAnalytics(analyticsRes?.data?.data || null);
+  } catch (error) {
+    console.error("Subscription fetch failed:", {
+      message: error?.message,
+      status: error?.response?.status,
+      data: error?.response?.data,
+      url: error?.config?.url,
+      method: error?.config?.method,
+    });
+
+    if (error?.response?.status === 401) {
+      console.warn("Unauthorized. Clearing session...");
+      localStorage.removeItem("token");
       window.location.href = "/login";
       return;
     }
 
-    try {
-      setLoading(true);
-
-      const [subRes, analyticsRes] = await Promise.all([
-        api.get("/subscription/me"),
-        api.get("/subscription/analytics/overview"),
-      ]);
-
-      setCurrentPlan(subRes.data?.data || null);
-      setAnalytics(analyticsRes.data?.data || null);
-    } catch (error) {
-      console.error("Subscription fetch error:", error?.response?.data);
-
-      if (error?.response?.status === 401) {
-        localStorage.removeItem("token");
-        window.location.href = "/login";
-      }
-    } finally {
-      setLoading(false);
+    if (!error?.response) {
+      console.error(
+        "Network/Server issue: Backend may be unreachable, sleeping, or blocked by CORS."
+      );
     }
-  }, [api, token]);
+
+    setCurrentPlan(null);
+    setAnalytics(null);
+  } finally {
+    setLoading(false);
+  }
+}, [api, token]);
 
   const openUpgradeModal = (planKey) => {
     setSelectedPlan(planKey);
@@ -169,25 +192,42 @@ export default function Subscription() {
   };
 
   const submitUpgradeRequest = async () => {
-    if (!upgradeForm.name || !upgradeForm.email || !upgradeForm.phone) {
-      alert("Please fill all required fields.");
-      return;
-    }
+  if (
+    !upgradeForm.name.trim() ||
+    !upgradeForm.email.trim() ||
+    !upgradeForm.phone.trim() ||
+    !upgradeForm.notes.trim()
+  ) {
+    alert("Please complete all required fields.");
+    return;
+  }
 
-    try {
-      setFormLoading(true);
+  try {
+    setFormLoading(true);
 
-      await axios.post(
-        `${API}/subscription/upgrade-request`,
-        {
-          ...upgradeForm,
-          plan: selectedPlan,
-          billingCycle,
-        },
-        getAuthHeaders()
-      );
+    const payload = {
+      name: upgradeForm.name.trim(),
+      email: upgradeForm.email.trim(),
+      phone: upgradeForm.phone.trim(),
+      company: upgradeForm.company?.trim() || "N/A",
+      address: upgradeForm.address?.trim() || "N/A",
+      notes: upgradeForm.notes.trim(),
+      plan: selectedPlan,
+      billingCycle,
+    };
 
-      alert("Upgrade request sent successfully!");
+    const response = await axios.post(
+      `${API}/subscription/upgrade-request`,
+      payload,
+      {
+        ...getAuthHeaders(),
+        timeout: 10000,
+      }
+    );
+
+    if (response?.data?.success) {
+      alert("Request submitted successfully. Our team will contact you soon.");
+
       setShowUpgradeModal(false);
 
       setUpgradeForm({
@@ -198,15 +238,27 @@ export default function Subscription() {
         address: "",
         notes: "",
       });
-    } catch (error) {
-      console.error(error);
-      alert(
-        error?.response?.data?.message || "Failed to send upgrade request."
-      );
-    } finally {
-      setFormLoading(false);
+    } else {
+      throw new Error(response?.data?.message || "Unexpected response");
     }
-  };
+  } catch (error) {
+    console.error("Upgrade request failed:", {
+      message: error?.message,
+      status: error?.response?.status,
+      data: error?.response?.data,
+    });
+
+    if (error.code === "ECONNABORTED") {
+      alert("Server response delayed. Please try again.");
+    } else if (!error.response) {
+      alert("Network issue. Please check your connection.");
+    } else {
+      alert(error.response.data.message || "Request failed.");
+    }
+  } finally {
+    setFormLoading(false);
+  }
+};
 
   const cancelSubscription = async () => {
     if (!currentPlan?._id) return;

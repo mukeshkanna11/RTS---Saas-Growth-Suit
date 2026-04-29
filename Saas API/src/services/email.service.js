@@ -4,78 +4,102 @@ const nodemailer = require("nodemailer");
 
 /**
  * =========================================================
- * RTS SaaS - Enterprise Email Service
- * Production-ready reusable mail system
- *
- * Features:
- * - Subscription upgrade mails
- * - Helpdesk support mails
- * - Customer confirmation mails
- * - Safe startup (won’t crash app if env missing)
- * - SMTP / Gmail compatible
+ * RTS SaaS - Production Email Service
+ * Reliable SMTP system for hosted environments
  * =========================================================
  */
 
 class EmailService {
   constructor() {
     this.transporter = null;
+    this.ready = false;
     this.initialize();
   }
 
   // ======================================================
-  // INIT TRANSPORTER
+  // INIT
   // ======================================================
-  initialize() {
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
+  async initialize() {
+    try {
+      const user = process.env.SMTP_USER;
+      const pass = process.env.SMTP_PASS;
 
-    if (!user || !pass) {
-      console.warn(
-        "⚠ Email service disabled: SMTP_USER / SMTP_PASS missing in environment"
-      );
-      return;
+      if (!user || !pass) {
+        console.warn(
+          "⚠ Email disabled: SMTP_USER / SMTP_PASS missing"
+        );
+        return;
+      }
+
+      this.transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || "smtp.gmail.com",
+        port: Number(process.env.SMTP_PORT || 587),
+        secure: Number(process.env.SMTP_PORT || 587) === 465,
+        auth: { user, pass },
+
+        // critical for Render / hosted env
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
+        pool: true,
+        maxConnections: 5,
+        maxMessages: 100,
+      });
+
+      await this.transporter.verify();
+
+      this.ready = true;
+      console.log("✅ Email service ready");
+    } catch (error) {
+      console.error("❌ Email init failed:", error.message);
+      this.ready = false;
     }
-
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || "smtp.gmail.com",
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: false,
-      auth: {
-        user,
-        pass,
-      },
-    });
-
-    console.log("✅ Email service initialized");
   }
 
   // ======================================================
-  // CORE SEND METHOD
+  // UTIL
   // ======================================================
-  async sendEmail({ to, subject, html, text }) {
-    try {
-      if (!this.transporter) {
-        throw new Error("Email transporter not configured");
-      }
+  escapeHtml(str = "") {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
 
+  // ======================================================
+  // SEND CORE
+  // ======================================================
+  async sendEmail({ to, subject, html, text }, retries = 2) {
+    if (!this.transporter || !this.ready) {
+      console.warn("⚠ Email skipped: transporter unavailable");
+      return { success: false, error: "Transport unavailable" };
+    }
+
+    try {
       const info = await this.transporter.sendMail({
         from:
           process.env.SMTP_FROM ||
-          `RTS SaaS Platform <${process.env.SMTP_USER}>`,
+          `RTS SaaS <${process.env.SMTP_USER}>`,
         to,
         subject,
         text,
         html,
       });
 
-      console.log("📩 Email sent:", info.messageId);
-
+      console.log(`📩 Email sent → ${to}`);
       return {
         success: true,
         messageId: info.messageId,
       };
     } catch (error) {
-      console.error("❌ Email send failed:", error.message);
+      console.error(`❌ Send failed (${to}):`, error.message);
+
+      if (retries > 0) {
+        console.log(`🔁 Retrying... (${retries})`);
+        return this.sendEmail({ to, subject, html, text }, retries - 1);
+      }
 
       return {
         success: false,
@@ -85,60 +109,22 @@ class EmailService {
   }
 
   // ======================================================
-  // SUBSCRIPTION LEAD MAIL
+  // SUBSCRIPTION LEAD
   // ======================================================
-  async sendSubscriptionLead({
-    name,
-    email,
-    address,
-    plan,
-    billingCycle,
-  }) {
-    const subject = `🚀 New Subscription Upgrade Request - ${plan}`;
+  async sendSubscriptionLead(data) {
+    const subject = `New Subscription Upgrade Request - ${data.plan}`;
 
     const html = `
-      <div style="font-family:Arial,sans-serif;padding:24px;">
-        <h2>New SaaS Subscription Request</h2>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Address:</strong> ${address}</p>
-        <p><strong>Selected Plan:</strong> ${plan}</p>
-        <p><strong>Billing Cycle:</strong> ${billingCycle}</p>
-        <hr />
-        <p>This request was submitted via the RTS SaaS dashboard.</p>
-      </div>
-    `;
-
-    return this.sendEmail({
-      to: process.env.COMPANY_MAIL,
-      subject,
-      html,
-    });
-  }
-
-  // ======================================================
-  // HELPDESK REQUEST MAIL
-  // ======================================================
-  async sendHelpdeskRequest({
-    name,
-    email,
-    issueType,
-    subjectLine,
-    description,
-  }) {
-    const subject = `🛠 Helpdesk Request - ${subjectLine}`;
-
-    const html = `
-      <div style="font-family:Arial,sans-serif;padding:24px;">
-        <h2>New Helpdesk Ticket</h2>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Issue Type:</strong> ${issueType}</p>
-        <p><strong>Subject:</strong> ${subjectLine}</p>
-        <p><strong>Description:</strong></p>
-        <p>${description}</p>
-        <hr />
-        <p>Submitted from RTS SaaS Helpdesk.</p>
+      <div style="font-family:Arial;padding:24px;">
+        <h2>New Subscription Request</h2>
+        <p><strong>Name:</strong> ${this.escapeHtml(data.name)}</p>
+        <p><strong>Email:</strong> ${this.escapeHtml(data.email)}</p>
+        <p><strong>Phone:</strong> ${this.escapeHtml(data.phone || "N/A")}</p>
+        <p><strong>Company:</strong> ${this.escapeHtml(data.company || "N/A")}</p>
+        <p><strong>Address:</strong> ${this.escapeHtml(data.address || "N/A")}</p>
+        <p><strong>Notes:</strong> ${this.escapeHtml(data.notes || "N/A")}</p>
+        <p><strong>Plan:</strong> ${this.escapeHtml(data.plan)}</p>
+        <p><strong>Billing:</strong> ${this.escapeHtml(data.billingCycle)}</p>
       </div>
     `;
 
@@ -153,16 +139,16 @@ class EmailService {
   // CUSTOMER CONFIRMATION
   // ======================================================
   async sendCustomerConfirmation({ email, name, plan }) {
-    const subject = "Your RTS SaaS Request Has Been Received";
+    const subject = "Your RTS SaaS Request Was Received";
 
     const html = `
-      <div style="font-family:Arial,sans-serif;padding:24px;">
-        <h2>Hello ${name},</h2>
-        <p>We’ve successfully received your request for the 
-        <strong>${plan}</strong> plan.</p>
-        <p>Our team will contact you shortly with the next steps.</p>
-        <br />
-        <p>Thank you for choosing RTS SaaS.</p>
+      <div style="font-family:Arial;padding:24px;">
+        <h2>Hello ${this.escapeHtml(name)},</h2>
+        <p>We received your request for the 
+        <strong>${this.escapeHtml(plan)}</strong> plan.</p>
+        <p>Our team will contact you soon.</p>
+        <br/>
+        <p>Thank you for choosing ReadyTechSolutions.</p>
       </div>
     `;
 
@@ -174,19 +160,25 @@ class EmailService {
   }
 
   // ======================================================
-  // GENERIC SYSTEM NOTIFICATION
+  // HELPDESK
   // ======================================================
-  async sendNotification({ to, title, message }) {
+  async sendHelpdeskRequest(data) {
+    const subject = `Helpdesk Request - ${data.subjectLine}`;
+
     const html = `
-      <div style="font-family:Arial,sans-serif;padding:24px;">
-        <h2>${title}</h2>
-        <p>${message}</p>
+      <div style="font-family:Arial;padding:24px;">
+        <h2>Support Ticket</h2>
+        <p><strong>Name:</strong> ${this.escapeHtml(data.name)}</p>
+        <p><strong>Email:</strong> ${this.escapeHtml(data.email)}</p>
+        <p><strong>Issue:</strong> ${this.escapeHtml(data.issueType)}</p>
+        <p><strong>Subject:</strong> ${this.escapeHtml(data.subjectLine)}</p>
+        <p>${this.escapeHtml(data.description)}</p>
       </div>
     `;
 
     return this.sendEmail({
-      to,
-      subject: title,
+      to: process.env.COMPANY_MAIL,
+      subject,
       html,
     });
   }
