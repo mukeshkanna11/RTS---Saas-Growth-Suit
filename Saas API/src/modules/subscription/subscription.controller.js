@@ -276,41 +276,45 @@ exports.upgradeRequest = async (req, res) => {
     if (!name || !email || !phone || !company || !address || !plan) {
       return res.status(400).json({
         success: false,
-        message: "All required fields must be provided",
+        message: "Missing required fields",
       });
     }
 
-    // 🚀 FIRE AND FORGET EMAILS (NO WAITING)
-    EmailService.sendSubscriptionLead({
-      name,
-      email,
-      phone,
-      company,
-      address,
-      notes,
-      plan,
-      billingCycle,
-    }).catch((err) => {
-      console.error("Admin email failed:", err.message);
-    });
+    // 🚀 send emails parallel (FASTER)
+    const [adminMail, userMail] = await Promise.all([
+      EmailService.sendSubscriptionLead({
+        name,
+        email,
+        phone,
+        company,
+        address,
+        notes,
+        plan,
+        billingCycle,
+      }),
+      EmailService.sendCustomerConfirmation({
+        email,
+        name,
+        plan,
+      }),
+    ]);
 
-    EmailService.sendCustomerConfirmation({
-      email,
-      name,
-      plan,
-    }).catch((err) => {
-      console.error("Customer email failed:", err.message);
-    });
+    if (!adminMail.success || !userMail.success) {
+      console.log("AdminMail:", adminMail);
+      console.log("UserMail:", userMail);
 
-    // ✅ RESPONSE SHOULD NOT DEPEND ON EMAIL
-    return res.status(200).json({
+      return res.status(500).json({
+        success: false,
+        message: "Email sending failed",
+      });
+    }
+
+    return res.json({
       success: true,
       message: "Upgrade request submitted successfully",
     });
-
   } catch (err) {
-    console.error("Upgrade request error:", err);
-
+    console.error(err);
     return res.status(500).json({
       success: false,
       message: err.message,
