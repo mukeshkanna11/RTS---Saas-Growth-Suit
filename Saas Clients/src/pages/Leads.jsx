@@ -1,43 +1,12 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import axios from "axios";
+import API from "../api";
 import { useAuthStore } from "../store/authStore";
-
-const API = "http://localhost:5000/api/v1";
 
 export default function Leads() {
 
   /* ================= AUTH ================= */
   const token = useAuthStore((s) => s.token);
   const logout = useAuthStore((s) => s.logout);
-
-  /* ================= AXIOS INSTANCE ================= */
-  const api = useMemo(() => {
-    const instance = axios.create({
-      baseURL: API,
-    });
-
-    // ✅ Attach token
-    instance.interceptors.request.use((config) => {
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
-    });
-
-    // ✅ Handle 401 globally
-    instance.interceptors.response.use(
-      (res) => res,
-      (err) => {
-        if (err.response?.status === 401) {
-          console.warn("🔐 Token expired → logout");
-          logout();
-        }
-        return Promise.reject(err);
-      }
-    );
-
-    return instance;
-  }, [token, logout]);
 
   /* ================= STATES ================= */
   const [leads, setLeads] = useState([]);
@@ -67,52 +36,48 @@ export default function Leads() {
 
   /* ================= FETCH LEADS ================= */
   const fetchLeads = useCallback(async () => {
-
-    // ❗ skip if no token
     if (!token) return;
 
-    // ❗ prevent multiple calls
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
 
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
     try {
-      // cancel previous request
-      if (controllerRef.current) {
-        controllerRef.current.abort();
-      }
-
-      controllerRef.current = new AbortController();
-
       setLoading(true);
 
-      const params = {};
-      if (search) params.search = search;
-      if (statusFilter !== "all") params.status = statusFilter;
+      const params = {
+        ...(search ? { search } : {}),
+        ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+      };
 
-      const res = await api.get("/leads", {
+      const res = await API.get("/leads", {
         params,
-        signal: controllerRef.current.signal,
+        signal: controller.signal,
       });
 
-      setLeads(res.data?.data?.leads || []);
+      setLeads(res?.data?.data?.leads || []);
 
     } catch (err) {
 
-      if (err.code === "ERR_CANCELED" || err.name === "CanceledError") return;
+      if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") return;
 
-      if (err.response?.status === 429) {
-        console.warn("🚫 Too many requests");
-        return;
+      console.error("❌ Leads fetch error:", {
+        message: err?.message,
+        status: err?.response?.status,
+        data: err?.response?.data,
+      });
+
+      if (err?.response?.status === 401) {
+        logout();
       }
-
-      console.error("Fetch error:", err);
 
     } finally {
       setLoading(false);
       isFetchingRef.current = false;
     }
-
-  }, [api, search, statusFilter, token]);
+  }, [search, statusFilter, token, logout]);
 
   /* ================= DEBOUNCE ================= */
   useEffect(() => {
@@ -120,81 +85,63 @@ export default function Leads() {
 
     debounceRef.current = setTimeout(() => {
       fetchLeads();
-    }, 700);
+    }, 600);
 
     return () => clearTimeout(debounceRef.current);
-  }, [search, statusFilter, fetchLeads]);
+  }, [fetchLeads]);
 
   /* ================= CREATE LEAD ================= */
   const handleCreateLead = async () => {
-  try {
-    // ❗ IMPORTANT
-    if (!token) {
-      console.warn("No token → cannot create lead");
-      return;
+    try {
+      if (!token) return;
+
+      setFormError("");
+
+      if (!form.name.trim()) {
+        setFormError("Name is required");
+        return;
+      }
+
+      const payload = {
+        ...form,
+        name: form.name.trim(),
+      };
+
+      const res = await API.post("/leads", payload);
+
+      setLeads((prev) => [res.data.data.lead, ...prev]);
+      setShowModal(false);
+
+    } catch (err) {
+      console.error(err);
+      setFormError(err?.response?.data?.message || "Create failed");
     }
-
-    setFormError("");
-
-    if (!form.name.trim()) {
-      setFormError("Name is required");
-      return;
-    }
-
-    const payload = {
-      name: form.name.trim(),
-      email: form.email?.trim() || "",
-      phone: form.phone?.trim() || "",
-      companyName: form.companyName?.trim() || "",
-      jobTitle: form.jobTitle?.trim() || "",
-      source: form.source,
-      tags: Array.isArray(form.tags) ? form.tags : [],
-    };
-
-    const res = await api.post("/leads", payload);
-
-    setLeads((prev) => [res.data.data.lead, ...prev]);
-
-    setShowModal(false);
-
-  } catch (err) {
-    console.error(err);
-
-    if (err.response?.status === 401) {
-      setFormError("Session expired. Please login again.");
-      return;
-    }
-
-    setFormError(err?.response?.data?.message || "Create failed");
-  }
-};
+  };
 
   /* ================= STATUS UPDATE ================= */
   const handleStatusChange = async (id, status) => {
-    const prevLeads = [...leads];
+    const prev = [...leads];
 
     setLeads((p) =>
       p.map((l) => (l._id === id ? { ...l, status } : l))
     );
 
     try {
-      await api.patch(`/leads/${id}/status`, { status });
+      await API.patch(`/leads/${id}/status`, { status });
     } catch (err) {
-      setLeads(prevLeads); // rollback
+      setLeads(prev);
     }
   };
 
   /* ================= DELETE ================= */
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete lead?")) return;
-
-    const prevLeads = [...leads];
+    const prev = [...leads];
     setLeads((p) => p.filter((l) => l._id !== id));
 
     try {
-      await api.delete(`/leads/${id}`);
+      await API.delete(`/leads/${id}`);
     } catch {
-      setLeads(prevLeads); // rollback
+      setLeads(prev);
     }
   };
 
@@ -206,48 +153,58 @@ export default function Leads() {
     fd.append("file", file);
 
     try {
-      await api.post("/leads/import", fd);
-      fetchLeads(); // one safe refresh
+      await API.post("/leads/import", fd);
+      fetchLeads();
     } catch (err) {
       console.error(err);
     }
   };
 
-  /* ================= HELPERS ================= */
-  const getNotesText = (notes) => {
-    if (!notes) return "—";
-    if (typeof notes === "string") return notes;
-    if (Array.isArray(notes)) return notes.length;
-    if (typeof notes === "object") return notes.text || "1 note";
-    return "—";
-  };
+  // ================= GET NOTES TEXT =================//
+const getNotesText = (notes) => {
+  if (!notes) return "No notes";
 
+  if (typeof notes === "string") return notes;
+
+  if (Array.isArray(notes)) {
+    return notes
+      .map((n) =>
+        typeof n === "string"
+          ? n
+          : n?.text || n?.note || JSON.stringify(n)
+      )
+      .join(", ");
+  }
+
+  if (typeof notes === "object") {
+    return notes?.text || notes?.note || JSON.stringify(notes);
+  }
+
+  return "No notes";
+};
+
+  
+  /* ================= HELPERS ================= */
   const getScoreTag = (score = 0) => {
     if (score > 70) return "🔥 Hot";
     if (score > 40) return "⚡ Warm";
     return "❄ Cold";
   };
 
-  const badge = (s) =>
-    ({
-      new: "text-blue-400",
-      contacted: "text-purple-400",
-      qualified: "text-yellow-400",
-      converted: "text-green-400",
-      lost: "text-red-400",
-    }[s] || "text-gray-400");
+  const badge = (s) => ({
+    new: "text-blue-400",
+    contacted: "text-purple-400",
+    qualified: "text-yellow-400",
+    converted: "text-green-400",
+    lost: "text-red-400",
+  }[s] || "text-gray-400");
 
- const stats = useMemo(() => ({
-  total: leads?.length || 0,
-
-  new: leads?.filter((l) => l && l.status === "new").length,
-
-  qualified: leads?.filter((l) => l && l.status === "qualified").length,
-
-  converted: leads?.filter((l) => l && l.status === "converted").length,
-
-}), [leads]);
-
+  const stats = useMemo(() => ({
+    total: leads.length,
+    new: leads.filter((l) => l.status === "new").length,
+    qualified: leads.filter((l) => l.status === "qualified").length,
+    converted: leads.filter((l) => l.status === "converted").length,
+  }), [leads]);
 
   /* ================= UI ================= */
   return (
