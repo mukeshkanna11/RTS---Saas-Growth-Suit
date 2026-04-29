@@ -1,23 +1,18 @@
 // ======================================================
-// src/modules/subscription/subscription.plans.js
-// READYTECH SAAS PRICING STRATEGY CONFIG
+// SUBSCRIPTION PLANS (SAAS READY)
 // ======================================================
 
 const subscriptionPlans = {
   starter: {
     id: "starter",
     name: "Starter Plan",
-    tagline: "Perfect for startups and small businesses",
+    tagline: "Perfect for startups",
 
     pricing: {
       monthly: 2999,
       yearly: 29990,
       currency: "INR",
-      display: "₹2,999 / month",
     },
-
-    coreDescription:
-      "Designed for early-stage businesses needing essential tools to manage leads and customer relationships.",
 
     limits: {
       projectsIncluded: 5,
@@ -34,30 +29,17 @@ const subscriptionPlans = {
       campaigns: false,
       erp: false,
     },
-
-    features: [
-      "Lead Management",
-      "Basic CRM Dashboard",
-      "5 Active Projects",
-      "Email Support",
-      "50GB Secure Storage",
-    ],
   },
 
   growth: {
     id: "growth",
     name: "Growth Plan",
-    tagline: "Built for growing teams and scaling businesses",
 
     pricing: {
       monthly: 7999,
       yearly: 79990,
       currency: "INR",
-      display: "₹7,999 / month",
     },
-
-    coreDescription:
-      "Advanced automation and analytics tools for companies ready to scale operations efficiently.",
 
     limits: {
       projectsIncluded: 20,
@@ -74,31 +56,17 @@ const subscriptionPlans = {
       campaigns: true,
       erp: false,
     },
-
-    features: [
-      "Advanced CRM",
-      "Marketing Automation",
-      "Analytics Dashboard",
-      "20 Active Projects",
-      "Priority Support",
-      "250GB Storage",
-    ],
   },
 
   enterprise: {
     id: "enterprise",
     name: "Enterprise Plan",
-    tagline: "Complete business ecosystem for enterprises",
 
     pricing: {
       monthly: 19999,
       yearly: 199990,
       currency: "INR",
-      display: "₹19,999 / month",
     },
-
-    coreDescription:
-      "Enterprise-grade platform with unlimited scalability, ERP access, and custom integrations.",
 
     limits: {
       projectsIncluded: 999,
@@ -115,31 +83,12 @@ const subscriptionPlans = {
       campaigns: true,
       erp: true,
     },
-
-    features: [
-      "Unlimited Projects",
-      "Dedicated Account Manager",
-      "ERP Access",
-      "Custom Integrations",
-      "White Label Support",
-      "5TB Enterprise Storage",
-    ],
   },
 };
 
-// ======================================================
-// HELPERS
-// ======================================================
-
-const getPlan = (planKey) => {
-  if (!planKey) return null;
-  return subscriptionPlans[planKey.toLowerCase()] || null;
-};
-
-const getAllPlans = () => subscriptionPlans;
+const getPlan = (key) => subscriptionPlans[key?.toLowerCase()] || null;
 
 module.exports = {
-  ...subscriptionPlans,
+  subscriptionPlans,
   getPlan,
-  getAllPlans,
 };

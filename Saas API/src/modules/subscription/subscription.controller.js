@@ -1,24 +1,19 @@
-// ======================================================
-// src/modules/subscription/subscription.controller.js
-// FULL UPDATED SAAS-LEVEL CONTROLLER (FIXED FOR NEW PLAN STRUCTURE)
-// ======================================================
-
+const mongoose = require("mongoose");
 const Subscription = require("./subscription.model");
-const plans = require("./subscription.plans");
-const { sendSubscriptionEmails } = require("../../services/email.service");
+const { getPlan } = require("./subscription.plans");
+const EmailService = require("../../services/email.service");
+
+/**
+ * ======================================================
+ * SUBSCRIPTION CONTROLLER - RTS SAAS
+ * Enterprise-ready subscription lifecycle + mail flow
+ * ======================================================
+ */
 
 // ======================================================
-// HELPER
+// CREATE SUBSCRIPTION INTENT
 // ======================================================
-const getSelectedPlan = (planKey) => {
-  if (!planKey) return null;
-  return plans[planKey.toLowerCase()] || null;
-};
-
-// ======================================================
-// CREATE SUBSCRIPTION
-// ======================================================
-exports.createSubscription = async (req, res) => {
+exports.createIntent = async (req, res) => {
   try {
     const {
       companyId,
@@ -28,21 +23,23 @@ exports.createSubscription = async (req, res) => {
       billingCycle = "monthly",
     } = req.body;
 
-    const selectedPlan = getSelectedPlan(plan);
+    if (!mongoose.Types.ObjectId.isValid(companyId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid company ID",
+      });
+    }
+
+    const selectedPlan = getPlan(plan);
 
     if (!selectedPlan) {
       return res.status(400).json({
         success: false,
-        message: "Invalid subscription plan",
+        message: "Invalid plan",
       });
     }
 
-    const renewalDate = new Date();
-    renewalDate.setMonth(
-      renewalDate.getMonth() + (billingCycle === "yearly" ? 12 : 1)
-    );
-
-    const finalAmount =
+    const amount =
       billingCycle === "yearly"
         ? selectedPlan.pricing.yearly
         : selectedPlan.pricing.monthly;
@@ -53,52 +50,75 @@ exports.createSubscription = async (req, res) => {
       clientEmail,
       plan: selectedPlan.id,
       billingCycle,
-      amount: finalAmount,
+      amount,
+      status: "pending",
+      paymentStatus: "pending",
       projectsIncluded: selectedPlan.limits.projectsIncluded,
       teamMembers: selectedPlan.limits.teamMembers,
       modules: selectedPlan.modules,
-      renewalDate,
-      status: "active",
     });
 
-    if (sendSubscriptionEmails) {
-      await sendSubscriptionEmails({
-        clientName,
-        clientEmail,
-        plan: selectedPlan.name,
-        amount: finalAmount,
-      });
-    }
-
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      message: "Subscription created successfully",
+      message: "Subscription intent created",
       data: subscription,
     });
-  } catch (error) {
-    res.status(500).json({
+  } catch (err) {
+    return res.status(500).json({
       success: false,
-      message: error.message,
+      message: err.message,
     });
   }
 };
 
 // ======================================================
-// GET ALL SUBSCRIPTIONS
+// CONFIRM PAYMENT
 // ======================================================
-exports.getAllSubscriptions = async (req, res) => {
+exports.confirmPayment = async (req, res) => {
   try {
-    const data = await Subscription.find().populate("companyId");
+    const { subscriptionId, transactionId } = req.body;
 
-    res.json({
+    if (!mongoose.Types.ObjectId.isValid(subscriptionId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid subscription ID",
+      });
+    }
+
+    const sub = await Subscription.findById(subscriptionId);
+
+    if (!sub) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription not found",
+      });
+    }
+
+    sub.paymentStatus = "paid";
+    sub.status = "active";
+    sub.transactionId = transactionId;
+
+    const renewal = new Date();
+
+    if (sub.billingCycle === "yearly") {
+      renewal.setFullYear(renewal.getFullYear() + 1);
+    } else {
+      renewal.setMonth(renewal.getMonth() + 1);
+    }
+
+    sub.renewalDate = renewal;
+
+    await sub.save();
+
+    return res.json({
       success: true,
-      count: data.length,
-      data,
+      message: "Payment confirmed",
+      data: sub,
     });
-  } catch (error) {
-    res.status(500).json({
+  } catch (err) {
+    return res.status(500).json({
       success: false,
-      message: error.message,
+      message: err.message,
     });
   }
 };
@@ -108,39 +128,11 @@ exports.getAllSubscriptions = async (req, res) => {
 // ======================================================
 exports.getMySubscription = async (req, res) => {
   try {
-    let query = {};
+    const query = req.user.companyId
+      ? { companyId: req.user.companyId }
+      : { clientEmail: req.user.email };
 
-    if (req.user.companyId?.match(/^[0-9a-fA-F]{24}$/)) {
-      query.companyId = req.user.companyId;
-    } else if (req.user.email) {
-      query.clientEmail = req.user.email;
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid user identity",
-      });
-    }
-
-    const data = await Subscription.findOne(query);
-
-    res.json({
-      success: true,
-      data,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ======================================================
-// GET SINGLE SUBSCRIPTION
-// ======================================================
-exports.getSubscriptionById = async (req, res) => {
-  try {
-    const data = await Subscription.findById(req.params.id);
+    const data = await Subscription.findOne(query).sort({ createdAt: -1 });
 
     if (!data) {
       return res.status(404).json({
@@ -149,57 +141,35 @@ exports.getSubscriptionById = async (req, res) => {
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data,
     });
-  } catch (error) {
-    res.status(500).json({
+  } catch (err) {
+    return res.status(500).json({
       success: false,
-      message: error.message,
+      message: err.message,
     });
   }
 };
 
 // ======================================================
-// UPDATE SUBSCRIPTION
+// GET ALL
 // ======================================================
-exports.updateSubscription = async (req, res) => {
+exports.getAll = async (req, res) => {
   try {
-    const data = await Subscription.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
+    const data = await Subscription.find()
+      .populate("companyId")
+      .sort({ createdAt: -1 });
 
-    res.json({
+    return res.json({
       success: true,
-      message: "Subscription updated successfully",
       data,
     });
-  } catch (error) {
-    res.status(500).json({
+  } catch (err) {
+    return res.status(500).json({
       success: false,
-      message: error.message,
-    });
-  }
-};
-
-// ======================================================
-// DELETE SUBSCRIPTION
-// ======================================================
-exports.deleteSubscription = async (req, res) => {
-  try {
-    await Subscription.findByIdAndDelete(req.params.id);
-
-    res.json({
-      success: true,
-      message: "Subscription deleted successfully",
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
+      message: err.message,
     });
   }
 };
@@ -211,7 +181,16 @@ exports.changePlan = async (req, res) => {
   try {
     const { plan, billingCycle = "monthly" } = req.body;
 
-    const selectedPlan = getSelectedPlan(plan);
+    const sub = await Subscription.findById(req.params.id);
+
+    if (!sub) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription not found",
+      });
+    }
+
+    const selectedPlan = getPlan(plan);
 
     if (!selectedPlan) {
       return res.status(400).json({
@@ -220,33 +199,29 @@ exports.changePlan = async (req, res) => {
       });
     }
 
-    const finalAmount =
+    const amount =
       billingCycle === "yearly"
         ? selectedPlan.pricing.yearly
         : selectedPlan.pricing.monthly;
 
-    const data = await Subscription.findByIdAndUpdate(
-      req.params.id,
-      {
-        plan: selectedPlan.id,
-        billingCycle,
-        amount: finalAmount,
-        projectsIncluded: selectedPlan.limits.projectsIncluded,
-        teamMembers: selectedPlan.limits.teamMembers,
-        modules: selectedPlan.modules,
-      },
-      { new: true, runValidators: true }
-    );
+    sub.plan = selectedPlan.id;
+    sub.billingCycle = billingCycle;
+    sub.amount = amount;
+    sub.projectsIncluded = selectedPlan.limits.projectsIncluded;
+    sub.teamMembers = selectedPlan.limits.teamMembers;
+    sub.modules = selectedPlan.modules;
 
-    res.json({
+    await sub.save();
+
+    return res.json({
       success: true,
-      message: "Plan changed successfully",
-      data,
+      message: "Plan updated successfully",
+      data: sub,
     });
-  } catch (error) {
-    res.status(500).json({
+  } catch (err) {
+    return res.status(500).json({
       success: false,
-      message: error.message,
+      message: err.message,
     });
   }
 };
@@ -254,47 +229,70 @@ exports.changePlan = async (req, res) => {
 // ======================================================
 // CANCEL SUBSCRIPTION
 // ======================================================
-exports.cancelSubscription = async (req, res) => {
+exports.cancel = async (req, res) => {
   try {
-    const data = await Subscription.findByIdAndUpdate(
+    const sub = await Subscription.findByIdAndUpdate(
       req.params.id,
       { status: "cancelled" },
       { new: true }
     );
 
-    res.json({
+    if (!sub) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription not found",
+      });
+    }
+
+    return res.json({
       success: true,
       message: "Subscription cancelled",
-      data,
+      data: sub,
     });
-  } catch (error) {
-    res.status(500).json({
+  } catch (err) {
+    return res.status(500).json({
       success: false,
-      message: error.message,
+      message: err.message,
     });
   }
 };
 
 // ======================================================
-// REACTIVATE SUBSCRIPTION
+// UPGRADE REQUEST + EMAIL FLOW
 // ======================================================
-exports.reactivateSubscription = async (req, res) => {
+exports.upgradeRequest = async (req, res) => {
   try {
-    const data = await Subscription.findByIdAndUpdate(
-      req.params.id,
-      { status: "active" },
-      { new: true }
-    );
+    const { name, email, address, plan, billingCycle } = req.body;
 
-    res.json({
-      success: true,
-      message: "Subscription reactivated",
-      data,
+    if (!name || !email || !address || !plan) {
+      return res.status(400).json({
+        success: false,
+        message: "All required fields must be provided",
+      });
+    }
+
+    await EmailService.sendSubscriptionLead({
+      name,
+      email,
+      address,
+      plan,
+      billingCycle,
     });
-  } catch (error) {
-    res.status(500).json({
+
+    await EmailService.sendCustomerConfirmation({
+      email,
+      name,
+      plan,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Upgrade request submitted successfully",
+    });
+  } catch (err) {
+    return res.status(500).json({
       success: false,
-      message: error.message,
+      message: err.message,
     });
   }
 };
@@ -302,17 +300,10 @@ exports.reactivateSubscription = async (req, res) => {
 // ======================================================
 // ANALYTICS
 // ======================================================
-exports.subscriptionAnalytics = async (req, res) => {
+exports.analytics = async (req, res) => {
   try {
-    const totalSubscriptions = await Subscription.countDocuments();
-
-    const activeSubscriptions = await Subscription.countDocuments({
-      status: "active",
-    });
-
-    const cancelledSubscriptions = await Subscription.countDocuments({
-      status: "cancelled",
-    });
+    const total = await Subscription.countDocuments();
+    const active = await Subscription.countDocuments({ status: "active" });
 
     const revenue = await Subscription.aggregate([
       {
@@ -323,19 +314,18 @@ exports.subscriptionAnalytics = async (req, res) => {
       },
     ]);
 
-    res.json({
+    return res.json({
       success: true,
       data: {
-        totalSubscriptions,
-        activeSubscriptions,
-        cancelledSubscriptions,
+        totalSubscriptions: total,
+        activeSubscriptions: active,
         totalRevenue: revenue[0]?.totalRevenue || 0,
       },
     });
-  } catch (error) {
-    res.status(500).json({
+  } catch (err) {
+    return res.status(500).json({
       success: false,
-      message: error.message,
+      message: err.message,
     });
   }
 };
