@@ -258,42 +258,73 @@ exports.cancel = async (req, res) => {
 };
 
 // ======================================================
-// UPGRADE REQUEST + EMAIL FLOW
+// UPGRADE REQUEST
 // ======================================================
 exports.upgradeRequest = async (req, res) => {
   try {
-    const { name, email, address, plan, billingCycle } = req.body;
+    const {
+      name,
+      email,
+      phone,
+      company,
+      address,
+      notes,
+      plan,
+      billingCycle,
+    } = req.body;
 
-    if (!name || !email || !address || !plan) {
+    // ---------------- VALIDATION ----------------
+    if (!name || !email || !plan) {
       return res.status(400).json({
         success: false,
-        message: "All required fields must be provided",
+        message: "Name, email, and plan are required",
       });
     }
 
-    await EmailService.sendSubscriptionLead({
-      name,
-      email,
-      address,
-      plan,
-      billingCycle,
-    });
-
-    await EmailService.sendCustomerConfirmation({
-      email,
-      name,
-      plan,
-    });
-
-    return res.status(200).json({
+    // ---------------- INSTANT RESPONSE ----------------
+    res.status(200).json({
       success: true,
       message: "Upgrade request submitted successfully",
     });
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: err.message,
+
+    // ---------------- BACKGROUND TASK ----------------
+    process.nextTick(async () => {
+      try {
+        const safePayload = {
+          name,
+          email,
+          phone: phone || "N/A",
+          company: company || "N/A",
+          address: address || "N/A",
+          notes: notes || "N/A",
+          plan,
+          billingCycle: billingCycle || "monthly",
+        };
+
+        // Run both emails in parallel
+        await Promise.allSettled([
+          EmailService.sendSubscriptionLead(safePayload),
+          EmailService.sendCustomerConfirmation({
+            email,
+            name,
+            plan,
+          }),
+        ]);
+
+        console.log("✅ Background emails processed");
+      } catch (err) {
+        console.error("❌ Background email task failed:", err.message);
+      }
     });
+  } catch (err) {
+    console.error("❌ Upgrade request failed:", err.message);
+
+    if (!res.headersSent) {
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
   }
 };
 
