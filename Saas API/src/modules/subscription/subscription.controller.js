@@ -280,41 +280,33 @@ exports.upgradeRequest = async (req, res) => {
       });
     }
 
-    const adminMail = await EmailService.sendSubscriptionLead({
-      name,
-      email,
-      phone,
-      company,
-      address,
-      notes,
-      plan,
-      billingCycle,
-    });
+    const [adminMail, userMail] = await Promise.allSettled([
+      EmailService.sendSubscriptionLead({
+        name,
+        email,
+        phone,
+        company,
+        address,
+        notes,
+        plan,
+        billingCycle,
+      }),
+      EmailService.sendCustomerConfirmation({
+        email,
+        name,
+        plan,
+      }),
+    ]);
 
-    const userMail = await EmailService.sendCustomerConfirmation({
-      email,
-      name,
-      plan,
-    });
-
-    console.log("ADMIN MAIL RESULT:", adminMail);
-    console.log("USER MAIL RESULT:", userMail);
-
-    // ⚠ DON'T FAIL ENTIRE REQUEST IF ONE EMAIL FAILS
-    if (!adminMail.success) {
-      return res.status(500).json({
-        success: false,
-        message: "Admin email failed",
-        error: adminMail.error,
-      });
-    }
+    console.log("ADMIN MAIL:", adminMail);
+    console.log("USER MAIL:", userMail);
 
     return res.json({
       success: true,
       message: "Upgrade request submitted successfully",
       emailStatus: {
-        adminMail: adminMail.success,
-        userMail: userMail.success,
+        admin: adminMail.status,
+        user: userMail.status,
       },
     });
   } catch (err) {
