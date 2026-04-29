@@ -4,7 +4,7 @@ class EmailService {
   constructor() {
     this.transporter = null;
     this.ready = false;
-    this.init();
+    this.initPromise = this.init(); // ✅ IMPORTANT FIX
   }
 
   async init() {
@@ -18,20 +18,15 @@ class EmailService {
       }
 
       this.transporter = nodemailer.createTransport({
-        host: "smtp.gmail.com",
-        port: 587,
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT),
         secure: false,
+
         auth: { user, pass },
 
-        // IMPORTANT FIX FOR RENDER
         tls: {
           rejectUnauthorized: false,
         },
-
-        pool: true,
-        maxConnections: 1,
-        maxMessages: 5,
-        rateLimit: 5,
       });
 
       await this.transporter.verify();
@@ -44,24 +39,33 @@ class EmailService {
     }
   }
 
+  async waitReady() {
+    if (this.initPromise) {
+      await this.initPromise;
+    }
+  }
+
   async sendMail({ to, subject, html }) {
+    await this.waitReady();
+
     if (!this.ready) {
       console.log("⚠ Email not ready");
-      return { success: false };
+      return { success: false, error: "not ready" };
     }
 
     try {
-      const result = await this.transporter.sendMail({
+      const info = await this.transporter.sendMail({
         from: process.env.SMTP_FROM,
         to,
         subject,
         html,
       });
 
-      console.log("📩 SENT →", to);
-      return { success: true, messageId: result.messageId };
+      console.log("📩 EMAIL SENT →", to);
+
+      return { success: true, messageId: info.messageId };
     } catch (err) {
-      console.error("❌ EMAIL ERROR:", err.message);
+      console.error("❌ EMAIL ERROR →", to, err.message);
       return { success: false, error: err.message };
     }
   }
