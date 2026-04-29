@@ -280,36 +280,36 @@ exports.upgradeRequest = async (req, res) => {
       });
     }
 
-    const adminMail = await EmailService.sendSubscriptionLead({
+    // 🚀 FIRE AND FORGET EMAILS (NO WAITING)
+    EmailService.sendSubscriptionLead({
       name,
       email,
       phone,
       company,
       address,
-      notes: notes || "N/A",
+      notes,
       plan,
-      billingCycle: billingCycle || "monthly",
+      billingCycle,
+    }).catch((err) => {
+      console.error("Admin email failed:", err.message);
     });
 
-    const customerMail = await EmailService.sendCustomerConfirmation({
+    EmailService.sendCustomerConfirmation({
       email,
       name,
       plan,
+    }).catch((err) => {
+      console.error("Customer email failed:", err.message);
     });
 
-    if (!adminMail.success || !customerMail.success) {
-      return res.status(500).json({
-        success: false,
-        message: "Email sending failed",
-      });
-    }
-
+    // ✅ RESPONSE SHOULD NOT DEPEND ON EMAIL
     return res.status(200).json({
       success: true,
       message: "Upgrade request submitted successfully",
     });
+
   } catch (err) {
-    console.error(err);
+    console.error("Upgrade request error:", err);
 
     return res.status(500).json({
       success: false,
