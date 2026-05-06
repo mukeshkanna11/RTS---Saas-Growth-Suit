@@ -10,6 +10,7 @@ export default function Leads() {
   /* ================= STATES ================= */
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [file, setFile] = useState(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -24,41 +25,43 @@ export default function Leads() {
     source: "website",
     companyName: "",
     jobTitle: "",
+    dealValue: "",
+    notes: "",
     tags: [],
   });
 
- /* ================= FETCH LEADS ================= */
-const fetchLeads = useCallback(async () => {
-  if (!token) {
-    console.warn("⚠️ No token, skipping fetch");
-    return;
-  }
+  /* ================= FETCH LEADS ================= */
+  const fetchLeads = useCallback(async () => {
+    if (!token) {
+      console.warn("⚠️ No token, skipping fetch");
+      return;
+    }
 
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const res = await API.get("/leads");
+      const res = await API.get("/leads");
 
-    console.log("✅ API RESPONSE:", res.data);
+      console.log("✅ API RESPONSE:", res.data);
 
-    const leadsData = res?.data?.data?.leads || [];
+      const leadsData = res?.data?.data?.leads || [];
 
-    setLeads(leadsData);
+      setLeads(leadsData);
 
-  } catch (err) {
-    console.error("❌ Fetch error:", err?.response?.data || err.message);
-    setLeads([]);
-  } finally {
-    setLoading(false);
-  }
-}, [token]);
+    } catch (err) {
+      console.error("❌ Fetch error:", err?.response?.data || err.message);
+      setLeads([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
 
   /* ================= AUTO FETCH ================= */
-useEffect(() => {
-  if (token) {
-    fetchLeads();
-  }
-}, [token, fetchLeads]);
+  useEffect(() => {
+    if (token) {
+      fetchLeads();
+    }
+  }, [token, fetchLeads]);
 
   /* ================= CREATE ================= */
   const handleCreateLead = async () => {
@@ -70,16 +73,25 @@ useEffect(() => {
         return;
       }
 
-      const res = await API.post("/leads", form);
+      const payload = {
+        ...form,
+        status: "new",
+        dealValue: Number(form.dealValue || 0),
+        notes: form.notes
+          ? [{ text: form.notes }]
+          : [],
+      };
+      console.log("🚀 PAYLOAD:", payload);
 
-      // 🔥 FIX: backend returns data directly
+      const res = await API.post("/leads", payload);
+
       const newLead = res?.data?.data;
 
       setLeads((prev) => [newLead, ...prev]);
-
       setShowModal(false);
 
     } catch (err) {
+      console.error("❌ CREATE ERROR:", err?.response?.data);
       setFormError(err?.response?.data?.message || "Create failed");
     }
   };
@@ -113,15 +125,15 @@ useEffect(() => {
   };
 
   /* ================= NOTES FIX ================= */
- const getNotesText = (notes) => {
-  if (!notes || notes.length === 0) return "-";
+  const getNotesText = (notes) => {
+    if (!notes || notes.length === 0) return "-";
 
-  if (Array.isArray(notes)) {
-    return notes.map((n) => n.text).join(", ");
-  }
+    if (Array.isArray(notes)) {
+      return notes.map((n) => n.text).join(", ");
+    }
 
-  return notes;
-};
+    return notes;
+  };
 
   /* ================= STATS ================= */
   const stats = useMemo(() => {
@@ -134,57 +146,57 @@ useEffect(() => {
   }, [leads]);
 
   /* ================= CSV UPLOAD ================= */
-const handleCSVUpload = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+  const handleCSVUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  const formData = new FormData();
-  formData.append("file", file);
+    const formData = new FormData();
+    formData.append("file", file);
 
-  try {
-    const res = await API.post("/leads/upload", formData, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    try {
+      const res = await API.post("/leads/upload", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
-    console.log("Upload success:", res.data);
-  } catch (err) {
-    console.error("Upload failed:", err);
-  }
-};
-
-
-/* ================= SCORE TAG ================= */
-const getScoreTag = (score) => {
-  if (score >= 80) return <span className="text-red-500">🔥 Hot</span>;
-  if (score >= 50) return <span className="text-yellow-500">⚡ Warm</span>;
-  return <span className="text-blue-400">❄️ Cold</span>;
-};
+      console.log("Upload success:", res.data);
+    } catch (err) {
+      console.error("Upload failed:", err);
+    }
+  };
 
 
-/* ================= BADGE ================= */
-const badge = (status) => {
-  switch (status) {
-    case "new":
-      return "bg-blue-500 text-white px-2 py-1 rounded";
-    case "qualified":
-      return "bg-yellow-500 text-black px-2 py-1 rounded";
-    case "converted":
-      return "bg-green-600 text-white px-2 py-1 rounded";
-    case "contacted":
-      return "bg-purple-500 text-white px-2 py-1 rounded";
-    default:
-      return "bg-gray-400 text-white px-2 py-1 rounded";
-  }
-};
+  /* ================= SCORE TAG ================= */
+  const getScoreTag = (score) => {
+    if (score >= 80) return <span className="text-red-500">🔥 Hot</span>;
+    if (score >= 50) return <span className="text-yellow-500">⚡ Warm</span>;
+    return <span className="text-blue-400">❄️ Cold</span>;
+  };
+
+
+  /* ================= BADGE ================= */
+  const badge = (status) => {
+    switch (status) {
+      case "new":
+        return "bg-blue-500 text-white px-2 py-1 rounded";
+      case "qualified":
+        return "bg-yellow-500 text-black px-2 py-1 rounded";
+      case "converted":
+        return "bg-green-600 text-white px-2 py-1 rounded";
+      case "contacted":
+        return "bg-purple-500 text-white px-2 py-1 rounded";
+      default:
+        return "bg-gray-400 text-white px-2 py-1 rounded";
+    }
+  };
 
   /* ================= UI ================= */
   return (
     <div className="min-h-screen text-white bg-black">
 
-       {/* ================= TOP BAR (PREMIUM SAAS STYLE) ================= */}
+      {/* ================= TOP BAR (PREMIUM SAAS STYLE) ================= */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 bg-black/60 backdrop-blur">
         <div>
           <h1 className="text-lg font-bold tracking-wide">
@@ -217,383 +229,402 @@ const badge = (status) => {
         </div>
       </div>
 
-   {/* ================= PREMIUM STATS ================= */}
-<div className="grid grid-cols-2 gap-4 p-4 md:grid-cols-4">
+      {/* ================= PREMIUM STATS ================= */}
+      <div className="grid grid-cols-2 gap-4 p-4 md:grid-cols-4">
 
-  {/* TOTAL */}
-  <div className="relative p-4 overflow-hidden border rounded-xl bg-gradient-to-br from-blue-600/20 to-blue-900/10 border-blue-500/20">
-    <div className="absolute inset-0 bg-white/5 blur-2xl"></div>
+        {/* TOTAL */}
+        <div className="relative p-4 overflow-hidden border rounded-xl bg-gradient-to-br from-blue-600/20 to-blue-900/10 border-blue-500/20">
+          <div className="absolute inset-0 bg-white/5 blur-2xl"></div>
 
-    <div className="relative flex items-center justify-between">
-      <div>
-        <p className="text-xs text-gray-400">Total Leads</p>
-        <h2 className="text-2xl font-bold">{stats.total}</h2>
+          <div className="relative flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-400">Total Leads</p>
+              <h2 className="text-2xl font-bold">{stats.total}</h2>
+            </div>
+            <span className="text-2xl">📊</span>
+          </div>
+
+          <div className="w-full h-1 mt-3 rounded-full bg-white/10">
+            <div className="w-2/3 h-full bg-blue-400 rounded-full"></div>
+          </div>
+        </div>
+
+        {/* NEW */}
+        <div className="relative p-4 overflow-hidden border rounded-xl bg-gradient-to-br from-cyan-600/20 to-cyan-900/10 border-cyan-500/20">
+          <div className="absolute inset-0 bg-white/5 blur-2xl"></div>
+
+          <div className="relative flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-400">New Leads</p>
+              <h2 className="text-2xl font-bold">{stats.new}</h2>
+            </div>
+            <span className="text-2xl">🆕</span>
+          </div>
+
+          <div className="w-full h-1 mt-3 rounded-full bg-white/10">
+            <div className="w-1/2 h-full rounded-full bg-cyan-400"></div>
+          </div>
+        </div>
+
+        {/* QUALIFIED */}
+        <div className="relative p-4 overflow-hidden border rounded-xl bg-gradient-to-br from-yellow-600/20 to-yellow-900/10 border-yellow-500/20">
+          <div className="absolute inset-0 bg-white/5 blur-2xl"></div>
+
+          <div className="relative flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-400">Qualified</p>
+              <h2 className="text-2xl font-bold">{stats.qualified}</h2>
+            </div>
+            <span className="text-2xl">⚡</span>
+          </div>
+
+          <div className="w-full h-1 mt-3 rounded-full bg-white/10">
+            <div className="w-1/3 h-full bg-yellow-400 rounded-full"></div>
+          </div>
+        </div>
+
+        {/* CONVERTED */}
+        <div className="relative p-4 overflow-hidden border rounded-xl bg-gradient-to-br from-green-600/20 to-green-900/10 border-green-500/20">
+          <div className="absolute inset-0 bg-white/5 blur-2xl"></div>
+
+          <div className="relative flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-400">Converted</p>
+              <h2 className="text-2xl font-bold">{stats.converted}</h2>
+            </div>
+            <span className="text-2xl">🎯</span>
+          </div>
+
+          <div className="w-full h-1 mt-3 rounded-full bg-white/10">
+            <div className="w-1/4 h-full bg-green-400 rounded-full"></div>
+          </div>
+        </div>
+
       </div>
-      <span className="text-2xl">📊</span>
-    </div>
 
-    <div className="w-full h-1 mt-3 rounded-full bg-white/10">
-      <div className="w-2/3 h-full bg-blue-400 rounded-full"></div>
-    </div>
-  </div>
+      {/* ================= PREMIUM FILTER BAR ================= */}
+      <div className="flex flex-wrap items-center gap-3 p-4 mx-4 mb-4 border bg-black/40 backdrop-blur border-white/10 rounded-xl">
 
-  {/* NEW */}
-  <div className="relative p-4 overflow-hidden border rounded-xl bg-gradient-to-br from-cyan-600/20 to-cyan-900/10 border-cyan-500/20">
-    <div className="absolute inset-0 bg-white/5 blur-2xl"></div>
+        {/* SEARCH */}
+        <div className="relative flex-1 min-w-[200px]">
+          <span className="absolute text-gray-500 -translate-y-1/2 left-3 top-1/2">
+            🔎
+          </span>
 
-    <div className="relative flex items-center justify-between">
-      <div>
-        <p className="text-xs text-gray-400">New Leads</p>
-        <h2 className="text-2xl font-bold">{stats.new}</h2>
+          <input
+            className="w-full py-2 pr-3 text-sm text-white bg-gray-900 border rounded-lg pl-9 border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Search leads, email, company..."
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {/* STATUS FILTER */}
+        <select
+          className="px-3 py-2 text-sm text-white bg-gray-900 border rounded-lg border-white/10 focus:ring-2 focus:ring-blue-500"
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="all">All Status</option>
+          <option value="new">🆕 New</option>
+          <option value="contacted">📞 Contacted</option>
+          <option value="qualified">⚡ Qualified</option>
+          <option value="converted">🎯 Converted</option>
+        </select>
+
+        {/* FILE UPLOAD */}
+        <div className="relative">
+          <input
+            type="file"
+            onChange={(e) => setFile(e.target.files[0])}
+            className="text-xs text-gray-400 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-gray-800 file:text-white hover:file:bg-gray-700"
+          />
+        </div>
+
+        {/* IMPORT BUTTON */}
+        <button
+          onClick={handleCSVUpload}
+          className="px-4 py-2 text-sm font-medium text-white transition bg-green-600 rounded-lg hover:bg-green-500 active:scale-95"
+        >
+          ⬆ Import Leads
+        </button>
+
       </div>
-      <span className="text-2xl">🆕</span>
-    </div>
 
-    <div className="w-full h-1 mt-3 rounded-full bg-white/10">
-      <div className="w-1/2 h-full rounded-full bg-cyan-400"></div>
-    </div>
-  </div>
+      {/* Table */}
 
-  {/* QUALIFIED */}
-  <div className="relative p-4 overflow-hidden border rounded-xl bg-gradient-to-br from-yellow-600/20 to-yellow-900/10 border-yellow-500/20">
-    <div className="absolute inset-0 bg-white/5 blur-2xl"></div>
 
-    <div className="relative flex items-center justify-between">
-      <div>
-        <p className="text-xs text-gray-400">Qualified</p>
-        <h2 className="text-2xl font-bold">{stats.qualified}</h2>
-      </div>
-      <span className="text-2xl">⚡</span>
-    </div>
+      <div className="p-4 overflow-auto">
 
-    <div className="w-full h-1 mt-3 rounded-full bg-white/10">
-      <div className="w-1/3 h-full bg-yellow-400 rounded-full"></div>
-    </div>
-  </div>
+        {loading ? (
+          <div className="py-10 text-center text-gray-400">
+            Loading leads...
+          </div>
+        ) : (
+          <div className="overflow-hidden border border-white/10 rounded-xl bg-black/30 backdrop-blur">
 
-  {/* CONVERTED */}
-  <div className="relative p-4 overflow-hidden border rounded-xl bg-gradient-to-br from-green-600/20 to-green-900/10 border-green-500/20">
-    <div className="absolute inset-0 bg-white/5 blur-2xl"></div>
+            <table className="w-full text-sm">
 
-    <div className="relative flex items-center justify-between">
-      <div>
-        <p className="text-xs text-gray-400">Converted</p>
-        <h2 className="text-2xl font-bold">{stats.converted}</h2>
-      </div>
-      <span className="text-2xl">🎯</span>
-    </div>
+              {/* HEADER */}
+              <thead className="sticky top-0 text-xs text-gray-400 uppercase bg-black/60 backdrop-blur">
+                <tr>
+                  <th className="p-3 text-left">Name</th>
+                  <th className="p-3 text-left">Email</th>
+                  <th className="p-3 text-left">Score</th>
+                  <th className="p-3 text-left">Status</th>
+                  <th className="p-3 text-left">Tags</th>
+                  <th className="p-3 text-left">Notes</th>
+                  <th className="p-3 text-left">Actions</th>
+                </tr>
+              </thead>
 
-    <div className="w-full h-1 mt-3 rounded-full bg-white/10">
-      <div className="w-1/4 h-full bg-green-400 rounded-full"></div>
-    </div>
-  </div>
+              {/* BODY */}
+              <tbody>
 
-</div>
-
-     {/* ================= PREMIUM FILTER BAR ================= */}
-<div className="flex flex-wrap items-center gap-3 p-4 mx-4 mb-4 border bg-black/40 backdrop-blur border-white/10 rounded-xl">
-
-  {/* SEARCH */}
-  <div className="relative flex-1 min-w-[200px]">
-    <span className="absolute text-gray-500 -translate-y-1/2 left-3 top-1/2">
-      🔎
-    </span>
-
-    <input
-      className="w-full py-2 pr-3 text-sm text-white bg-gray-900 border rounded-lg pl-9 border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      placeholder="Search leads, email, company..."
-      onChange={(e) => setSearch(e.target.value)}
-    />
-  </div>
-
-  {/* STATUS FILTER */}
-  <select
-    className="px-3 py-2 text-sm text-white bg-gray-900 border rounded-lg border-white/10 focus:ring-2 focus:ring-blue-500"
-    onChange={(e) => setStatusFilter(e.target.value)}
-  >
-    <option value="all">All Status</option>
-    <option value="new">🆕 New</option>
-    <option value="contacted">📞 Contacted</option>
-    <option value="qualified">⚡ Qualified</option>
-    <option value="converted">🎯 Converted</option>
-  </select>
-
-  {/* FILE UPLOAD */}
-  <div className="relative">
-    <input
-      type="file"
-      onChange={(e) => setFile(e.target.files[0])}
-      className="text-xs text-gray-400 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-gray-800 file:text-white hover:file:bg-gray-700"
-    />
-  </div>
-
-  {/* IMPORT BUTTON */}
-  <button
-    onClick={handleCSVUpload}
-    className="px-4 py-2 text-sm font-medium text-white transition bg-green-600 rounded-lg hover:bg-green-500 active:scale-95"
-  >
-    ⬆ Import Leads
-  </button>
-
-</div>
-
-{/* Table */}
-
-      
-<div className="p-4 overflow-auto">
-
-  {loading ? (
-    <div className="py-10 text-center text-gray-400">
-      Loading leads...
-    </div>
-  ) : (
-    <div className="overflow-hidden border border-white/10 rounded-xl bg-black/30 backdrop-blur">
-
-      <table className="w-full text-sm">
-
-        {/* HEADER */}
-        <thead className="sticky top-0 text-xs text-gray-400 uppercase bg-black/60 backdrop-blur">
-          <tr>
-            <th className="p-3 text-left">Name</th>
-            <th className="p-3 text-left">Email</th>
-            <th className="p-3 text-left">Score</th>
-            <th className="p-3 text-left">Status</th>
-            <th className="p-3 text-left">Tags</th>
-            <th className="p-3 text-left">Notes</th>
-            <th className="p-3 text-left">Actions</th>
-          </tr>
-        </thead>
-
-        {/* BODY */}
-        <tbody>
-
-          {leads.map((l) => (
-            <tr
-              key={l._id}
-              className="transition border-t border-white/5 hover:bg-white/5"
-            >
-
-              {/* NAME */}
-              <td className="p-3 font-medium text-white">
-                {l.name}
-              </td>
-
-              {/* EMAIL */}
-              <td className="p-3 text-gray-400">
-                {l.email}
-              </td>
-
-              {/* SCORE */}
-              <td className="p-3">
-                <span className="px-2 py-1 text-xs font-semibold text-blue-300 rounded-lg bg-blue-500/10">
-                  {getScoreTag(l.score)}
-                </span>
-              </td>
-
-              {/* STATUS */}
-              <td className="p-3">
-                <span className={`px-2 py-1 rounded-lg text-xs font-medium ${badge(l.status)}`}>
-                  {l.status}
-                </span>
-              </td>
-
-              {/* TAGS */}
-              <td className="p-3">
-                <div className="flex flex-wrap gap-1">
-                  {(l.tags || []).map((t, i) => (
-                    <span
-                      key={i}
-                      className="px-2 py-1 text-xs text-gray-300 bg-gray-800 border rounded-md border-white/10"
-                    >
-                      #{t}
-                    </span>
-                  ))}
-                </div>
-              </td>
-
-              {/* NOTES */}
-              <td className="p-3 text-xs text-gray-400 max-w-[200px] truncate">
-                {getNotesText(l.notes)}
-              </td>
-
-              {/* ACTIONS */}
-              <td className="p-3">
-                <div className="flex items-center gap-2">
-
-                  <select
-                    value={l.status}
-                    onChange={(e) =>
-                      handleStatusChange(l._id, e.target.value)
-                    }
-                    className="px-2 py-1 text-xs text-white bg-gray-900 border rounded-lg border-white/10"
+                {leads.map((l) => (
+                  <tr
+                    key={l._id}
+                    className="transition border-t border-white/5 hover:bg-white/5"
                   >
-                    <option value="new">New</option>
-                    <option value="contacted">Contacted</option>
-                    <option value="qualified">Qualified</option>
-                    <option value="converted">Converted</option>
-                    <option value="lost">Lost</option>
-                  </select>
 
-                  <button
-                    onClick={() => handleDelete(l._id)}
-                    className="px-2 py-1 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-500"
-                  >
-                    Delete
-                  </button>
+                    {/* NAME */}
+                    <td className="p-3 font-medium text-white">
+                      {l.name}
+                    </td>
 
-                </div>
-              </td>
+                    {/* EMAIL */}
+                    <td className="p-3 text-gray-400">
+                      {l.email}
+                    </td>
 
-            </tr>
-          ))}
+                    {/* SCORE */}
+                    <td className="p-3">
+                      <span className="px-2 py-1 text-xs font-semibold text-blue-300 rounded-lg bg-blue-500/10">
+                        {getScoreTag(l.score)}
+                      </span>
+                    </td>
 
-        </tbody>
-      </table>
-    </div>
-  )}
-</div>
+                    {/* STATUS */}
+                    <td className="p-3">
+                      <span className={`px-2 py-1 rounded-lg text-xs font-medium ${badge(l.status)}`}>
+                        {l.status}
+                      </span>
+                    </td>
+
+                    {/* TAGS */}
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-1">
+                        {(l.tags || []).map((t, i) => (
+                          <span
+                            key={i}
+                            className="px-2 py-1 text-xs text-gray-300 bg-gray-800 border rounded-md border-white/10"
+                          >
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+
+                    {/* NOTES */}
+                    <td className="p-3 text-xs text-gray-400 max-w-[200px] truncate">
+                      {getNotesText(l.notes)}
+                    </td>
+
+                    {/* ACTIONS */}
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+
+                        <select
+                          value={l.status}
+                          onChange={(e) =>
+                            handleStatusChange(l._id, e.target.value)
+                          }
+                          className="px-2 py-1 text-xs text-white bg-gray-900 border rounded-lg border-white/10"
+                        >
+                          <option value="new">New</option>
+                          <option value="contacted">Contacted</option>
+                          <option value="qualified">Qualified</option>
+                          <option value="converted">Converted</option>
+                          <option value="lost">Lost</option>
+                        </select>
+
+                        <button
+                          onClick={() => handleDelete(l._id)}
+                          className="px-2 py-1 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-500"
+                        >
+                          Delete
+                        </button>
+
+                      </div>
+                    </td>
+
+                  </tr>
+                ))}
+
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* MODAL */}
       {showModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/70">
-         <div className="w-[560px] p-6 bg-gradient-to-br from-gray-900 to-gray-950 border border-white/10 rounded-2xl shadow-2xl">
+          <div className="w-[560px] p-6 bg-gradient-to-br from-gray-900 to-gray-950 border border-white/10 rounded-2xl shadow-2xl">
 
-  {/* HEADER */}
-  <div className="flex items-start justify-between mb-5">
-    <div>
-      <h2 className="text-xl font-bold">✨ Create New Lead</h2>
-      <p className="text-xs text-gray-400">Fill details to add into pipeline</p>
-    </div>
+            {/* HEADER */}
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <h2 className="text-xl font-bold">✨ Create New Lead</h2>
+                <p className="text-xs text-gray-400">Fill details to add into pipeline</p>
+              </div>
 
-    <button
-      onClick={() => setShowModal(false)}
-      className="px-3 py-1 text-sm bg-gray-800 rounded hover:bg-gray-700"
-    >
-      ← Back
-    </button>
-  </div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-3 py-1 text-sm bg-gray-800 rounded hover:bg-gray-700"
+              >
+                ← Back
+              </button>
+            </div>
 
-  {/* ERROR DISPLAY (NO ALERTS) */}
-  {formError && (
-    <div className="p-2 mb-3 text-sm text-red-300 border rounded-lg bg-red-900/30 border-red-500/30">
-      {formError}
-    </div>
-  )}
+            {/* ERROR DISPLAY (NO ALERTS) */}
+            {formError && (
+              <div className="p-2 mb-3 text-sm text-red-300 border rounded-lg bg-red-900/30 border-red-500/30">
+                {formError}
+              </div>
+            )}
 
-  {/* FORM GRID */}
-  <div className="grid grid-cols-2 gap-3">
+            {/* FORM GRID */}
+            <div className="grid grid-cols-2 gap-3">
 
-    {/* NAME */}
-    <input
-      placeholder="Full Name *"
-      className="col-span-2 p-3 bg-gray-800 border border-gray-700 rounded-lg"
-      value={form.name}
-      onChange={(e) => setForm({ ...form, name: e.target.value })}
-    />
+              {/* NAME */}
+              <input
+                placeholder="Full Name *"
+                className="col-span-2 p-3 bg-gray-800 border border-gray-700 rounded-lg"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
 
-    {/* EMAIL */}
-    <input
-      placeholder="Email"
-      className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
-      value={form.email}
-      onChange={(e) => setForm({ ...form, email: e.target.value })}
-    />
+              {/* EMAIL */}
+              <input
+                placeholder="Email"
+                className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
 
-    {/* PHONE */}
-    <input
-      placeholder="Phone"
-      className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
-      value={form.phone}
-      onChange={(e) => setForm({ ...form, phone: e.target.value })}
-    />
+              {/* PHONE */}
+              <input
+                placeholder="Phone"
+                className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
 
-    {/* COMPANY */}
-    <input
-      placeholder="Company Name"
-      className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
-      value={form.companyName}
-      onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-    />
+              {/* COMPANY */}
+              <input
+                placeholder="Company Name"
+                className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
+                value={form.companyName}
+                onChange={(e) => setForm({ ...form, companyName: e.target.value })}
+              />
 
-    {/* JOB TITLE DROPDOWN */}
-    <select
-      className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
-      value={form.jobTitle}
-      onChange={(e) => setForm({ ...form, jobTitle: e.target.value })}
-    >
-      <option value="">🎯 Select Job Title</option>
-      <option value="Founder">Founder</option>
-      <option value="CEO">CEO</option>
-      <option value="Manager">Manager</option>
-      <option value="Marketing">Marketing</option>
-      <option value="Developer">Developer</option>
-      <option value="Sales">Sales</option>
-      <option value="HR">HR</option>
-    </select>
+              {/* JOB TITLE DROPDOWN */}
+              <select
+                className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
+                value={form.jobTitle}
+                onChange={(e) => setForm({ ...form, jobTitle: e.target.value })}
+              >
+                <option value="">🎯 Select Job Title</option>
+                <option value="Founder">Founder</option>
+                <option value="CEO">CEO</option>
+                <option value="Manager">Manager</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Developer">Developer</option>
+                <option value="Sales">Sales</option>
+                <option value="HR">HR</option>
+              </select>
 
-    {/* SOURCE */}
-    <select
-      className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
-      value={form.source}
-      onChange={(e) => setForm({ ...form, source: e.target.value })}
-    >
-      <option value="website">🌐 Website</option>
-      <option value="facebook">📘 Facebook</option>
-      <option value="linkedin">💼 LinkedIn</option>
-      <option value="google">🔎 Google</option>
-      <option value="referral">🤝 Referral</option>
-    </select>
+              {/* DEAL VALUE */}
+              <input
+                type="number"
+                placeholder="Deal Value (₹)"
+                className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
+                value={form.dealValue || ""}
+                onChange={(e) =>
+                  setForm({ ...form, dealValue: e.target.value })
+                }
+              />
+              {/* SOURCE */}
+              <select
+                className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
+                value={form.source}
+                onChange={(e) => setForm({ ...form, source: e.target.value })}
+              >
+                <option value="website">🌐 Website</option>
+                <option value="facebook">📘 Facebook</option>
+                <option value="linkedin">💼 LinkedIn</option>
+                <option value="google">🔎 Google</option>
+                <option value="referral">🤝 Referral</option>
+              </select>
 
-    {/* TAGS MULTI SELECT STYLE */}
-    <div className="col-span-2">
-      <label className="text-xs text-gray-400">Tags</label>
+              {/* NOTES */}
+              <textarea
+                placeholder="Notes"
+                className="col-span-2 p-3 bg-gray-800 border border-gray-700 rounded-lg"
+                value={form.notes || ""}
+                onChange={(e) =>
+                  setForm({ ...form, notes: e.target.value })
+                }
+              />
 
-      <div className="grid grid-cols-4 gap-2 mt-2">
-        {["hot", "warm", "cold", "priority", "vip", "new"].map((tag) => (
-          <button
-            key={tag}
-            type="button"
-            onClick={() => {
-              const exists = form.tags.includes(tag);
+              {/* TAGS MULTI SELECT STYLE */}
+              <div className="col-span-2">
+                <label className="text-xs text-gray-400">Tags</label>
 
-              setForm({
-                ...form,
-                tags: exists
-                  ? form.tags.filter((t) => t !== tag)
-                  : [...form.tags, tag],
-              });
-            }}
-            className={`p-2 text-xs rounded-lg border ${
-              form.tags.includes(tag)
-                ? "bg-blue-600 border-blue-500"
-                : "bg-gray-800 border-gray-700"
-            }`}
-          >
-            {tag}
-          </button>
-        ))}
-      </div>
-    </div>
-  </div>
+                <div className="grid grid-cols-4 gap-2 mt-2">
+                  {["hot", "warm", "cold", "priority", "vip", "new"].map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => {
+                        const exists = form.tags.includes(tag);
 
-  {/* ACTIONS */}
-  <div className="flex justify-end gap-3 mt-6">
+                        setForm({
+                          ...form,
+                          tags: exists
+                            ? form.tags.filter((t) => t !== tag)
+                            : [...form.tags, tag],
+                        });
+                      }}
+                      className={`p-2 text-xs rounded-lg border ${form.tags.includes(tag)
+                          ? "bg-blue-600 border-blue-500"
+                          : "bg-gray-800 border-gray-700"
+                        }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-    <button
-      onClick={() => setShowModal(false)}
-      className="px-4 py-2 text-gray-300 bg-gray-800 rounded-lg hover:bg-gray-700"
-    >
-      Cancel
-    </button>
+            {/* ACTIONS */}
+            <div className="flex justify-end gap-3 mt-6">
 
-    <button
-      onClick={handleCreateLead}
-      className="px-5 py-2 font-semibold text-white rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 hover:opacity-90"
-    >
-      🚀 Create Lead
-    </button>
-  </div>
-</div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 text-gray-300 bg-gray-800 rounded-lg hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleCreateLead}
+                className="px-5 py-2 font-semibold text-white rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 hover:opacity-90"
+              >
+                🚀 Create Lead
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
