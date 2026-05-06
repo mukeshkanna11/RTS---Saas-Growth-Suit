@@ -1,17 +1,32 @@
-// ========================================
-// analytics.routes.js
-// ========================================
-
 const express = require("express");
 const router = express.Router();
 
 const controller = require("./analytics.controller");
-const auth = require("../../middleware/auth.middleware");
+const { protect, authorize } = require("../../middleware/auth.middleware");
 
-router.post("/", auth, controller.createMetric);
-router.get("/", auth, controller.getMetrics);
-router.get("/summary", auth, controller.getDashboardSummary);
-router.get("/revenue-trend", auth, controller.getRevenueTrend);
-router.delete("/:id", auth, controller.deleteMetric);
+// CREATE
+router.post(
+  "/",
+  protect,
+  authorize("admin", "manager"),
+  controller.createMetric
+);
+
+// GET ALL
+router.get("/", protect, controller.getMetrics);
+
+// SUMMARY
+router.get("/summary", protect, controller.getDashboardSummary);
+
+// TREND
+router.get("/revenue-trend", protect, controller.getRevenueTrend);
+
+// DELETE
+router.delete(
+  "/:id",
+  protect,
+  authorize("admin"),
+  controller.deleteMetric
+);
 
 module.exports = router;

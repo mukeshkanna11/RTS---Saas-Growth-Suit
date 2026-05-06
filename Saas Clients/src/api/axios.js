@@ -1,12 +1,6 @@
 import axios from "axios";
-import { useAuthStore } from "../store/authStore";
 
-/* ================= ENV ================= */
 const BASE_URL = import.meta.env.VITE_API_URL;
-
-if (!BASE_URL) {
-  throw new Error("❌ VITE_API_URL is not defined");
-}
 
 /* ================= AXIOS INSTANCE ================= */
 const API = axios.create({
@@ -15,15 +9,10 @@ const API = axios.create({
   timeout: 20000,
 });
 
-/* ================= TOKEN HELPER ================= */
+/* ================= TOKEN (SINGLE SOURCE OF TRUTH) ================= */
 const getToken = () => {
   try {
-    const token =
-      localStorage.getItem("accessToken") ||
-      localStorage.getItem("token") ||
-      localStorage.getItem("readytech_token");
-
-    return token ? token.replace(/"/g, "") : null;
+    return localStorage.getItem("accessToken");
   } catch (err) {
     return null;
   }
@@ -54,54 +43,30 @@ API.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    /* 🌐 NETWORK ERROR */
+    // 🌐 Network error
     if (!error.response) {
-      console.error("🌐 Network Error - Backend not reachable");
-      return Promise.reject(
-        new Error("Server is not reachable. Check backend or URL.")
-      );
+      console.error("Network error");
+      return Promise.reject(new Error("Server not reachable"));
     }
 
     const status = error.response.status;
 
-    /* 🔐 TOKEN EXPIRED → REFRESH */
-    if (status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
+    /* ================= 401 HANDLING ================= */
+    if (status === 401) {
       try {
-        const { data } = await axios.post(
-          `${BASE_URL}/api/v1/auth/refresh`,
-          {},
-          { withCredentials: true }
-        );
-
-        const newToken = data?.data?.accessToken;
-
-        if (!newToken) {
-          throw new Error("Refresh token failed");
-        }
-
-        localStorage.setItem("accessToken", newToken);
-
-        originalRequest.headers = originalRequest.headers || {};
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
-
-        return API(originalRequest);
-      } catch (refreshError) {
-        console.error("🔐 Refresh token failed");
-
+        // clear auth safely
         localStorage.removeItem("accessToken");
-        localStorage.removeItem("token");
-        localStorage.removeItem("readytech_token");
+        localStorage.removeItem("refreshToken");
 
-        const auth = useAuthStore.getState();
-        auth?.logout?.();
+        // optional: try refresh token (future upgrade)
+        // const refreshToken = localStorage.getItem("refreshToken");
 
+        // redirect safely (SPA friendly)
         if (window.location.pathname !== "/login") {
-          window.location.replace("/login");
+          window.location.href = "/login";
         }
-
-        return Promise.reject(refreshError);
+      } catch (err) {
+        console.error("Auth cleanup failed", err);
       }
     }
 

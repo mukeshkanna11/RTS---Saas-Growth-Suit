@@ -2,77 +2,35 @@ const mongoose = require("mongoose");
 
 const leadSchema = new mongoose.Schema(
   {
-    // ---------------- BASIC INFO ----------------
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    // BASIC
+    name: { type: String, required: true, trim: true },
+    email: { type: String, lowercase: true, trim: true, index: true },
+    phone: { type: String, index: true },
 
-    email: {
-      type: String,
-      lowercase: true,
-      trim: true,
-      index: true,
-    },
-
-    phone: {
-      type: String,
-      index: true,
-    },
-
-    // ---------------- BUSINESS INFO ----------------
+    // BUSINESS
     companyName: String,
     jobTitle: String,
     website: String,
 
-    // ---------------- SOURCE TRACKING ----------------
+    // SOURCE
     source: {
       type: String,
-      enum: [
-        "website",
-        "facebook",
-        "linkedin",
-        "referral",
-        "google",
-        "ads",
-        "other",
-      ],
+      enum: ["website", "facebook", "linkedin", "referral", "google", "ads", "other"],
       default: "other",
     },
 
-    utm: {
-      source: String,
-      medium: String,
-      campaign: String,
-    },
-
-    // ---------------- PIPELINE ----------------
+    // PIPELINE
     status: {
       type: String,
-      enum: [
-        "new",
-        "contacted",
-        "qualified",
-        "proposal",
-        "negotiation",
-        "converted",
-        "lost",
-      ],
+      enum: ["new", "contacted", "qualified", "proposal", "negotiation", "converted", "lost"],
       default: "new",
       index: true,
     },
 
-    pipelineStage: {
-      type: String,
-      default: "New",
-    },
+    pipelineStage: { type: String, default: "New" },
 
-    // ---------------- LEAD SCORING ----------------
-    score: {
-      type: Number,
-      default: 0,
-    },
+    // SCORING
+    score: { type: Number, default: 0 },
 
     scoreBreakdown: {
       email: { type: Number, default: 0 },
@@ -81,10 +39,19 @@ const leadSchema = new mongoose.Schema(
       source: { type: Number, default: 0 },
     },
 
-    // ---------------- TAGS ----------------
-    tags: [String],
+    // 🔥 RBAC STRUCTURE
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
 
-    // ---------------- ASSIGNMENT ----------------
+    managerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+    },
+
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -93,122 +60,61 @@ const leadSchema = new mongoose.Schema(
 
     assignedAt: Date,
 
-    // ---------------- FOLLOW-UP ----------------
-    followUpDate: {
-      type: Date,
-      index: true,
-    },
-
+    // FOLLOW-UP
+    followUpDate: { type: Date, index: true },
     lastContactedAt: Date,
     nextAction: String,
 
-    // ---------------- ACTIVITIES ----------------
-    activities: [
-      {
-        type: String,
-        note: String,
-        createdBy: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-        createdAt: {
-          type: Date,
-          default: Date.now,
-        },
-      },
-    ],
-
-    // ---------------- NOTES ----------------
+    // NOTES
     notes: [
       {
         text: String,
-        createdBy: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-        createdAt: {
-          type: Date,
-          default: Date.now,
-        },
+        createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        createdAt: { type: Date, default: Date.now },
       },
     ],
 
-    // ---------------- CAPTURE ----------------
-    capture: {
-      page: String,
-      formId: String,
-      ip: String,
-      userAgent: String,
-    },
-
-    // ---------------- CONVERSION ----------------
-    convertedToCustomer: {
-      type: Boolean,
-      default: false,
-    },
-
+    // CONVERSION
+    convertedToCustomer: { type: Boolean, default: false },
     convertedAt: Date,
     dealValue: Number,
 
-    // ---------------- TENANT ----------------
-    tenantId: {
-      type: String,
-      required: true,
-      index: true,
-    },
+    // TENANT
+    tenantId: { type: String, required: true, index: true },
 
-    // ---------------- RELATIONS ----------------
-    company: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Company",
-    },
+    // FLAGS
+    isEmailSent: { type: Boolean, default: false },
+    isWhatsAppSent: { type: Boolean, default: false },
 
-    // ---------------- FLAGS ----------------
-    isEmailSent: {
-      type: Boolean,
-      default: false,
-    },
-
-    isWhatsAppSent: {
-      type: Boolean,
-      default: false,
-    },
-
-    // ---------------- SOFT DELETE ----------------
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
+    // DELETE
+    isDeleted: { type: Boolean, default: false, index: true },
   },
   { timestamps: true }
 );
 
-// ---------------- INDEXES ----------------
-leadSchema.index({ tenantId: 1, status: 1 });
+// INDEXES (🔥 IMPORTANT)
+leadSchema.index({ tenantId: 1, managerId: 1 });
 leadSchema.index({ tenantId: 1, assignedTo: 1 });
-leadSchema.index({ tenantId: 1, followUpDate: 1 });
+leadSchema.index({ tenantId: 1, status: 1 });
+leadSchema.index({ tenantId: 1, isDeleted: 1 });
 leadSchema.index({ tenantId: 1, createdAt: -1 });
-leadSchema.index({ email: 1, tenantId: 1 });
 
-// ---------------- AUTO SCORING (FIXED 🔥) ----------------
+// AUTO SCORING
 leadSchema.pre("save", function () {
   let score = 0;
 
   if (this.email) score += 10;
   if (this.phone) score += 10;
-  if (this.source === "google" || this.source === "ads") score += 20;
+  if (["google", "ads"].includes(this.source)) score += 20;
 
   this.score = score;
 
   this.scoreBreakdown = {
     email: this.email ? 10 : 0,
     phone: this.phone ? 10 : 0,
-    source:
-      this.source === "google" || this.source === "ads" ? 20 : 0,
-    engagement: this.scoreBreakdown?.engagement || 0,
+    source: ["google", "ads"].includes(this.source) ? 20 : 0,
+    engagement: this.scoreBreakdown?.engagement ?? 0,
   };
 });
 
-// ---------------- MODEL ----------------
 module.exports = mongoose.model("Lead", leadSchema);
