@@ -15,17 +15,18 @@ import {
 } from "lucide-react";
 
 import { logoutUser } from "../api/auth";
-import { useAuthStore } from "../store/authStore"; // ✅ FIXED IMPORT
+import { useAuthStore } from "../store/authStore";
+
+/* ✅ PRODUCTION SAFE LOGO (VITE) */
+import logo from "../assets/Logo.png";
 
 export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const role = location.pathname.split("/")[1];
-
+  const role = location.pathname.split("/")[1] || "admin";
   const [collapsed, setCollapsed] = useState(false);
 
-  // ✅ FIXED (MOVED OUTSIDE JSX)
   const user = useAuthStore((s) => s.user);
 
   /* ================= NAV ITEM ================= */
@@ -34,13 +35,13 @@ export default function MainLayout() {
 
     return (
       <motion.div
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.96 }}
+        whileHover={{ scale: 1.04 }}
+        whileTap={{ scale: 0.97 }}
         onClick={() => navigate(path)}
-        className={`relative flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200
+        className={`relative flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer transition-all duration-200 overflow-hidden
         ${
           active
-            ? "bg-gradient-to-r from-blue-500/30 to-purple-600/30 text-white shadow-[0_0_12px_rgba(99,102,241,0.6)]"
+            ? "bg-gradient-to-r from-blue-500/30 to-purple-600/30 text-white shadow-[0_0_15px_rgba(99,102,241,0.6)]"
             : "text-gray-400 hover:bg-white/10 hover:text-white"
         }`}
       >
@@ -48,10 +49,10 @@ export default function MainLayout() {
           <div className="absolute left-0 w-[3px] h-5 bg-blue-400 rounded-r-full" />
         )}
 
-        <div>{icon}</div>
+        <div className="flex-shrink-0">{icon}</div>
 
         {!collapsed && (
-          <span className="text-sm font-medium">{label}</span>
+          <span className="text-sm font-medium truncate">{label}</span>
         )}
       </motion.div>
     );
@@ -60,20 +61,20 @@ export default function MainLayout() {
   return (
     <div className="relative flex h-screen text-white bg-[#020617] overflow-hidden">
 
-      {/* 🌌 BACKGROUND GLOW */}
+      {/* 🌌 BACKGROUND */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute w-64 h-64 bg-blue-500/20 blur-3xl top-10 left-10" />
-        <div className="absolute w-64 h-64 bg-purple-600/20 blur-3xl bottom-10 right-10" />
+        <div className="absolute w-72 h-72 bg-blue-500/20 blur-3xl top-10 left-10" />
+        <div className="absolute w-72 h-72 bg-purple-600/20 blur-3xl bottom-10 right-10" />
       </div>
 
       {/* ================= SIDEBAR ================= */}
       <aside
-        className={`relative z-10 flex flex-col justify-between transition-all duration-300 
+        className={`relative z-10 flex flex-col justify-between transition-all duration-300 overflow-hidden
         ${collapsed ? "w-16" : "w-64"} 
         bg-[#0B0F19]/90 backdrop-blur-xl border-r border-white/10`}
       >
         {/* TOP */}
-        <div className="p-4">
+        <div className="p-4 flex flex-col h-full">
 
           {/* TOGGLE */}
           <div className="flex justify-end mb-4">
@@ -85,23 +86,23 @@ export default function MainLayout() {
             </button>
           </div>
 
-          {/* LOGO */}
-          <div className="flex items-center gap-3 mb-6">
-            <div className="relative flex items-center">
+          {/* LOGO + NAME */}
+          <div className="flex items-center gap-3 mb-6 min-w-0">
+            <div className="relative flex-shrink-0">
               <img
-                src="/src/assets/Logo.png"
+                src={logo}
                 alt="ReadyTechSolutions"
-                className="h-10 w-auto object-contain drop-shadow-[0_0_10px_rgba(59,130,246,0.6)]"
+                className="h-10 w-auto object-contain"
               />
               <div className="absolute -inset-2 bg-blue-500/10 blur-xl opacity-70 pointer-events-none" />
             </div>
 
             {!collapsed && (
-              <div className="leading-tight">
-                <h2 className="text-base font-semibold text-white">
+              <div className="leading-tight min-w-0">
+                <h2 className="text-sm font-semibold text-white truncate">
                   ReadyTechSolutions
                 </h2>
-                <p className="text-[11px] text-gray-400">
+                <p className="text-[11px] text-gray-400 truncate">
                   Growth Suite
                 </p>
               </div>
@@ -109,7 +110,7 @@ export default function MainLayout() {
           </div>
 
           {/* NAV */}
-          <nav className="space-y-1">
+          <nav className="space-y-1 flex-1">
             <NavItem icon={<Home size={18} />} label="Dashboard" path={`/${role}`} />
             <NavItem icon={<Target size={18} />} label="Leads" path={`/${role}/leads`} />
             <NavItem icon={<Briefcase size={18} />} label="CRM" path={`/${role}/crm`} />
@@ -121,25 +122,25 @@ export default function MainLayout() {
         </div>
 
         {/* BOTTOM */}
-        <div className="p-4 border-t border-white/10">
+        <div className="p-4 border-t border-white/10 space-y-3">
 
           {/* USER */}
-          {/* <div className="flex items-center gap-2 mb-3">
-            <div className="flex items-center justify-center w-8 h-8 text-xs font-bold rounded-full bg-gradient-to-r from-blue-500 to-purple-600">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center justify-center w-9 h-9 text-sm font-semibold rounded-full bg-gradient-to-r from-blue-500 to-purple-600">
               {user?.name?.charAt(0)?.toUpperCase() || "U"}
             </div>
 
             {!collapsed && (
-              <div>
-                <p className="text-xs font-medium text-white">
+              <div className="min-w-0">
+                <p className="text-xs font-medium truncate">
                   {user?.name || "User"}
                 </p>
-                <p className="text-[10px] text-gray-400 capitalize">
+                <p className="text-[10px] text-gray-400 capitalize truncate">
                   {user?.role || role}
                 </p>
               </div>
             )}
-          </div> */}
+          </div>
 
           {/* LOGOUT */}
           <button
@@ -155,13 +156,13 @@ export default function MainLayout() {
       {/* ================= MAIN ================= */}
       <div className="flex flex-col flex-1 overflow-hidden z-10">
 
-        {/* TOP BAR */}
+        {/* HEADER */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#0B0F19]/80 backdrop-blur-xl">
 
           {/* LEFT */}
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-base font-semibold capitalize text-white">
+              <h1 className="text-base font-semibold capitalize">
                 {role}
               </h1>
               <p className="text-xs text-gray-400">
@@ -179,7 +180,7 @@ export default function MainLayout() {
           {/* RIGHT */}
           <div className="flex items-center gap-4">
 
-            <button className="px-4 py-2 text-xs font-medium rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 transition shadow-[0_0_12px_rgba(99,102,241,0.5)]">
+            <button className="px-4 py-2 text-xs font-medium rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 transition">
               + New
             </button>
 
@@ -188,23 +189,20 @@ export default function MainLayout() {
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             </div>
 
-            <div className="flex items-center gap-3 pl-3 border-l border-white/10">
-
-              <div className="flex items-center justify-center w-10 h-10 text-sm font-semibold text-white rounded-full bg-gradient-to-r from-blue-500 to-purple-600 shadow-[0_0_15px_rgba(99,102,241,0.6)]">
+            <div className="flex items-center gap-3 pl-3 border-l border-white/10 min-w-0">
+              <div className="flex items-center justify-center w-10 h-10 text-sm font-semibold rounded-full bg-gradient-to-r from-blue-500 to-purple-600">
                 {user?.name?.charAt(0)?.toUpperCase() || "U"}
               </div>
 
-              <div>
-                <p className="text-sm font-medium text-white">
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">
                   {user?.name || "User"}
                 </p>
-                <p className="text-xs text-gray-400 capitalize">
+                <p className="text-xs text-gray-400 capitalize truncate">
                   {user?.role || role}
                 </p>
               </div>
-
             </div>
-
           </div>
         </div>
 
