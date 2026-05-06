@@ -12,7 +12,7 @@ class AppError extends Error {
   }
 }
 
-/* ================= TOKEN GENERATOR (FIXED) ================= */
+/* ================= TOKEN GENERATOR ================= */
 const generateTokens = (user) => {
   if (!user?.tenantId) {
     throw new AppError("Tenant missing in user - cannot generate token", 500);
@@ -20,7 +20,7 @@ const generateTokens = (user) => {
 
   const payload = {
     id: user._id.toString(),
-    tenantId: user.tenantId.toString(), // 🔥 FORCE STRING SAFETY
+    tenantId: user.tenantId.toString(),
     role: user.role,
   };
 
@@ -31,7 +31,7 @@ const generateTokens = (user) => {
   const refreshToken = jwt.sign(
     {
       id: user._id.toString(),
-      tenantId: user.tenantId.toString(), // 🔥 ADD FOR CONSISTENCY
+      tenantId: user.tenantId.toString(),
       ver: crypto.randomUUID(),
     },
     process.env.JWT_REFRESH_SECRET,
@@ -41,7 +41,7 @@ const generateTokens = (user) => {
   return { accessToken, refreshToken };
 };
 
-/* ================= SAFE USER ================= */
+/* ================= SANITIZE USER ================= */
 const sanitizeUser = (user) => {
   const obj = user.toObject ? user.toObject() : user;
 
@@ -75,7 +75,7 @@ exports.register = async (data) => {
     email: cleanEmail,
     password: hashed,
     role: "admin",
-    tenantId, // 🔥 GUARANTEED HERE
+    tenantId,
   });
 
   const tokens = generateTokens(user);
@@ -86,11 +86,11 @@ exports.register = async (data) => {
   return {
     user: sanitizeUser(user),
     company,
-    accessToken: tokens.accessToken,
+    token: tokens.accessToken, // ✅ unified
   };
 };
 
-/* ================= LOGIN (FIXED SAFETY) ================= */
+/* ================= LOGIN (FULLY FIXED) ================= */
 exports.login = async ({ email, password }) => {
   const cleanEmail = email.toLowerCase().trim();
 
@@ -117,6 +117,18 @@ exports.login = async ({ email, password }) => {
 
   return {
     user: sanitizeUser(user),
-    accessToken: tokens.accessToken,
+    token: tokens.accessToken, // ✅ FIXED (important)
   };
+};
+
+/* ================= LOGOUT ================= */
+exports.logout = async (userId) => {
+  const user = await User.findById(userId);
+
+  if (!user) throw new AppError("User not found", 404);
+
+  user.refreshToken = null;
+  await user.save();
+
+  return true;
 };

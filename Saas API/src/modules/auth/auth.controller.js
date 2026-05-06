@@ -39,7 +39,7 @@ exports.register = async (req, res) => {
 };
 
 /* ===============================
-   🔐 LOGIN CONTROLLER (FIXED SAAS SAFE)
+   🔐 LOGIN CONTROLLER (FIXED)
 =============================== */
 exports.login = async (req, res) => {
   try {
@@ -55,12 +55,11 @@ exports.login = async (req, res) => {
 
     const data = await authService.login(result.data);
 
-    // 🔥 IMPORTANT SAFETY CHECK
+    // ✅ FIXED CHECK
     if (!data?.token || !data?.user) {
       return fail(res, "Login service returned invalid response", 500);
     }
 
-    // 🔥 ENSURE TENANT ALWAYS EXISTS (critical for your SaaS bug)
     if (!data.user.tenantId) {
       return fail(res, "Tenant not assigned to user", 400);
     }
@@ -77,7 +76,7 @@ exports.login = async (req, res) => {
 };
 
 /* ===============================
-   🚪 LOGOUT CONTROLLER (SAFE)
+   🚪 LOGOUT CONTROLLER
 =============================== */
 exports.logout = async (req, res) => {
   try {
