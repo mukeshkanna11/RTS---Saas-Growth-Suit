@@ -65,37 +65,46 @@ export default function Leads() {
 
   /* ================= CREATE ================= */
   const handleCreateLead = async () => {
-    try {
-      setFormError("");
+  try {
+    setFormError("");
 
-      if (!form.name.trim()) {
-        setFormError("Name required");
-        return;
-      }
-
-      const payload = {
-        ...form,
-        status: "new",
-        dealValue: Number(form.dealValue || 0),
-        notes: form.notes
-          ? [{ text: form.notes }]
-          : [],
-      };
-      console.log("🚀 PAYLOAD:", payload);
-
-      const res = await API.post("/leads", payload);
-
-      const newLead = res?.data?.data;
-
-      setLeads((prev) => [newLead, ...prev]);
-      setShowModal(false);
-
-    } catch (err) {
-      console.error("❌ CREATE ERROR:", err?.response?.data);
-      setFormError(err?.response?.data?.message || "Create failed");
+    if (!form.name.trim()) {
+      setFormError("Name required");
+      return;
     }
-  };
 
+    if (!/^[0-9]{10}$/.test(form.phone)) {
+      setFormError("Phone must be 10 digits");
+      return;
+    }
+
+    const payload = {
+      ...form,
+      status: "new",
+      dealValue: Number(form.dealValue || 0),
+      notes: form.notes ? String(form.notes) : "",
+    };
+
+    console.log("🚀 FINAL PAYLOAD:", payload);
+
+    const res = await API.post("/leads", payload);
+
+    const newLead = res?.data?.data;
+
+    setLeads((prev) => [newLead, ...prev]);
+    setShowModal(false);
+
+  } catch (err) {
+    console.error("❌ FULL ERROR:", err?.response?.data);
+    console.error("❌ VALIDATION:", err?.response?.data?.errors);
+
+    setFormError(
+      err?.response?.data?.errors?.[0] ||
+      err?.response?.data?.message ||
+      "Create failed"
+    );
+  }
+};
   /* ================= STATUS ================= */
   const handleStatusChange = async (id, status) => {
     const prev = [...leads];
