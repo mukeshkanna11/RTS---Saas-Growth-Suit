@@ -12,7 +12,7 @@ const objectId = (value, helpers) => {
 };
 
 // -------------------------------
-// ENUMS (SYNC WITH MODEL)
+// ENUMS
 // -------------------------------
 const STATUS = [
   "new",
@@ -37,37 +37,28 @@ const SOURCES = [
 // -------------------------------
 // 🟢 CREATE LEAD
 // -------------------------------
-exports.createLeadSchema = Joi.object({
+const createLeadSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
-
-  email: Joi.string().email().optional(),
-
-  phone: Joi.string().pattern(/^[0-9]{10}$/).optional(),
+  email: Joi.string().email().allow("", null).optional(),
+  phone: Joi.string().pattern(/^[0-9]{10}$/).allow("", null).optional(),
 
   companyName: Joi.string().max(150).optional(),
   jobTitle: Joi.string().max(100).optional(),
   website: Joi.string().uri().optional(),
 
-  source: Joi.string().valid(...SOURCES).optional(),
-
-  utm: Joi.object({
-    source: Joi.string().optional(),
-    medium: Joi.string().optional(),
-    campaign: Joi.string().optional(),
-  }).optional(),
-
-  status: Joi.string().valid(...STATUS).optional(),
+  source: Joi.string().valid(...SOURCES).default("website"),
+  status: Joi.string().valid(...STATUS).default("new"),
 
   pipelineStage: Joi.string().optional(),
 
   assignedTo: Joi.string().custom(objectId).optional(),
 
-  tags: Joi.array().items(Joi.string()).optional(),
+  tags: Joi.array().items(Joi.string()).default([]),
 
   followUpDate: Joi.date().optional(),
   nextAction: Joi.string().max(200).optional(),
 
-  dealValue: Joi.number().min(0).optional(),
+  dealValue: Joi.number().min(0).default(0),
 
   notes: Joi.string().max(1000).optional(),
 
@@ -80,9 +71,9 @@ exports.createLeadSchema = Joi.object({
 // -------------------------------
 // ✏️ UPDATE LEAD
 // -------------------------------
-exports.updateLeadSchema = Joi.object({
+const updateLeadSchema = Joi.object({
   name: Joi.string().optional(),
-  email: Joi.string().email().optional(),
+  email: Joi.string().email().allow("", null).optional(),
   phone: Joi.string().optional(),
 
   companyName: Joi.string().optional(),
@@ -105,55 +96,51 @@ exports.updateLeadSchema = Joi.object({
 });
 
 // -------------------------------
-// 👤 ASSIGN
+// 👤 ASSIGN LEAD
 // -------------------------------
-exports.assignLeadSchema = Joi.object({
+const assignLeadSchema = Joi.object({
   userId: Joi.string().custom(objectId).required(),
 });
 
 // -------------------------------
 // 🔄 STATUS UPDATE
 // -------------------------------
-exports.updateStatusSchema = Joi.object({
+const updateStatusSchema = Joi.object({
   status: Joi.string().valid(...STATUS).required(),
 });
 
 // -------------------------------
 // 🔔 FOLLOW-UP
 // -------------------------------
-exports.followUpSchema = Joi.object({
+const followUpSchema = Joi.object({
   followUpDate: Joi.date().required(),
   nextAction: Joi.string().max(200).optional(),
 });
 
 // -------------------------------
-// 📝 ADD NOTE
+// 📝 NOTE
 // -------------------------------
-exports.addNoteSchema = Joi.object({
+const addNoteSchema = Joi.object({
   text: Joi.string().max(1000).required(),
 });
 
 // -------------------------------
-// 📜 ADD ACTIVITY
+// 📜 ACTIVITY
 // -------------------------------
-exports.addActivitySchema = Joi.object({
-  type: Joi.string()
-    .valid("call", "email", "whatsapp", "meeting", "note")
-    .required(),
-
+const addActivitySchema = Joi.object({
+  type: Joi.string().valid("call", "email", "whatsapp", "meeting", "note").required(),
   note: Joi.string().max(1000).required(),
 });
 
 // -------------------------------
-// 🔍 QUERY (ADVANCED FILTER)
+// 🔍 QUERY
 // -------------------------------
-exports.getLeadsQuerySchema = Joi.object({
-  page: Joi.number().min(1).optional(),
-  limit: Joi.number().min(1).max(100).optional(),
+const getLeadsQuerySchema = Joi.object({
+  page: Joi.number().min(1).default(1),
+  limit: Joi.number().min(1).max(100).default(10),
 
   status: Joi.string().optional(),
   source: Joi.string().optional(),
-
   search: Joi.string().optional(),
 
   assignedTo: Joi.string().custom(objectId).optional(),
@@ -161,3 +148,14 @@ exports.getLeadsQuerySchema = Joi.object({
   fromDate: Joi.date().optional(),
   toDate: Joi.date().optional(),
 });
+
+module.exports = {
+  createLeadSchema,
+  updateLeadSchema,
+  assignLeadSchema,
+  updateStatusSchema,
+  followUpSchema,
+  addNoteSchema,
+  addActivitySchema,
+  getLeadsQuerySchema,
+};

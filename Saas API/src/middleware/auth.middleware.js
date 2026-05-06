@@ -1,105 +1,109 @@
 const jwt = require("jsonwebtoken");
-const mongoose = require("mongoose");
 const User = require("../modules/user/user.model");
 
-// ==========================================
-// AUTH MIDDLEWARE - PRODUCTION READY VERSION
-// ==========================================
+/* =========================
+   🧠 SAFE USER BUILDER
+========================= */
+const buildUserContext = (user) => {
+  return {
+    id: user?._id?.toString() || null,
+    name: user?.name || null,
+    email: user?.email || null,
+    role: user?.role || "employee",
+    tenantId: user?.tenantId || null,
+  };
+};
 
-// Protect routes
+/* =========================
+   🔐 AUTH PROTECT MIDDLEWARE
+========================= */
 const protect = async (req, res, next) => {
   try {
-    let token;
+    const authHeader = req.headers.authorization;
 
-    // Extract token from Authorization header
-    if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith("Bearer ")
-    ) {
-      token = req.headers.authorization.split(" ")[1];
-    }
-
-    if (!token) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
         success: false,
-        message: "Access denied. Token missing.",
+        message: "Authorization token missing",
       });
     }
 
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const token = authHeader.split(" ")[1];
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({
+        success: false,
+        message: "Token expired or invalid",
+      });
+    }
 
     if (!decoded?.id) {
       return res.status(401).json({
         success: false,
-        message: "Invalid token payload.",
+        message: "Invalid token payload",
       });
     }
 
-    // Fetch user
-    const user = await User.findById(decoded.id).select("-password");
+    const user = await User.findById(decoded.id).select(
+      "_id name email role tenantId isDeleted isActive"
+    );
 
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "User not found.",
+        message: "User not found",
       });
     }
 
     if (user.isDeleted || user.isActive === false) {
       return res.status(403).json({
         success: false,
-        message: "User account is inactive.",
+        message: "User inactive or deleted",
       });
     }
 
-    // Validate company mapping
-    let resolvedCompanyId = null;
+    const safeUser = buildUserContext(user);
 
-    if (
-      user.companyId &&
-      mongoose.Types.ObjectId.isValid(user.companyId)
-    ) {
-      resolvedCompanyId = user.companyId;
+    // 🚨 CRITICAL SAFETY CHECK (your real bug fix)
+    if (!safeUser.tenantId) {
+      return res.status(400).json({
+        success: false,
+        message: "Tenant missing in user context",
+      });
     }
 
-    // Attach clean user object
-    req.user = {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      companyId: resolvedCompanyId,
-      tenantId: user.tenantId || null,
-    };
+    req.user = safeUser;
 
     next();
   } catch (err) {
-    console.error("AUTH ERROR:", err.message);
+    console.error("AUTH ERROR:", err);
 
     return res.status(401).json({
       success: false,
-      message: "Invalid or expired token.",
+      message: "Authentication failed",
     });
   }
 };
 
-// ==========================================
-// ROLE-BASED AUTHORIZATION
-// ==========================================
+/* =========================
+   🧑‍💼 ROLE BASED ACCESS
+========================= */
 const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!req.user) {
+    if (!req.user?.id) {
       return res.status(401).json({
         success: false,
-        message: "Authentication required.",
+        message: "Unauthorized",
       });
     }
 
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: "Access denied.",
+        message: "Access denied for this role",
       });
     }
 
@@ -107,31 +111,53 @@ const authorize = (...roles) => {
   };
 };
 
-// ==========================================
-// ADMIN ONLY ACCESS
-// ==========================================
-const adminOnly = authorize("admin", "superadmin");
+/* =========================
+   👑 ADMIN ONLY
+========================= */
+const adminOnly = authorize("admin");
 
-// ==========================================
-// OPTIONAL COMPANY CHECK
-// Use this for routes that REQUIRE company mapping
-// ==========================================
-const requireCompany = (req, res, next) => {
-  if (!req.user?.companyId) {
-    return res.status(400).json({
-      success: false,
-      message: "Company not linked.",
-    });
-  }
+/* =========================
+   🧠 SAAS TENANT FILTER
+========================= */
+const buildTenantFilter = (user) => {
+  if (!user?.tenantId) return { isDeleted: false };
 
-  next();
+  return {
+    tenantId: user.tenantId,
+    isDeleted: false,
+  };
 };
 
-// ==========================================
-// EXPORTS
-// ==========================================
-module.exports = protect;
-module.exports.protect = protect;
-module.exports.authorize = authorize;
-module.exports.adminOnly = adminOnly;
-module.exports.requireCompany = requireCompany;
+/* =========================
+   🧠 ROLE SCOPING FILTER
+========================= */
+const buildScopeFilter = (user) => {
+  if (!user) return { isDeleted: false };
+
+  const base = {
+    tenantId: user.tenantId,
+    isDeleted: false,
+  };
+
+  if (user.role === "admin") return base;
+
+  if (user.role === "manager") {
+    return {
+      ...base,
+      managerId: user.id,
+    };
+  }
+
+  return {
+    ...base,
+    assignedTo: user.id,
+  };
+};
+
+module.exports = {
+  protect,
+  authorize,
+  adminOnly,
+  buildTenantFilter,
+  buildScopeFilter,
+};

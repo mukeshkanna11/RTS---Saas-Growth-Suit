@@ -2,24 +2,37 @@ const express = require("express");
 const router = express.Router();
 
 const { protect, authorize } = require("../../middleware/auth.middleware");
-
-// ✅ IMPORT ALL CONTROLLERS PROPERLY
 const userController = require("./user.controller");
 
-// =====================================================
-// 🏢 USER MANAGEMENT (ADMIN ONLY)
-// Base: /api/v1/users
-// =====================================================
+/* =========================================
+   🏢 USER MANAGEMENT ROUTES (SAAS RBAC)
+========================================= */
 
-// 🔥 Get all users
+/**
+ * 👥 GET USERS
+ * Admin → all users
+ * Manager → team users
+ */
 router.get(
   "/",
   protect,
-  authorize("admin"),
+  authorize("admin", "manager"),
   userController.getUsersController
 );
 
-// 🔥 Create user
+/**
+ * 👤 GET SINGLE USER
+ */
+router.get(
+  "/:id",
+  protect,
+  authorize("admin", "manager", "employee"),
+  userController.getUserById
+);
+
+/**
+ * ➕ CREATE USER (ADMIN ONLY)
+ */
 router.post(
   "/",
   protect,
@@ -27,7 +40,19 @@ router.post(
   userController.createUser
 );
 
-// 🔥 Update user role
+/**
+ * ✏️ UPDATE USER (ADMIN + MANAGER)
+ */
+router.put(
+  "/:id",
+  protect,
+  authorize("admin", "manager"),
+  userController.updateUser
+);
+
+/**
+ * 🧨 UPDATE ROLE (ADMIN ONLY)
+ */
 router.put(
   "/:id/role",
   protect,
@@ -35,7 +60,9 @@ router.put(
   userController.updateUserRole
 );
 
-// 🔥 Delete user
+/**
+ * ❌ DELETE USER (ADMIN ONLY)
+ */
 router.delete(
   "/:id",
   protect,
@@ -43,44 +70,13 @@ router.delete(
   userController.deleteUser
 );
 
-// =====================================================
-// 👤 PROFILE (ALL LOGGED IN USERS)
-// =====================================================
-
+/* =========================================
+   👤 PROFILE ROUTE
+========================================= */
 router.get(
   "/profile",
   protect,
   userController.getProfile
-);
-
-// =====================================================
-// 🧪 TEST ROUTES
-// =====================================================
-
-// Admin test
-router.get(
-  "/test/admin",
-  protect,
-  authorize("admin"),
-  (req, res) => {
-    res.json({
-      success: true,
-      message: "Admin access granted ✅",
-    });
-  }
-);
-
-// Manager test
-router.get(
-  "/test/manager",
-  protect,
-  authorize("admin", "manager"),
-  (req, res) => {
-    res.json({
-      success: true,
-      message: "Manager access granted ✅",
-    });
-  }
 );
 
 module.exports = router;

@@ -4,50 +4,142 @@ const leadService = require("./lead.service");
 // 🔥 MARKETING AUTOMATION
 const { runLeadAutomation } = require("../marketing/automation.engine");
 
-// ---------------- COMMON RESPONSE ----------------
+// ---------------- RESPONSE HELPERS ----------------
 const success = (res, data, message = "Success") =>
   res.json({ success: true, message, data });
 
 const fail = (res, message = "Error", code = 500) =>
   res.status(code).json({ success: false, message });
 
-// -------------------------------
+// =====================================================
+// 🔐 SAFE USER EXTRACTOR (IMPORTANT FIX 🔥)
+// =====================================================
+const getUser = (req) => {
+  if (!req.user) return null;
+
+  return {
+    id: req.user.id,
+    role: req.user.role,
+    tenantId: req.user.tenantId,
+    name: req.user.name,
+    email: req.user.email,
+  };
+};
+
+// =====================================================
+// 🔐 RBAC FILTER
+// =====================================================
+const buildAccessFilter = (user) => {
+  if (!user) return null;
+
+  const base = {
+    tenantId: user.tenantId,
+    isDeleted: false,
+  };
+
+  if (user.role === "admin") return base;
+
+  if (user.role === "manager") {
+    return {
+      ...base,
+      managerId: user.id,
+    };
+  }
+
+  return {
+    ...base,
+    assignedTo: user.id,
+  };
+};
+
+// =====================================================
 // 🟢 CREATE LEAD
-// -------------------------------
+// =====================================================
 exports.createLead = async (req, res, next) => {
   try {
-    const tenantId = req.user.tenantId;
+    // -------------------------------
+    // 🔐 SAFE USER EXTRACTION (DIRECT FROM MIDDLEWARE)
+    // -------------------------------
+    const user = req.user;
 
-    if (!req.body.name) {
-      return fail(res, "Name is required", 400);
+    if (!user || !user.id) {
+      return fail(res, "Unauthorized - user missing from auth middleware", 401);
     }
 
-    const lead = await leadService.createLead(req.body, tenantId);
+    if (!user.tenantId) {
+      return fail(res, "Unauthorized - tenant missing", 401);
+    }
 
-    // 🔥 Trigger automation (NON-BLOCKING)
+    // -------------------------------
+    // 🚫 ROLE CHECK
+    // -------------------------------
+    if (user.role === "employee") {
+      return fail(res, "Not allowed", 403);
+    }
+
+    // -------------------------------
+    // 🟢 BUILD LEAD PAYLOAD (SAFELY)
+    // -------------------------------
+    const leadPayload = {
+      ...req.body,
+
+      tenantId: user.tenantId,
+
+      createdBy: user.id,
+
+      managerId:
+        user.role === "manager"
+          ? user.id
+          : req.body.managerId || null,
+
+      assignedTo: req.body.assignedTo || null,
+    };
+
+    // -------------------------------
+    // 🟢 CREATE LEAD
+    // -------------------------------
+    const lead = await leadService.createLead(
+      leadPayload,
+      user.tenantId,
+      user
+    );
+
+    // -------------------------------
+    // 🔥 AUTOMATION (NON-BLOCKING)
+    // -------------------------------
     setImmediate(() => {
       runLeadAutomation(
-        { ...lead.toObject(), trigger: "lead_created" },
-        req.user
-      ).catch((err) =>
-        console.error("Automation Error:", err.message)
-      );
+        {
+          ...lead.toObject(),
+          trigger: "lead_created",
+        },
+        user
+      ).catch(() => {});
     });
 
-    success(res, lead, "Lead created");
+    // -------------------------------
+    // ✅ RESPONSE
+    // -------------------------------
+    return success(res, lead, "Lead created");
   } catch (err) {
     next(err);
   }
 };
 
-// -------------------------------
-// 📥 GET ALL LEADS (WITH PAGINATION)
-// -------------------------------
+// =====================================================
+// 📥 GET ALL LEADS
+// =====================================================
 exports.getLeads = async (req, res) => {
   try {
-    const tenantId = req.user.tenantId;
+    const user = getUser(req);
+    if (!user) return fail(res, "Unauthorized", 401);
 
-    const result = await leadService.getLeads(req.query, tenantId);
+    const filter = buildAccessFilter(user);
+
+    const result = await leadService.getLeads(
+      { ...req.query, accessFilter: filter },
+      user.tenantId
+    );
 
     success(res, result);
   } catch (err) {
@@ -55,16 +147,22 @@ exports.getLeads = async (req, res) => {
   }
 };
 
-// -------------------------------
-// 🔍 GET SINGLE LEAD
-// -------------------------------
+// =====================================================
+// 🔍 GET ONE LEAD
+// =====================================================
 exports.getLeadById = async (req, res) => {
   try {
-    const tenantId = req.user.tenantId;
+    const user = getUser(req);
+    if (!user) return fail(res, "Unauthorized", 401);
 
-    const lead = await leadService.getLeadById(req.params.id, tenantId);
+    const filter = buildAccessFilter(user);
 
-    if (!lead) return fail(res, "Lead not found", 404);
+    const lead = await Lead.findOne({
+      _id: req.params.id,
+      ...filter,
+    });
+
+    if (!lead) return fail(res, "Not found / No access", 404);
 
     success(res, lead);
   } catch (err) {
@@ -72,201 +170,222 @@ exports.getLeadById = async (req, res) => {
   }
 };
 
-// -------------------------------
+// =====================================================
 // 👤 ASSIGN LEAD
-// -------------------------------
+// =====================================================
 exports.assignLead = async (req, res) => {
   try {
-    const { userId } = req.body;
-    const tenantId = req.user.tenantId;
+    const user = getUser(req);
+    if (!user) return fail(res, "Unauthorized", 401);
 
-    if (!userId) return fail(res, "UserId required", 400);
+    if (user.role === "employee") {
+      return fail(res, "Not allowed", 403);
+    }
 
     const lead = await leadService.assignLead(
       req.params.id,
-      userId,
-      tenantId,
-      req.user.id
+      req.body.userId,
+      user.tenantId,
+      user.id
     );
 
-    success(res, lead, "Lead assigned");
+    success(res, lead, "Assigned");
   } catch (err) {
     fail(res, err.message);
   }
 };
 
-// -------------------------------
+// =====================================================
 // ✏️ UPDATE LEAD
-// -------------------------------
+// =====================================================
 exports.updateLead = async (req, res) => {
   try {
-    const tenantId = req.user.tenantId;
+    const user = getUser(req);
+    if (!user) return fail(res, "Unauthorized", 401);
 
-    const lead = await leadService.updateLead(
-      req.params.id,
-      req.body,
-      tenantId,
-      req.user.id
-    );
+    const filter = buildAccessFilter(user);
 
-    if (!lead) return fail(res, "Lead not found", 404);
-
-    success(res, lead, "Lead updated");
-  } catch (err) {
-    fail(res, err.message);
-  }
-};
-
-// -------------------------------
-// 🔄 UPDATE STATUS + AUTOMATION
-// -------------------------------
-exports.updateStatus = async (req, res) => {
-  try {
-    const { status } = req.body;
-    const tenantId = req.user.tenantId;
-
-    if (!status) return fail(res, "Status required", 400);
-
-    const lead = await leadService.updateStatus(
-      req.params.id,
-      status,
-      tenantId,
-      req.user.id
-    );
-
-    // 🔥 Trigger automation (status-based)
-    setImmediate(() => {
-      runLeadAutomation(
-        { ...lead.toObject(), trigger: "status_changed", status },
-        req.user
-      ).catch((err) =>
-        console.error("Automation Error:", err.message)
-      );
+    const lead = await Lead.findOne({
+      _id: req.params.id,
+      ...filter,
     });
 
-    success(res, lead, "Status updated");
+    if (!lead) return fail(res, "No access", 403);
+
+    const updated = await leadService.updateLead(
+      req.params.id,
+      req.body,
+      user.tenantId,
+      user.id
+    );
+
+    success(res, updated, "Updated");
   } catch (err) {
     fail(res, err.message);
   }
 };
 
-// -------------------------------
-// 🔔 ADD FOLLOW-UP
-// -------------------------------
-exports.addFollowUp = async (req, res) => {
+// =====================================================
+// 🔄 UPDATE STATUS
+// =====================================================
+exports.updateStatus = async (req, res) => {
   try {
-    const { followUpDate, nextAction } = req.body;
-    const tenantId = req.user.tenantId;
+    const user = getUser(req);
+    if (!user) return fail(res, "Unauthorized", 401);
 
-    const lead = await leadService.addFollowUp(
+    const { status } = req.body;
+    if (!status) return fail(res, "Status required", 400);
+
+    const filter = buildAccessFilter(user);
+
+    const lead = await Lead.findOne({
+      _id: req.params.id,
+      ...filter,
+    });
+
+    if (!lead) return fail(res, "No access", 403);
+
+    const updated = await leadService.updateStatus(
       req.params.id,
-      followUpDate,
-      nextAction,
-      tenantId,
-      req.user.id
+      status,
+      user.tenantId,
+      user.id
     );
 
-    success(res, lead, "Follow-up scheduled");
-  } catch (err) {
-    fail(res, err.message);
-  }
-};
-
-// -------------------------------
-// 📝 ADD NOTE
-// -------------------------------
-exports.addNote = async (req, res) => {
-  try {
-    const { text } = req.body;
-    const tenantId = req.user.tenantId;
-
-    if (!text) return fail(res, "Note text required", 400);
-
-    const lead = await leadService.addNote(
-      req.params.id,
-      text,
-      tenantId,
-      req.user.id
-    );
-
-    success(res, lead, "Note added");
-  } catch (err) {
-    fail(res, err.message);
-  }
-};
-
-// -------------------------------
-// 📜 ADD ACTIVITY (CALL / EMAIL / MEETING)
-// -------------------------------
-exports.addActivity = async (req, res) => {
-  try {
-    const { type, note } = req.body;
-    const tenantId = req.user.tenantId;
-
-    const lead = await leadService.addActivity(
-      req.params.id,
-      type,
-      note,
-      tenantId,
-      req.user.id
-    );
-
-    success(res, lead, "Activity logged");
-  } catch (err) {
-    fail(res, err.message);
-  }
-};
-
-// -------------------------------
-// 🔥 CONVERT LEAD → CUSTOMER
-// -------------------------------
-exports.convertLead = async (req, res) => {
-  try {
-    const tenantId = req.user.tenantId;
-
-    const lead = await leadService.convertLead(
-      req.params.id,
-      tenantId,
-      req.user.id
-    );
-
-    // 🔥 Trigger conversion automation
     setImmediate(() => {
       runLeadAutomation(
-        { ...lead.toObject(), trigger: "lead_converted" },
-        req.user
+        { ...updated.toObject(), trigger: "status_changed", status },
+        user
       ).catch(() => {});
     });
 
-    success(res, lead, "Lead converted 🎉");
+    success(res, updated, "Status updated");
   } catch (err) {
     fail(res, err.message);
   }
 };
 
-// -------------------------------
-// ❌ DELETE LEAD (SOFT)
-// -------------------------------
-exports.deleteLead = async (req, res) => {
+// =====================================================
+// 🔔 FOLLOW-UP
+// =====================================================
+exports.addFollowUp = async (req, res) => {
   try {
-    const tenantId = req.user.tenantId;
+    const user = getUser(req);
+    if (!user) return fail(res, "Unauthorized", 401);
 
-    await leadService.deleteLead(req.params.id, tenantId);
+    const filter = buildAccessFilter(user);
 
-    success(res, null, "Lead deleted");
+    const lead = await Lead.findOne({
+      _id: req.params.id,
+      ...filter,
+    });
+
+    if (!lead) return fail(res, "No access", 403);
+
+    const updated = await leadService.addFollowUp(
+      req.params.id,
+      req.body.followUpDate,
+      req.body.nextAction,
+      user.tenantId,
+      user.id
+    );
+
+    success(res, updated, "Follow-up added");
   } catch (err) {
     fail(res, err.message);
   }
 };
 
-// -------------------------------
-// 📊 PIPELINE STATS
-// -------------------------------
+// =====================================================
+// 📝 NOTE
+// =====================================================
+exports.addNote = async (req, res) => {
+  try {
+    const user = getUser(req);
+    if (!user) return fail(res, "Unauthorized", 401);
+
+    const filter = buildAccessFilter(user);
+
+    const lead = await Lead.findOne({
+      _id: req.params.id,
+      ...filter,
+    });
+
+    if (!lead) return fail(res, "No access", 403);
+
+    const updated = await leadService.addNote(
+      req.params.id,
+      req.body.text,
+      user.tenantId,
+      user.id
+    );
+
+    success(res, updated, "Note added");
+  } catch (err) {
+    fail(res, err.message);
+  }
+};
+
+// =====================================================
+// 📜 ACTIVITY
+// =====================================================
+exports.addActivity = async (req, res) => {
+  try {
+    const user = getUser(req);
+    if (!user) return fail(res, "Unauthorized", 401);
+
+    const filter = buildAccessFilter(user);
+
+    const lead = await Lead.findOne({
+      _id: req.params.id,
+      ...filter,
+    });
+
+    if (!lead) return fail(res, "No access", 403);
+
+    await leadService.addActivity(
+      req.params.id,
+      req.body.type,
+      req.body.note,
+      user.tenantId,
+      user.id
+    );
+
+    success(res, null, "Activity added");
+  } catch (err) {
+    fail(res, err.message);
+  }
+};
+
+// =====================================================
+// 🔥 CONVERT LEAD
+// =====================================================
+exports.convertLead = async (req, res) => {
+  try {
+    const user = getUser(req);
+    if (!user) return fail(res, "Unauthorized", 401);
+
+    const lead = await leadService.convertLead(
+      req.params.id,
+      user.tenantId,
+      user.id
+    );
+
+    success(res, lead, "Converted 🎉");
+  } catch (err) {
+    fail(res, err.message);
+  }
+};
+
+// =====================================================
+// 📊 PIPELINE
+// =====================================================
 exports.getPipelineStats = async (req, res) => {
   try {
-    const tenantId = req.user.tenantId;
+    const user = getUser(req);
+    if (!user) return fail(res, "Unauthorized", 401);
 
-    const stats = await leadService.getPipelineStats(tenantId);
+    const stats = await leadService.getPipelineStats(user.tenantId);
 
     success(res, stats);
   } catch (err) {
@@ -274,14 +393,15 @@ exports.getPipelineStats = async (req, res) => {
   }
 };
 
-// -------------------------------
-// 📅 TODAY FOLLOW-UPS
-// -------------------------------
+// =====================================================
+// 📅 TODAY FOLLOWUPS
+// =====================================================
 exports.getTodayFollowUps = async (req, res) => {
   try {
-    const tenantId = req.user.tenantId;
+    const user = getUser(req);
+    if (!user) return fail(res, "Unauthorized", 401);
 
-    const leads = await leadService.getTodayFollowUps(tenantId);
+    const leads = await leadService.getTodayFollowUps(user.tenantId);
 
     success(res, leads);
   } catch (err) {
@@ -289,29 +409,43 @@ exports.getTodayFollowUps = async (req, res) => {
   }
 };
 
-// -------------------------------
-// 📂 CSV IMPORT + AUTOMATION
-// -------------------------------
+// =====================================================
+// 📂 IMPORT CSV
+// =====================================================
 exports.importCSV = async (req, res) => {
   try {
-    const tenantId = req.user.tenantId;
+    const user = getUser(req);
+    if (!user) return fail(res, "Unauthorized", 401);
 
-    if (!req.file) return fail(res, "CSV file required", 400);
+    if (!req.file) return fail(res, "CSV required", 400);
 
-    const leads = await leadService.importCSV(req.file.path, tenantId);
+    const leads = await leadService.importCSV(
+      req.file.path,
+      user.tenantId
+    );
 
-    // 🔥 Bulk automation (non-blocking)
-    setImmediate(() => {
-      leads.forEach((lead) => {
-        runLeadAutomation(
-          { ...lead.toObject(), trigger: "lead_imported" },
-          req.user
-        ).catch(() => {});
-      });
-    });
-
-    success(res, { count: leads.length }, "CSV imported");
+    success(res, { count: leads.length }, "Imported");
   } catch (err) {
     fail(res, err.message);
+  }
+};
+
+// =====================================================
+// ❌ DELETE
+// =====================================================
+exports.deleteLead = async (req, res, next) => {
+  try {
+    const result = await leadService.deleteLead(
+      req.params.id,
+      req.user.tenantId,
+      req.user
+    );
+
+    return res.status(result.statusCode || 200).json({
+      success: result.success ?? true,
+      message: result.message,
+    });
+  } catch (err) {
+    next(err);
   }
 };

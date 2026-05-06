@@ -1,92 +1,95 @@
 const authService = require("./auth.service");
 const { signupSchema, loginSchema } = require("./auth.validation");
 
-// --------------------------------------
-// 📝 REGISTER
-// --------------------------------------
+/* ===============================
+   🧠 SAFE RESPONSE HELPERS
+=============================== */
+const success = (res, data, message = "Success", code = 200) =>
+  res.status(code).json({ success: true, message, data });
+
+const fail = (res, message = "Error", code = 400) =>
+  res.status(code).json({ success: false, message });
+
+/* ===============================
+   📝 REGISTER CONTROLLER
+=============================== */
 exports.register = async (req, res) => {
   try {
     const result = signupSchema.safeParse(req.body);
 
     if (!result.success) {
-      return res.status(400).json({
-        success: false,
-        message: result.error.issues[0].message,
-      });
+      return fail(
+        res,
+        result.error.issues?.[0]?.message || "Validation error",
+        400
+      );
     }
 
     const data = await authService.register(result.data);
 
-    return res.status(201).json({
-      success: true,
-      message: "User registered successfully",
-      data,
-    });
-
+    return success(res, data, "Account created successfully", 201);
   } catch (err) {
     console.error("REGISTER ERROR:", err);
 
     return res.status(err.statusCode || 500).json({
       success: false,
-      message: err.message || "Something went wrong during registration",
+      message: err.message || "Registration failed",
     });
   }
 };
 
-
-// --------------------------------------
-// 🔐 LOGIN
-// --------------------------------------
+/* ===============================
+   🔐 LOGIN CONTROLLER (FIXED SAAS SAFE)
+=============================== */
 exports.login = async (req, res) => {
   try {
     const result = loginSchema.safeParse(req.body);
 
     if (!result.success) {
-      return res.status(400).json({
-        success: false,
-        message: result.error.issues[0].message,
-      });
+      return fail(
+        res,
+        result.error.issues?.[0]?.message || "Validation error",
+        400
+      );
     }
 
     const data = await authService.login(result.data);
 
-    return res.status(200).json({
-      success: true,
-      message: "Login successful",
-      data,
-    });
+    // 🔥 IMPORTANT SAFETY CHECK
+    if (!data?.token || !data?.user) {
+      return fail(res, "Login service returned invalid response", 500);
+    }
 
+    // 🔥 ENSURE TENANT ALWAYS EXISTS (critical for your SaaS bug)
+    if (!data.user.tenantId) {
+      return fail(res, "Tenant not assigned to user", 400);
+    }
+
+    return success(res, data, "Login successful");
   } catch (err) {
     console.error("LOGIN ERROR:", err);
 
     return res.status(err.statusCode || 401).json({
       success: false,
-      message: err.message || "Invalid email or password",
+      message: err.message || "Invalid credentials",
     });
   }
 };
 
-
-
-// --------------------------------------
-// 🚪 LOGOUT
-// --------------------------------------
+/* ===============================
+   🚪 LOGOUT CONTROLLER (SAFE)
+=============================== */
 exports.logout = async (req, res) => {
   try {
-    if (!req.user?.id) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return fail(res, "Unauthorized access", 401);
     }
 
-    await authService.logout(req.user.id);
+    await authService.logout(userId);
 
-    return res.status(200).json({
-      success: true,
-      message: "Logged out successfully",
-    });
-
+    return success(res, null, "Logged out successfully");
   } catch (err) {
     console.error("LOGOUT ERROR:", err);
 

@@ -2,43 +2,25 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../user/user.model");
 const Company = require("../company/company.model");
+const crypto = require("crypto");
 
-// --------------------------------------
-// ✅ CUSTOM ERROR CLASS (IMPORTANT)
-// --------------------------------------
+/* ================= ERROR CLASS ================= */
 class AppError extends Error {
-  constructor(message, statusCode) {
+  constructor(message, statusCode = 400) {
     super(message);
     this.statusCode = statusCode;
   }
 }
 
-// --------------------------------------
-// 🔥 GENERATE TENANT ID
-// --------------------------------------
-const generateTenantId = async () => {
-  const count = await Company.countDocuments();
-  return "RTS" + String(count + 1).padStart(3, "0");
-};
-
-// --------------------------------------
-// 🔥 GENERATE SLUG
-// --------------------------------------
-const generateSlug = (name) => {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "");
-};
-
-// --------------------------------------
-// 🔐 GENERATE TOKENS
-// --------------------------------------
+/* ================= TOKEN GENERATOR (FIXED) ================= */
 const generateTokens = (user) => {
+  if (!user?.tenantId) {
+    throw new AppError("Tenant missing in user - cannot generate token", 500);
+  }
+
   const payload = {
-    id: user._id,
-    tenantId: user.tenantId,
+    id: user._id.toString(),
+    tenantId: user.tenantId.toString(), // 🔥 FORCE STRING SAFETY
     role: user.role,
   };
 
@@ -47,7 +29,11 @@ const generateTokens = (user) => {
   });
 
   const refreshToken = jwt.sign(
-    { id: user._id },
+    {
+      id: user._id.toString(),
+      tenantId: user.tenantId.toString(), // 🔥 ADD FOR CONSISTENCY
+      ver: crypto.randomUUID(),
+    },
     process.env.JWT_REFRESH_SECRET,
     { expiresIn: "7d" }
   );
@@ -55,37 +41,41 @@ const generateTokens = (user) => {
   return { accessToken, refreshToken };
 };
 
-// --------------------------------------
-// 📝 REGISTER
-// --------------------------------------
+/* ================= SAFE USER ================= */
+const sanitizeUser = (user) => {
+  const obj = user.toObject ? user.toObject() : user;
+
+  delete obj.password;
+  delete obj.refreshToken;
+  delete obj.__v;
+
+  return obj;
+};
+
+/* ================= REGISTER ================= */
 exports.register = async (data) => {
   const { name, email, password, companyName } = data;
 
   const cleanEmail = email.toLowerCase().trim();
 
-  // 🔥 Check global duplicate email
-  const existingUser = await User.findOne({ email: cleanEmail });
-  if (existingUser) {
-    throw new AppError("Email already registered", 400);
-  }
+  const exists = await User.findOne({ email: cleanEmail });
+  if (exists) throw new AppError("Email already exists", 400);
 
-  const tenantId = await generateTenantId();
-  const slug = generateSlug(companyName + "-" + Date.now());
+  const tenantId = "RTS-" + crypto.randomBytes(3).toString("hex");
 
   const company = await Company.create({
     name: companyName,
     tenantId,
-    slug,
   });
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const hashed = await bcrypt.hash(password, 10);
 
   const user = await User.create({
     name,
     email: cleanEmail,
-    password: hashedPassword,
+    password: hashed,
     role: "admin",
-    tenantId,
+    tenantId, // 🔥 GUARANTEED HERE
   });
 
   const tokens = generateTokens(user);
@@ -94,62 +84,30 @@ exports.register = async (data) => {
   await user.save();
 
   return {
-    user,
+    user: sanitizeUser(user),
     company,
-    ...tokens,
+    accessToken: tokens.accessToken,
   };
 };
 
-// --------------------------------------
-// 👤 CREATE USER (ADMIN)
-// --------------------------------------
-exports.createUser = async (data, tenantId) => {
-  const { name, email, password, role } = data;
-
-  const cleanEmail = email.toLowerCase().trim();
-
-  if (role === "admin") {
-    throw new AppError("Cannot create admin user", 403);
-  }
-
-  const existingUser = await User.findOne({
-    email: cleanEmail,
-    tenantId,
-  });
-
-  if (existingUser) {
-    throw new AppError("User already exists in this company", 400);
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const user = await User.create({
-    name,
-    email: cleanEmail,
-    password: hashedPassword,
-    role,
-    tenantId,
-  });
-
-  return user;
-};
-
-// --------------------------------------
-// 🔐 LOGIN
-// --------------------------------------
+/* ================= LOGIN (FIXED SAFETY) ================= */
 exports.login = async ({ email, password }) => {
   const cleanEmail = email.toLowerCase().trim();
 
   const user = await User.findOne({ email: cleanEmail }).select("+password");
 
   if (!user) {
-    throw new AppError("Invalid email or password", 401);
+    throw new AppError("Invalid credentials", 401);
   }
 
-  const isMatch = await bcrypt.compare(password, user.password);
+  if (!user.tenantId) {
+    throw new AppError("User not assigned to tenant", 400);
+  }
 
-  if (!isMatch) {
-    throw new AppError("Invalid email or password", 401);
+  const match = await bcrypt.compare(password, user.password);
+
+  if (!match) {
+    throw new AppError("Invalid credentials", 401);
   }
 
   const tokens = generateTokens(user);
@@ -158,23 +116,7 @@ exports.login = async ({ email, password }) => {
   await user.save();
 
   return {
-    user,
-    ...tokens,
+    user: sanitizeUser(user),
+    accessToken: tokens.accessToken,
   };
-};
-
-
-// --------------------------------------
-// 🚪 LOGOUT
-// --------------------------------------
-exports.logout = async (userId) => {
-  if (!userId) {
-    throw new AppError("User ID required", 400);
-  }
-
-  await User.findByIdAndUpdate(userId, {
-    refreshToken: null,
-  });
-
-  return true;
 };

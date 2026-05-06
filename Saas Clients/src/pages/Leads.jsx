@@ -1,9 +1,8 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import API from "../api";
 import { useAuthStore } from "../store/authStore";
 
 export default function Leads() {
-
   /* ================= AUTH ================= */
   const token = useAuthStore((s) => s.token);
   const logout = useAuthStore((s) => s.logout);
@@ -11,13 +10,12 @@ export default function Leads() {
   /* ================= STATES ================= */
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [formError, setFormError] = useState("");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const [file, setFile] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const [form, setForm] = useState({
     name: "",
@@ -29,96 +27,64 @@ export default function Leads() {
     tags: [],
   });
 
-  /* ================= REFS ================= */
-  const controllerRef = useRef(null);
-  const debounceRef = useRef(null);
-  const isFetchingRef = useRef(false);
+ /* ================= FETCH LEADS ================= */
+const fetchLeads = useCallback(async () => {
+  if (!token) {
+    console.warn("⚠️ No token, skipping fetch");
+    return;
+  }
 
-  /* ================= FETCH LEADS ================= */
-  const fetchLeads = useCallback(async () => {
-    if (!token) return;
+  try {
+    setLoading(true);
 
-    if (isFetchingRef.current) return;
-    isFetchingRef.current = true;
+    const res = await API.get("/leads");
 
-    const controller = new AbortController();
-    controllerRef.current = controller;
+    console.log("✅ API RESPONSE:", res.data);
 
-    try {
-      setLoading(true);
+    const leadsData = res?.data?.data?.leads || [];
 
-      const params = {
-        ...(search ? { search } : {}),
-        ...(statusFilter !== "all" ? { status: statusFilter } : {}),
-      };
+    setLeads(leadsData);
 
-      const res = await API.get("/leads", {
-        params,
-        signal: controller.signal,
-      });
+  } catch (err) {
+    console.error("❌ Fetch error:", err?.response?.data || err.message);
+    setLeads([]);
+  } finally {
+    setLoading(false);
+  }
+}, [token]);
 
-      setLeads(res?.data?.data?.leads || []);
+  /* ================= AUTO FETCH ================= */
+useEffect(() => {
+  if (token) {
+    fetchLeads();
+  }
+}, [token, fetchLeads]);
 
-    } catch (err) {
-
-      if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") return;
-
-      console.error("❌ Leads fetch error:", {
-        message: err?.message,
-        status: err?.response?.status,
-        data: err?.response?.data,
-      });
-
-      if (err?.response?.status === 401) {
-        logout();
-      }
-
-    } finally {
-      setLoading(false);
-      isFetchingRef.current = false;
-    }
-  }, [search, statusFilter, token, logout]);
-
-  /* ================= DEBOUNCE ================= */
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    debounceRef.current = setTimeout(() => {
-      fetchLeads();
-    }, 600);
-
-    return () => clearTimeout(debounceRef.current);
-  }, [fetchLeads]);
-
-  /* ================= CREATE LEAD ================= */
+  /* ================= CREATE ================= */
   const handleCreateLead = async () => {
     try {
-      if (!token) return;
-
       setFormError("");
 
       if (!form.name.trim()) {
-        setFormError("Name is required");
+        setFormError("Name required");
         return;
       }
 
-      const payload = {
-        ...form,
-        name: form.name.trim(),
-      };
+      const res = await API.post("/leads", form);
 
-      const res = await API.post("/leads", payload);
+      // 🔥 FIX: backend returns data directly
+      const newLead = res?.data?.data;
 
-      setLeads((prev) => [res.data.data.lead, ...prev]);
+      setLeads((prev) => [newLead, ...prev]);
+
       setShowModal(false);
 
     } catch (err) {
-      console.error(err);
       setFormError(err?.response?.data?.message || "Create failed");
     }
   };
 
-  /* ================= STATUS UPDATE ================= */
+  /* ================= STATUS ================= */
   const handleStatusChange = async (id, status) => {
     const prev = [...leads];
 
@@ -128,7 +94,7 @@ export default function Leads() {
 
     try {
       await API.patch(`/leads/${id}/status`, { status });
-    } catch (err) {
+    } catch {
       setLeads(prev);
     }
   };
@@ -136,6 +102,7 @@ export default function Leads() {
   /* ================= DELETE ================= */
   const handleDelete = async (id) => {
     const prev = [...leads];
+
     setLeads((p) => p.filter((l) => l._id !== id));
 
     try {
@@ -145,66 +112,73 @@ export default function Leads() {
     }
   };
 
-  /* ================= CSV UPLOAD ================= */
-  const handleCSVUpload = async () => {
-    if (!file) return alert("Select file");
-
-    const fd = new FormData();
-    fd.append("file", file);
-
-    try {
-      await API.post("/leads/import", fd);
-      fetchLeads();
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // ================= GET NOTES TEXT =================//
-const getNotesText = (notes) => {
-  if (!notes) return "No notes";
-
-  if (typeof notes === "string") return notes;
+  /* ================= NOTES FIX ================= */
+ const getNotesText = (notes) => {
+  if (!notes || notes.length === 0) return "-";
 
   if (Array.isArray(notes)) {
-    return notes
-      .map((n) =>
-        typeof n === "string"
-          ? n
-          : n?.text || n?.note || JSON.stringify(n)
-      )
-      .join(", ");
+    return notes.map((n) => n.text).join(", ");
   }
 
-  if (typeof notes === "object") {
-    return notes?.text || notes?.note || JSON.stringify(notes);
-  }
-
-  return "No notes";
+  return notes;
 };
 
-  
-  /* ================= HELPERS ================= */
-  const getScoreTag = (score = 0) => {
-    if (score > 70) return "🔥 Hot";
-    if (score > 40) return "⚡ Warm";
-    return "❄ Cold";
-  };
+  /* ================= STATS ================= */
+  const stats = useMemo(() => {
+    return {
+      total: leads.length,
+      new: leads.filter((l) => l.status === "new").length,
+      qualified: leads.filter((l) => l.status === "qualified").length,
+      converted: leads.filter((l) => l.status === "converted").length,
+    };
+  }, [leads]);
 
-  const badge = (s) => ({
-    new: "text-blue-400",
-    contacted: "text-purple-400",
-    qualified: "text-yellow-400",
-    converted: "text-green-400",
-    lost: "text-red-400",
-  }[s] || "text-gray-400");
+  /* ================= CSV UPLOAD ================= */
+const handleCSVUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
-  const stats = useMemo(() => ({
-    total: leads.length,
-    new: leads.filter((l) => l.status === "new").length,
-    qualified: leads.filter((l) => l.status === "qualified").length,
-    converted: leads.filter((l) => l.status === "converted").length,
-  }), [leads]);
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const res = await API.post("/leads/upload", formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    console.log("Upload success:", res.data);
+  } catch (err) {
+    console.error("Upload failed:", err);
+  }
+};
+
+
+/* ================= SCORE TAG ================= */
+const getScoreTag = (score) => {
+  if (score >= 80) return <span className="text-red-500">🔥 Hot</span>;
+  if (score >= 50) return <span className="text-yellow-500">⚡ Warm</span>;
+  return <span className="text-blue-400">❄️ Cold</span>;
+};
+
+
+/* ================= BADGE ================= */
+const badge = (status) => {
+  switch (status) {
+    case "new":
+      return "bg-blue-500 text-white px-2 py-1 rounded";
+    case "qualified":
+      return "bg-yellow-500 text-black px-2 py-1 rounded";
+    case "converted":
+      return "bg-green-600 text-white px-2 py-1 rounded";
+    case "contacted":
+      return "bg-purple-500 text-white px-2 py-1 rounded";
+    default:
+      return "bg-gray-400 text-white px-2 py-1 rounded";
+  }
+};
 
   /* ================= UI ================= */
   return (

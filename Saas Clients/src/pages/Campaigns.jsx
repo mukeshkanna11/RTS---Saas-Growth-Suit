@@ -12,14 +12,7 @@ export default function Campaigns() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-  const [editForm, setEditForm] = useState({
-    _id: "",
-    name: "",
-    type: "email",
-    subject: "",
-    content: "",
-  });
-
+  const [editForm, setEditForm] = useState({});
   const [form, setForm] = useState({
     name: "",
     type: "email",
@@ -27,34 +20,33 @@ export default function Campaigns() {
     content: "",
   });
 
-  const [stats, setStats] = useState({
-    total: 0,
-    success: 0,
-    failed: 0,
-  });
+  /* ================= SAFE API CALL ================= */
+  const safeCall = async (fn, label) => {
+    try {
+      return await fn();
+    } catch (err) {
+      console.error(label, err);
+
+      if (err.response) {
+        alert(err.response.data?.message || "Server error");
+      } else {
+        alert("⚠️ Backend not reachable (Render sleeping)");
+      }
+      throw err;
+    }
+  };
 
   /* ================= FETCH ================= */
   const fetchCampaigns = async () => {
     try {
       setLoading(true);
-      const res = await API.get("/marketing/campaign");
-      const data = res.data?.data || [];
 
-      setCampaigns(data);
+      const res = await safeCall(
+        () => API.get("/marketing/campaign"),
+        "FETCH"
+      );
 
-      let success = 0;
-      let failed = 0;
-
-      data.forEach((c) => {
-        success += c.stats?.success || 0;
-        failed += c.stats?.failed || 0;
-      });
-
-      setStats({
-        total: data.length,
-        success,
-        failed,
-      });
+      setCampaigns(res.data?.data || []);
     } finally {
       setLoading(false);
     }
@@ -66,23 +58,48 @@ export default function Campaigns() {
 
   /* ================= CREATE ================= */
   const createCampaign = async () => {
-    await API.post("/marketing/campaign", form);
+    if (!form.name || !form.content) {
+      return alert("Name & Content required");
+    }
 
-    setForm({
-      name: "",
-      type: "email",
-      subject: "",
-      content: "",
-    });
+    try {
+      setActionLoading("create");
 
-    fetchCampaigns();
+      const res = await safeCall(
+        () =>
+          API.post("/marketing/campaign", {
+            ...form,
+            type: form.type.toLowerCase(),
+          }),
+        "CREATE"
+      );
+
+      // ✅ instant UI update
+      setCampaigns((prev) => [res.data.data, ...prev]);
+
+      setForm({
+        name: "",
+        type: "email",
+        subject: "",
+        content: "",
+      });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   /* ================= SEND ================= */
   const sendCampaign = async (id) => {
     try {
       setActionLoading(id);
-      await API.post(`/marketing/campaign/${id}/send`);
+
+      await safeCall(
+        () => API.post(`/marketing/campaign/${id}/send`),
+        "SEND"
+      );
+
+      alert("Campaign Sent 🚀");
+
       fetchCampaigns();
     } finally {
       setActionLoading(null);
@@ -91,59 +108,95 @@ export default function Campaigns() {
 
   /* ================= EDIT ================= */
   const openEdit = (c) => {
-    setEditForm(c);
+    setEditForm({
+      _id: c._id,
+      name: c.name || "",
+      subject: c.subject || "",
+      content: c.content || "",
+      type: c.type || "email",
+    });
     setIsEditOpen(true);
   };
 
   const updateCampaign = async () => {
-    await API.put(`/marketing/campaign/${editForm._id}`, editForm);
-    setIsEditOpen(false);
-    fetchCampaigns();
+    try {
+      setActionLoading("update");
+
+      const payload = {
+        name: editForm.name,
+        subject: editForm.subject,
+        content: editForm.content,
+        type: editForm.type.toLowerCase(),
+      };
+
+      await safeCall(
+        () => API.put(`/marketing/campaign/${editForm._id}`, payload),
+        "UPDATE"
+      );
+
+      // ✅ instant UI update
+      setCampaigns((prev) =>
+        prev.map((c) =>
+          c._id === editForm._id ? { ...c, ...payload } : c
+        )
+      );
+
+      setIsEditOpen(false);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   /* ================= DELETE ================= */
   const deleteCampaign = async () => {
-    await API.delete(`/marketing/campaign/${deleteConfirm}`);
-    setDeleteConfirm(null);
-    fetchCampaigns();
+    try {
+      setActionLoading("delete");
+
+      await safeCall(
+        () => API.delete(`/marketing/campaign/${deleteConfirm}`),
+        "DELETE"
+      );
+
+      // ✅ instant remove
+      setCampaigns((prev) =>
+        prev.filter((c) => c._id !== deleteConfirm)
+      );
+
+      setDeleteConfirm(null);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   /* ================= FILTER ================= */
   const filtered = useMemo(() => {
-    return campaigns.filter((c) => {
-      return (
-        c.name.toLowerCase().includes(search.toLowerCase()) &&
+    return campaigns.filter(
+      (c) =>
+        c.name?.toLowerCase().includes(search.toLowerCase()) &&
         (filter === "all" || c.type === filter)
-      );
-    });
+    );
   }, [campaigns, search, filter]);
 
   return (
     <div className="min-h-screen p-6 text-white bg-gradient-to-br from-black via-gray-950 to-black">
 
-      {/* ================= HEADER ================= */}
-      <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
-
+      {/* HEADER */}
+      <div className="flex justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            📢 Campaign Center
-          </h1>
-          <p className="text-sm text-gray-400">
-            Enterprise SaaS Marketing Module • ReadyTech CRM
-          </p>
+          <h1 className="text-4xl font-bold">📢 Campaign Center</h1>
+          <p className="text-gray-400">Marketing Automation Suite</p>
         </div>
 
         <div className="flex gap-3">
-
           <input
-            className="px-4 py-2 text-sm bg-gray-900 border border-gray-800 rounded-lg outline-none focus:border-blue-500"
-            placeholder="Search campaigns..."
+            className="px-4 py-2 bg-gray-900 border border-gray-700 rounded-xl"
+            placeholder="Search..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
 
           <select
-            className="px-3 py-2 text-sm bg-gray-900 border border-gray-800 rounded-lg"
+            className="px-4 py-2 bg-gray-900 border border-gray-700 rounded-xl"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           >
@@ -151,26 +204,14 @@ export default function Campaigns() {
             <option value="email">Email</option>
             <option value="whatsapp">WhatsApp</option>
           </select>
-
         </div>
       </div>
 
-      {/* ================= STATS ================= */}
-      <div className="grid gap-4 mb-6 md:grid-cols-3">
-
-        <StatCard label="Total Campaigns" value={stats.total} />
-        <StatCard label="Success Sends" value={stats.success} color="green" />
-        <StatCard label="Failed Sends" value={stats.failed} color="red" />
-
-      </div>
-
-      {/* ================= CREATE CARD ================= */}
-      <div className="p-6 mb-6 border border-gray-800 shadow-xl bg-gray-900/60 rounded-2xl">
-
-        <h2 className="mb-4 text-lg font-semibold">Create Campaign</h2>
+      {/* CREATE */}
+      <div className="p-6 mb-8 bg-gray-900 border border-gray-800 rounded-3xl">
+        <h2 className="mb-4 text-xl font-semibold">Create Campaign</h2>
 
         <div className="grid gap-4 md:grid-cols-2">
-
           <Input
             placeholder="Campaign Name"
             value={form.name}
@@ -178,12 +219,12 @@ export default function Campaigns() {
           />
 
           <select
-            className="p-3 text-sm bg-gray-800 border border-gray-700 rounded-lg"
+            className="p-3 bg-gray-800 border border-gray-700 rounded-xl"
             value={form.type}
             onChange={(e) => setForm({ ...form, type: e.target.value })}
           >
-            <option>Email</option>
-            <option>WhatsApp</option>
+            <option value="email">Email</option>
+            <option value="whatsapp">WhatsApp</option>
           </select>
 
           <Input
@@ -194,189 +235,191 @@ export default function Campaigns() {
           />
 
           <textarea
-            className="w-full p-3 text-sm bg-gray-800 border border-gray-700 rounded-lg md:col-span-2"
+            className="p-3 bg-gray-800 border border-gray-700 rounded-xl md:col-span-2"
             rows={4}
-            placeholder="Write campaign content..."
+            placeholder="Write content..."
             value={form.content}
             onChange={(e) => setForm({ ...form, content: e.target.value })}
           />
-
         </div>
 
         <button
           onClick={createCampaign}
-          className="px-5 py-2 mt-4 text-sm font-semibold text-white transition bg-blue-600 rounded-lg hover:bg-blue-700"
+          disabled={actionLoading === "create"}
+          className="px-6 py-2 mt-4 bg-blue-600 rounded-xl"
         >
-          🚀 Launch Campaign
+          {actionLoading === "create" ? "Creating..." : "🚀 Launch"}
+        </button>
+      </div>
+
+      {/* TABLE */}
+      <div className="border border-gray-800 rounded-3xl">
+        {loading ? (
+          <p className="p-6">Loading...</p>
+        ) : (
+          <table className="w-full">
+            <tbody>
+              {filtered.map((c) => (
+                <tr key={c._id} className="border-b border-gray-800">
+                  <td className="p-4">{c.name}</td>
+                  <td>{c.type}</td>
+                  <td>{c.status}</td>
+
+                  <td className="flex gap-2 p-4">
+                    <Btn
+                      disabled={actionLoading === c._id}
+                      onClick={() => sendCampaign(c._id)}
+                      color="green"
+                    >
+                      {actionLoading === c._id ? "..." : "Send"}
+                    </Btn>
+
+                    <Btn onClick={() => openEdit(c)} color="blue">
+                      Edit
+                    </Btn>
+
+                    <Btn onClick={() => setDeleteConfirm(c._id)} color="red">
+                      Delete
+                    </Btn>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+     {/* ================= EDIT MODAL ================= */}
+{/* ================= EDIT MODAL ================= */}
+{/* ================= EDIT MODAL ================= */}
+{isEditOpen && (
+  <Modal onClose={() => setIsEditOpen(false)}>
+    <div className="flex flex-col gap-6">
+
+      {/* HEADER */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">✏️ Edit Campaign</h2>
+          <p className="text-sm text-gray-400">
+            Update campaign details and content
+          </p>
+        </div>
+      </div>
+
+      {/* FORM GRID */}
+      <div className="grid grid-cols-2 gap-5">
+
+        {/* NAME */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-gray-400">Campaign Name</label>
+          <Input
+            value={editForm.name}
+            onChange={(e) =>
+              setEditForm({ ...editForm, name: e.target.value })
+            }
+          />
+        </div>
+
+        {/* SUBJECT */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-gray-400">Subject</label>
+          <Input
+            value={editForm.subject}
+            onChange={(e) =>
+              setEditForm({ ...editForm, subject: e.target.value })
+            }
+          />
+        </div>
+
+        {/* CONTENT FULL WIDTH */}
+        <div className="flex flex-col col-span-2 gap-1">
+          <label className="text-xs text-gray-400">Content</label>
+          <textarea
+            rows={7}
+            className="w-full p-4 text-sm bg-gray-800 border border-gray-700 outline-none resize-none rounded-xl focus:ring-2 focus:ring-blue-500"
+            value={editForm.content}
+            onChange={(e) =>
+              setEditForm({ ...editForm, content: e.target.value })
+            }
+          />
+        </div>
+
+      </div>
+
+      {/* ACTION BAR */}
+      <div className="flex items-center justify-between pt-4 border-t border-gray-800">
+
+        <button
+          onClick={() => setIsEditOpen(false)}
+          className="px-5 py-2 text-sm text-gray-300 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={updateCampaign}
+          disabled={actionLoading === "update"}
+          className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50"
+        >
+          {actionLoading === "update" ? "Updating..." : "Save Changes"}
         </button>
 
       </div>
 
-      {/* ================= TABLE ================= */}
-      <div className="border border-gray-800 bg-gray-900/60 rounded-2xl">
+    </div>
+  </Modal>
+)}
 
-        <div className="p-4 border-b border-gray-800">
-          <h2 className="font-semibold">Campaign List</h2>
+{/* ================= DELETE MODAL ================= */}
+{deleteConfirm && (
+  <Modal onClose={() => setDeleteConfirm(null)}>
+    <div className="space-y-4 text-center">
+
+      <div className="flex justify-center">
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-600/20">
+          <span className="text-xl">⚠️</span>
         </div>
+      </div>
 
-        {loading ? (
-          <p className="p-6 text-gray-400 animate-pulse">Loading...</p>
-        ) : (
-          <table className="w-full text-sm">
+      <div>
+        <h2 className="text-lg font-semibold">Delete Campaign</h2>
+        <p className="text-sm text-gray-400">
+          This action cannot be undone
+        </p>
+      </div>
 
-            <thead className="text-gray-400">
-              <tr className="border-b border-gray-800">
-                <th className="p-3 text-left">Name</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
+      <div className="flex justify-center gap-3 pt-2">
 
-            <tbody>
-              {filtered.map((c) => (
-                <tr
-                  key={c._id}
-                  className="transition border-b border-gray-800 hover:bg-white/5"
-                >
+        <button
+          onClick={() => setDeleteConfirm(null)}
+          className="px-4 py-2 text-sm text-gray-300 bg-gray-800 border border-gray-700 rounded-xl hover:bg-gray-700"
+        >
+          Cancel
+        </button>
 
-                  <td className="p-3">{c.name}</td>
-                  <td className="text-gray-300">{c.type}</td>
-
-                  <td>
-                    <span className="px-2 py-1 text-xs bg-gray-800 rounded-full">
-                      {c.status}
-                    </span>
-                  </td>
-
-                  <td className="flex gap-2 p-3">
-
-                    <ActionBtn
-                      label="Send"
-                      color="green"
-                      onClick={() => sendCampaign(c._id)}
-                      loading={actionLoading === c._id}
-                    />
-
-                    <ActionBtn
-                      label="Edit"
-                      color="blue"
-                      onClick={() => openEdit(c)}
-                    />
-
-                    <ActionBtn
-                      label="Delete"
-                      color="red"
-                      onClick={() => setDeleteConfirm(c._id)}
-                    />
-
-                  </td>
-
-                </tr>
-              ))}
-            </tbody>
-
-          </table>
-        )}
+        <button
+          onClick={deleteCampaign}
+          disabled={actionLoading === "delete"}
+          className="px-5 py-2 text-sm font-semibold text-white bg-red-600 rounded-xl hover:bg-red-700 disabled:opacity-50"
+        >
+          {actionLoading === "delete" ? "Deleting..." : "Delete"}
+        </button>
 
       </div>
 
-      {/* ================= EDIT MODAL ================= */}
-      {isEditOpen && (
-        <Modal onClose={() => setIsEditOpen(false)} title="Edit Campaign">
-
-          <div className="space-y-3">
-
-            <Input
-              value={editForm.name}
-              onChange={(e) =>
-                setEditForm({ ...editForm, name: e.target.value })
-              }
-            />
-
-            <Input
-              value={editForm.subject}
-              onChange={(e) =>
-                setEditForm({ ...editForm, subject: e.target.value })
-              }
-            />
-
-            <textarea
-              className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg"
-              rows={4}
-              value={editForm.content}
-              onChange={(e) =>
-                setEditForm({ ...editForm, content: e.target.value })
-              }
-            />
-
-            <button
-              onClick={updateCampaign}
-              className="w-full py-2 font-semibold text-white bg-blue-600 rounded-lg"
-            >
-              Update Campaign
-            </button>
-
-          </div>
-
-        </Modal>
-      )}
-
-      {/* ================= DELETE MODAL ================= */}
-      {deleteConfirm && (
-        <Modal onClose={() => setDeleteConfirm(null)} title="Delete Campaign">
-
-          <p className="mb-4 text-gray-400">
-            Are you sure you want to delete this campaign?
-          </p>
-
-          <div className="flex gap-2">
-            <button onClick={deleteCampaign} className="btn-red">
-              Delete
-            </button>
-            <button
-              onClick={() => setDeleteConfirm(null)}
-              className="btn-gray"
-            >
-              Cancel
-            </button>
-          </div>
-
-        </Modal>
-      )}
-
+    </div>
+  </Modal>
+)}
     </div>
   );
 }
 
-/* ================= COMPONENTS ================= */
+/* COMPONENTS */
+const Input = (props) => (
+  <input {...props} className="p-3 bg-gray-800 rounded-xl" />
+);
 
-function StatCard({ label, value, color }) {
-  const colors = {
-    green: "text-green-400",
-    red: "text-red-400",
-  };
-
-  return (
-    <div className="p-5 border border-gray-800 bg-white/5 rounded-2xl">
-      <p className="text-gray-400">{label}</p>
-      <h2 className={`text-3xl font-bold ${colors[color] || ""}`}>
-        {value}
-      </h2>
-    </div>
-  );
-}
-
-function Input(props) {
-  return (
-    <input
-      {...props}
-      className={`p-3 text-sm bg-gray-800 border border-gray-700 rounded-lg ${props.className || ""}`}
-    />
-  );
-}
-
-function ActionBtn({ label, color, onClick, loading }) {
+const Btn = ({ children, onClick, color, disabled }) => {
   const map = {
     green: "bg-green-600",
     blue: "bg-blue-600",
@@ -385,37 +428,23 @@ function ActionBtn({ label, color, onClick, loading }) {
 
   return (
     <button
+      disabled={disabled}
       onClick={onClick}
-      disabled={loading}
-      className={`px-3 py-1 text-xs rounded-lg text-white ${map[color]} hover:opacity-80`}
+      className={`px-3 py-1 rounded ${map[color]} ${disabled && "opacity-50"}`}
     >
-      {loading ? "..." : label}
+      {children}
     </button>
   );
-}
+};
 
-function Modal({ children, onClose, title }) {
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-
-      <div className="w-[420px] p-5 bg-gray-900 border border-gray-800 rounded-2xl relative">
-
-        <button
-          onClick={onClose}
-          className="absolute text-gray-400 top-3 right-4"
-        >
-          ✕
-        </button>
-
-        <h2 className="mb-4 text-lg font-semibold">{title}</h2>
-
-        {children}
-
-      </div>
-
+const Modal = ({ children, title, onClose }) => (
+  <div className="fixed inset-0 flex items-center justify-center bg-black/70">
+    <div className="p-5 bg-gray-900 rounded-xl">
+      <h2 className="mb-3">{title}</h2>
+      {children}
+      <button onClick={onClose} className="mt-3">
+        Close
+      </button>
     </div>
-  );
-}
-
-const btnRed = "px-4 py-2 bg-red-600 rounded-lg";
-const btnGray = "px-4 py-2 bg-gray-600 rounded-lg";
+  </div>
+);

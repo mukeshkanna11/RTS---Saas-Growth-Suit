@@ -3,6 +3,8 @@ const router = express.Router();
 
 const controller = require("./lead.controller");
 const validate = require("../../middleware/validate.middleware");
+const { protect, authorize } = require("../../middleware/auth.middleware");
+const upload = require("../../middleware/upload");
 
 const {
   createLeadSchema,
@@ -15,163 +17,123 @@ const {
   addActivitySchema,
 } = require("./lead.validation");
 
-const { protect, authorize } = require("../../middleware/auth.middleware");
-const upload = require("../../middleware/upload");
+// 🔐 GLOBAL AUTH
+router.use(protect);
 
-// ✅ CLEAN ASYNC HANDLER
-const asyncHandler = (fn) => {
-  return (req, res, next) => {
-    if (typeof next !== "function") {
-      return res.status(500).json({
-        success: false,
-        message: "next is not a function (asyncHandler)",
-      });
-    }
-
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
-};
-
-// -------------------------------
-// 📊 PIPELINE STATS
-// -------------------------------
+// ----------------------
+// 📊 STATS
+// ----------------------
 router.get(
   "/pipeline",
-  protect,
   authorize("admin", "manager"),
-  asyncHandler(controller.getPipelineStats)
+  controller.getPipelineStats
 );
 
-// -------------------------------
-// 📅 TODAY FOLLOW-UPS
-// -------------------------------
-router.get(
-  "/followups/today",
-  protect,
-  asyncHandler(controller.getTodayFollowUps)
-);
+router.get("/followups/today", controller.getTodayFollowUps);
 
-// -------------------------------
-// 📂 CSV IMPORT
-// -------------------------------
+// ----------------------
+// 📂 IMPORT
+// ----------------------
 router.post(
   "/import",
-  protect,
   authorize("admin", "manager"),
   upload.single("file"),
-  asyncHandler(controller.importCSV)
+  controller.importCSV
 );
 
-// -------------------------------
-// 🟢 CREATE LEAD
-// -------------------------------
+// ----------------------
+// 🟢 CREATE
+// ----------------------
 router.post(
   "/",
-  protect,
   authorize("admin", "manager"),
   validate(createLeadSchema),
-  asyncHandler(controller.createLead)
+  controller.createLead
 );
 
-// -------------------------------
-// 📥 GET ALL LEADS
-// -------------------------------
+// ----------------------
+// 📥 GET
+// ----------------------
 router.get(
   "/",
-  protect,
   validate(getLeadsQuerySchema, "query"),
-  asyncHandler(controller.getLeads)
+  controller.getLeads
 );
 
-// -------------------------------
-// 🔍 GET SINGLE LEAD
-// -------------------------------
-router.get(
-  "/:id",
-  protect,
-  asyncHandler(controller.getLeadById)
-);
+router.get("/:id", controller.getLeadById);
 
-// -------------------------------
-// ✏️ UPDATE LEAD
-// -------------------------------
+// ----------------------
+// ✏️ UPDATE
+// ----------------------
 router.patch(
   "/:id",
-  protect,
   authorize("admin", "manager"),
   validate(updateLeadSchema),
-  asyncHandler(controller.updateLead)
+  controller.updateLead
 );
 
-// -------------------------------
-// 👤 ASSIGN LEAD
-// -------------------------------
+// ----------------------
+// 👤 ASSIGN
+// ----------------------
 router.patch(
   "/:id/assign",
-  protect,
   authorize("admin", "manager"),
   validate(assignLeadSchema),
-  asyncHandler(controller.assignLead)
+  controller.assignLead
 );
 
-// -------------------------------
-// 🔄 UPDATE STATUS
-// -------------------------------
+// ----------------------
+// 🔄 STATUS
+// ----------------------
 router.patch(
   "/:id/status",
-  protect,
   validate(updateStatusSchema),
-  asyncHandler(controller.updateStatus)
+  controller.updateStatus
 );
 
-// -------------------------------
-// 🔔 ADD FOLLOW-UP
-// -------------------------------
+// ----------------------
+// 🔔 FOLLOW UP
+// ----------------------
 router.patch(
   "/:id/followup",
-  protect,
   validate(followUpSchema),
-  asyncHandler(controller.addFollowUp)
+  controller.addFollowUp
 );
 
-// -------------------------------
-// 📝 ADD NOTE
-// -------------------------------
+// ----------------------
+// 📝 NOTES
+// ----------------------
 router.post(
   "/:id/notes",
-  protect,
   validate(addNoteSchema),
-  asyncHandler(controller.addNote)
+  controller.addNote
 );
 
-// -------------------------------
-// 📜 ADD ACTIVITY
-// -------------------------------
+// ----------------------
+// 📜 ACTIVITY
+// ----------------------
 router.post(
   "/:id/activity",
-  protect,
   validate(addActivitySchema),
-  asyncHandler(controller.addActivity)
+  controller.addActivity
 );
 
-// -------------------------------
-// 🔥 CONVERT LEAD
-// -------------------------------
+// ----------------------
+// 🔥 CONVERT
+// ----------------------
 router.patch(
   "/:id/convert",
-  protect,
   authorize("admin", "manager"),
-  asyncHandler(controller.convertLead)
+  controller.convertLead
 );
 
-// -------------------------------
-// ❌ DELETE LEAD
-// -------------------------------
+// ----------------------
+// ❌ DELETE
+// ----------------------
 router.delete(
   "/:id",
-  protect,
   authorize("admin"),
-  asyncHandler(controller.deleteLead)
+  controller.deleteLead
 );
 
 module.exports = router;

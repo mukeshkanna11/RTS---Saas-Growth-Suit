@@ -1,28 +1,115 @@
 const Lead = require("./lead.model");
 const LeadActivity = require("./leadActivity.model");
-const fs = require("fs");
-const csv = require("csv-parser");
 
-// -------------------------------
-// CREATE
-// -------------------------------
-exports.createLead = async (data, tenantId) => {
-  const lead = await Lead.create({ ...data, tenantId });
+/* ================================
+   🧠 SAFE USER PARSER
+================================ */
+const safeUser = (user) => {
+  if (!user) {
+    return { id: null, role: "employee", tenantId: null };
+  }
+
+  return {
+    id: user.id || null,
+    role: user.role || "employee",
+    tenantId: user.tenantId || null,
+  };
+};
+
+/* ================================
+   🔐 TENANT VALIDATION
+================================ */
+const requireTenant = (tenantId) => {
+  if (!tenantId) {
+    throw new Error("Tenant missing - invalid auth context");
+  }
+};
+
+/* ================================
+   👤 USER VALIDATION
+================================ */
+const requireUser = (user) => {
+  if (!user?.id) {
+    throw new Error("User missing - auth middleware not working");
+  }
+};
+
+/* ================================
+   🧠 SAFETY: NOTES NORMALIZER
+   (FIX YOUR MONGOOSE ERROR)
+================================ */
+const normalizeNotes = (data, userId) => {
+  if (!data.notes) return;
+
+  // string → object array
+  if (typeof data.notes === "string") {
+    data.notes = [
+      {
+        text: data.notes,
+        createdAt: new Date(),
+        createdBy: userId,
+      },
+    ];
+  }
+};
+
+/* ================================
+   🔐 BUILD FILTER (SAAS SAFE)
+================================ */
+const buildFilter = (tenantId, user) => {
+  const safe = safeUser(user);
+
+  const base = {
+    tenantId,
+    isDeleted: false,
+  };
+
+  if (safe.role === "admin") return base;
+
+  if (safe.role === "manager") {
+    return { ...base, managerId: safe.id };
+  }
+
+  return { ...base, assignedTo: safe.id };
+};
+
+/* ================================
+   🟢 CREATE LEAD
+================================ */
+exports.createLead = async (data, tenantId, user) => {
+  const safe = safeUser(user);
+
+  requireTenant(tenantId);
+  requireUser(safe);
+
+  // 🔥 FIX MONGOOSE NOTES ISSUE
+  normalizeNotes(data, safe.id);
+
+  const lead = await Lead.create({
+    ...data,
+    tenantId,
+    createdBy: safe.id,
+  });
 
   await LeadActivity.create({
     leadId: lead._id,
     type: "system",
     description: "Lead created",
     tenantId,
+    createdBy: safe.id,
   });
 
   return lead;
 };
 
-// -------------------------------
-// GET ALL (OPTIMIZED)
-// -------------------------------
-exports.getLeads = async (query, tenantId) => {
+/* ================================
+   📥 GET LEADS
+================================ */
+exports.getLeads = async (query, tenantId, user) => {
+  const safe = safeUser(user);
+
+  requireTenant(tenantId);
+
   const {
     page = 1,
     limit = 10,
@@ -34,11 +121,14 @@ exports.getLeads = async (query, tenantId) => {
     toDate,
   } = query;
 
-  const filter = { tenantId, isDeleted: false };
+  const filter = buildFilter(tenantId, safe);
 
   if (status && status !== "all") filter.status = status;
-  if (assignedTo) filter.assignedTo = assignedTo;
   if (source) filter.source = source;
+
+  if (assignedTo && safe.role === "admin") {
+    filter.assignedTo = assignedTo;
+  }
 
   if (fromDate || toDate) {
     filter.createdAt = {};
@@ -47,20 +137,24 @@ exports.getLeads = async (query, tenantId) => {
   }
 
   if (search) {
+    const safeSearch = String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
     filter.$or = [
-      { name: new RegExp(search, "i") },
-      { email: new RegExp(search, "i") },
-      { phone: new RegExp(search, "i") },
+      { name: new RegExp(safeSearch, "i") },
+      { email: new RegExp(safeSearch, "i") },
+      { phone: new RegExp(safeSearch, "i") },
     ];
   }
 
+  const skip = (page - 1) * limit;
+
   const [leads, total] = await Promise.all([
     Lead.find(filter)
-      .populate("assignedTo", "name email")
+      .populate("assignedTo", "name email role")
       .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
+      .skip(skip)
       .limit(Number(limit))
-      .lean(), // 🔥 performance
+      .lean(),
 
     Lead.countDocuments(filter),
   ]);
@@ -76,16 +170,21 @@ exports.getLeads = async (query, tenantId) => {
   };
 };
 
-// -------------------------------
-// GET ONE (WITH ACTIVITIES)
-// -------------------------------
-exports.getLeadById = async (id, tenantId) => {
+/* ================================
+   🔍 GET LEAD BY ID
+================================ */
+exports.getLeadById = async (id, tenantId, user) => {
+  const safe = safeUser(user);
+
+  requireTenant(tenantId);
+
+  const filter = buildFilter(tenantId, safe);
+
   const lead = await Lead.findOne({
     _id: id,
-    tenantId,
-    isDeleted: false,
+    ...filter,
   })
-    .populate("assignedTo", "name email")
+    .populate("assignedTo", "name email role")
     .lean();
 
   if (!lead) return null;
@@ -93,42 +192,54 @@ exports.getLeadById = async (id, tenantId) => {
   const activities = await LeadActivity.find({
     leadId: id,
     tenantId,
-  })
-    .sort({ createdAt: -1 })
-    .lean();
+  }).sort({ createdAt: -1 });
 
   return { ...lead, activities };
 };
 
-// -------------------------------
-// UPDATE LEAD
-// -------------------------------
-exports.updateLead = async (leadId, data, tenantId, actorId) => {
-  const lead = await Lead.findOneAndUpdate(
-    { _id: leadId, tenantId },
-    { $set: data },
-    { new: true }
-  );
+/* ================================
+   ✏️ UPDATE LEAD
+================================ */
+exports.updateLead = async (id, data, tenantId, user) => {
+  if (!tenantId) throw new Error("Tenant missing");
 
-  if (!lead) throw new Error("Lead not found");
+  const lead = await Lead.findOne({
+    _id: id,
+    tenantId,
+    isDeleted: false,
+  });
+
+  if (!lead) {
+    throw new Error("Lead not found (check tenant or permissions)");
+  }
+
+  Object.assign(lead, data);
+
+  await lead.save();
 
   await LeadActivity.create({
-    leadId,
+    leadId: id,
     type: "update",
-    description: "Lead details updated",
-    createdBy: actorId,
+    description: "Lead updated",
     tenantId,
+    createdBy: user.id,
   });
 
   return lead;
 };
 
-// -------------------------------
-// ASSIGN
-// -------------------------------
-exports.assignLead = async (leadId, userId, tenantId, actorId) => {
+/* ================================
+   👤 ASSIGN LEAD
+================================ */
+exports.assignLead = async (id, userId, tenantId, user) => {
+  const safe = safeUser(user);
+
+  requireTenant(tenantId);
+
+  const filter = buildFilter(tenantId, safe);
+
   const lead = await Lead.findOneAndUpdate(
-    { _id: leadId, tenantId },
+    { _id: id, ...filter },
     {
       assignedTo: userId,
       assignedAt: new Date(),
@@ -136,196 +247,62 @@ exports.assignLead = async (leadId, userId, tenantId, actorId) => {
     { new: true }
   );
 
-  if (!lead) throw new Error("Lead not found");
+  if (!lead) throw new Error("Lead not found or no access");
 
   await LeadActivity.create({
-    leadId,
+    leadId: id,
     type: "assignment",
     description: "Lead assigned",
-    createdBy: actorId,
     tenantId,
+    createdBy: safe.id,
   });
 
   return lead;
 };
 
-// -------------------------------
-// UPDATE STATUS
-// -------------------------------
-exports.updateStatus = async (leadId, status, tenantId, actorId) => {
+/* ================================
+   🔄 STATUS UPDATE
+================================ */
+exports.updateStatus = async (id, status, tenantId, user) => {
+  const safe = safeUser(user);
+
+  requireTenant(tenantId);
+
+  const filter = buildFilter(tenantId, safe);
+
   const lead = await Lead.findOneAndUpdate(
-    { _id: leadId, tenantId },
+    { _id: id, ...filter },
     { status, lastContactedAt: new Date() },
     { new: true }
   );
 
-  if (!lead) throw new Error("Lead not found");
+  if (!lead) throw new Error("Lead not found or no access");
 
   await LeadActivity.create({
-    leadId,
+    leadId: id,
     type: "status",
-    description: `Status changed to ${status}`,
-    createdBy: actorId,
+    description: `Status → ${status}`,
     tenantId,
+    createdBy: safe.id,
   });
 
   return lead;
 };
 
-// -------------------------------
-// FOLLOW-UP
-// -------------------------------
-exports.addFollowUp = async (
-  leadId,
-  followUpDate,
-  nextAction,
-  tenantId,
-  actorId
-) => {
-  const lead = await Lead.findOneAndUpdate(
-    { _id: leadId, tenantId },
-    { followUpDate, nextAction },
-    { new: true }
-  );
 
-  if (!lead) throw new Error("Lead not found");
+/* ================================
+   📊 PIPELINE STATS
+================================ */
+exports.getPipelineStats = async (tenantId) => {
+  requireTenant(tenantId);
 
-  await LeadActivity.create({
-    leadId,
-    type: "followup",
-    description: `Follow-up scheduled on ${followUpDate}`,
-    createdBy: actorId,
-    tenantId,
-  });
-
-  return lead;
-};
-
-// -------------------------------
-// TODAY FOLLOWUPS
-// -------------------------------
-exports.getTodayFollowUps = async (tenantId) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-
-  return await Lead.find({
-    tenantId,
-    isDeleted: false,
-    followUpDate: {
-      $gte: today,
-      $lt: tomorrow,
-    },
-  })
-    .populate("assignedTo", "name email")
-    .lean();
-};
-
-// -------------------------------
-// ADD NOTE
-// -------------------------------
-exports.addNote = async (leadId, text, tenantId, actorId) => {
-  const lead = await Lead.findOneAndUpdate(
-    { _id: leadId, tenantId },
+  return Lead.aggregate([
     {
-      $push: {
-        notes: {
-          text,
-          createdBy: actorId,
-        },
+      $match: {
+        tenantId,
+        isDeleted: false,
       },
     },
-    { new: true }
-  );
-
-  if (!lead) throw new Error("Lead not found");
-
-  await LeadActivity.create({
-    leadId,
-    type: "note",
-    description: text,
-    createdBy: actorId,
-    tenantId,
-  });
-
-  return lead;
-};
-
-// -------------------------------
-// ADD ACTIVITY
-// -------------------------------
-exports.addActivity = async (
-  leadId,
-  type,
-  note,
-  tenantId,
-  actorId
-) => {
-  const lead = await Lead.findOne({ _id: leadId, tenantId });
-
-  if (!lead) throw new Error("Lead not found");
-
-  await LeadActivity.create({
-    leadId,
-    type,
-    description: note,
-    createdBy: actorId,
-    tenantId,
-  });
-
-  return true;
-};
-
-// -------------------------------
-// CONVERT LEAD
-// -------------------------------
-exports.convertLead = async (leadId, tenantId, actorId) => {
-  const lead = await Lead.findOneAndUpdate(
-    { _id: leadId, tenantId },
-    {
-      status: "converted",
-      convertedToCustomer: true,
-      convertedAt: new Date(),
-    },
-    { new: true }
-  );
-
-  if (!lead) throw new Error("Lead not found");
-
-  await LeadActivity.create({
-    leadId,
-    type: "conversion",
-    description: "Lead converted to customer",
-    createdBy: actorId,
-    tenantId,
-  });
-
-  return lead;
-};
-
-// -------------------------------
-// DELETE (SOFT)
-// -------------------------------
-exports.deleteLead = async (leadId, tenantId) => {
-  const lead = await Lead.findOneAndUpdate(
-    { _id: leadId, tenantId },
-    { isDeleted: true },
-    { new: true }
-  );
-
-  if (!lead) throw new Error("Lead not found");
-
-  return true;
-};
-
-// -------------------------------
-// PIPELINE STATS
-// -------------------------------
-exports.getPipelineStats = async (tenantId) => {
-  return await Lead.aggregate([
-    { $match: { tenantId, isDeleted: false } },
     {
       $group: {
         _id: "$status",
@@ -336,38 +313,190 @@ exports.getPipelineStats = async (tenantId) => {
   ]);
 };
 
-// -------------------------------
-// CSV IMPORT (🔥 FIXED + SAAS READY)
-// -------------------------------
-exports.importCSV = async (filePath, tenantId) => {
-  return new Promise((resolve, reject) => {
-    const results = [];
+/* ================================
+   🔔 ADD FOLLOW UP (MISSING FIX)
+================================ */
+exports.addFollowUp = async (id, followUpDate, nextAction, tenantId, user) => {
+  const safe = user || {};
 
-    fs.createReadStream(filePath)
-      .pipe(csv())
-      .on("data", (data) => {
-        if (!data.name) return;
-
-        results.push({
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          source: data.source || "other",
-          tenantId,
-        });
-      })
-      .on("end", async () => {
-        let insertedLeads = [];
-
-        if (results.length) {
-          insertedLeads = await Lead.insertMany(results);
-        }
-
-        fs.unlinkSync(filePath);
-
-        // 🔥 IMPORTANT: return full leads (for automation trigger)
-        resolve(insertedLeads);
-      })
-      .on("error", reject);
+  const lead = await Lead.findOne({
+    _id: id,
+    tenantId,
+    isDeleted: false,
   });
+
+  if (!lead) {
+    throw new Error("Lead not found or no access");
+  }
+
+  lead.followUpDate = followUpDate;
+  lead.nextAction = nextAction;
+
+  await lead.save();
+
+  await LeadActivity.create({
+    leadId: id,
+    type: "followup",
+    description: `Follow-up set for ${followUpDate}`,
+    tenantId,
+    createdBy: safe.id,
+  });
+
+  return lead;
+};
+
+exports.addNote = async (id, text, tenantId, user) => {
+  const lead = await Lead.findOne({
+    _id: id,
+    tenantId,
+    isDeleted: false,
+  });
+
+  if (!lead) throw new Error("Lead not found or no access");
+
+  if (!lead.notes) {
+    lead.notes = [];
+  }
+
+  lead.notes.push({
+    text,
+    createdAt: new Date(),
+    createdBy: user.id,
+  });
+
+  await lead.save();
+
+  await LeadActivity.create({
+    leadId: id,
+    type: "note",
+    description: "Note added",
+    tenantId,
+    createdBy: user.id,
+  });
+
+  return lead;
+};
+
+exports.addActivity = async (id, type, note, tenantId, user) => {
+  const lead = await Lead.findOne({
+    _id: id,
+    tenantId,
+    isDeleted: false,
+  });
+
+  if (!lead) throw new Error("Lead not found or no access");
+
+  await LeadActivity.create({
+    leadId: id,
+    type,
+    description: note,
+    tenantId,
+    createdBy: user.id,
+  });
+
+  return true;
+};
+
+exports.convertLead = async (id, tenantId, user) => {
+  const lead = await Lead.findOne({
+    _id: id,
+    tenantId,
+    isDeleted: false,
+  });
+
+  if (!lead) throw new Error("Lead not found or no access");
+
+  lead.status = "converted";
+  lead.convertedAt = new Date();
+
+  await lead.save();
+
+  await LeadActivity.create({
+    leadId: id,
+    type: "conversion",
+    description: "Lead converted to customer",
+    tenantId,
+    createdBy: user.id,
+  });
+
+  return lead;
+};
+
+exports.getTodayFollowUps = async (tenantId) => {
+  if (!tenantId) {
+    throw new Error("Tenant missing");
+  }
+
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+
+  const leads = await Lead.find({
+    tenantId,
+    isDeleted: false,
+    followUpDate: {
+      $gte: start,
+      $lte: end,
+    },
+  })
+    .populate("assignedTo", "name email role")
+    .sort({ followUpDate: 1 });
+
+  return leads;
+};
+
+/* ================================
+   ❌ DELETE LEAD
+================================ */
+exports.deleteLead = async (id, tenantId, user) => {
+  const safe = safeUser(user);
+
+  if (!safe.id) {
+    throw new Error("User missing from auth middleware");
+  }
+
+  if (!tenantId) {
+    throw new Error("Tenant missing");
+  }
+
+  const lead = await Lead.findOne({
+    _id: id,
+    tenantId,
+  });
+
+  if (!lead) {
+    return {
+      success: false,
+      statusCode: 404,
+      message: "Lead not found",
+    };
+  }
+
+  if (lead.isDeleted) {
+    return {
+      success: false,
+      statusCode: 200,
+      message: "Lead already deleted",
+    };
+  }
+
+  await Lead.updateOne(
+    { _id: id },
+    { $set: { isDeleted: true } }
+  );
+
+  await LeadActivity.create({
+    leadId: id,
+    type: "system",
+    description: "Lead deleted",
+    tenantId,
+    createdBy: safe.id,
+  });
+
+  return {
+    success: true,
+    message: "Lead deleted successfully",
+  };
 };
