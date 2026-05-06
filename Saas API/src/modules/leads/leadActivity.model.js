@@ -21,7 +21,7 @@ const leadActivitySchema = new mongoose.Schema(
     "status",
     "followup",
     "conversion",
-    "system"
+    "system",
   ],
   required: true
 },

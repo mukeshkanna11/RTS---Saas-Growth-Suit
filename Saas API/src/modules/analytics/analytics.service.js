@@ -1,7 +1,3 @@
-// ========================================
-// analytics.service.js
-// ========================================
-
 const Analytics = require("./analytics.model");
 
 class AnalyticsService {
@@ -9,15 +5,16 @@ class AnalyticsService {
     return await Analytics.create(data);
   }
 
-  async getMetrics(companyId, filters = {}) {
-    return await Analytics.find({ companyId, ...filters }).sort({
+  // 🔥 now receives FULL FILTER (RBAC)
+  async getMetrics(filter) {
+    return await Analytics.find(filter).sort({
       recordedAt: -1,
     });
   }
 
-  async getDashboardSummary(companyId) {
-    const result = await Analytics.aggregate([
-      { $match: { companyId } },
+  async getDashboardSummary(filter) {
+    return await Analytics.aggregate([
+      { $match: filter },
 
       {
         $group: {
@@ -38,15 +35,13 @@ class AnalyticsService {
         },
       },
     ]);
-
-    return result;
   }
 
-  async getRevenueTrend(companyId) {
+  async getRevenueTrend(filter) {
     return await Analytics.aggregate([
       {
         $match: {
-          companyId,
+          ...filter,
           category: "revenue",
         },
       },
@@ -63,8 +58,11 @@ class AnalyticsService {
     ]);
   }
 
-  async deleteMetric(id, companyId) {
-    return await Analytics.findOneAndDelete({ _id: id, companyId });
+  async deleteMetric(id, tenantId) {
+    return await Analytics.findOneAndDelete({
+      _id: id,
+      tenantId,
+    });
   }
 }
 

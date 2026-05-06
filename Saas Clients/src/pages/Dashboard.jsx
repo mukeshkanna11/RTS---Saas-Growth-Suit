@@ -1,124 +1,172 @@
-// export default function Dashboard() {
-//   return (
-//     <div className="space-y-6">
+import { useEffect, useState, useMemo } from "react";
+import api from "../api/axios";
+import { logoutUser } from "../api/auth";
+import { useAuthStore } from "../store/authStore";
+import {
+  Users,
+  Activity,
+  Target,
+  Briefcase,
+  DollarSign,
+  TrendingUp,
+  Building2,
+  ShieldCheck,
+} from "lucide-react";
 
-//       {/* HEADER */}
-//       <div className="flex items-center justify-between">
-//         <div>
-//           <h1 className="text-2xl font-bold text-white">
-//             Dashboard
-//           </h1>
-//           <p className="text-sm text-gray-400">
-//             Welcome back 👋 Here's your business overview
-//           </p>
-//         </div>
+export default function Dashboard() {
+  const user = useAuthStore((s) => s.user);
 
-//         <button className="px-4 py-2 text-sm text-white transition rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90">
-//           + Create
-//         </button>
-//       </div>
+  const [stats, setStats] = useState({
+    users: 0,
+    leads: 0,
+    deals: 0,
+    revenue: 0,
+    active: 0,
+  });
 
-//       {/* KPI CARDS */}
-//       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+  const [error, setError] = useState("");
 
-//         <Card title="Total Leads" value="1,240" growth="+12%" />
-//         <Card title="Revenue" value="₹85,000" growth="+8%" />
-//         <Card title="Campaigns" value="32" growth="+5%" />
-//         <Card title="Conversion Rate" value="18%" growth="+3%" />
+  // ========================
+  // TITLE
+  // ========================
+  const title = useMemo(() => {
+    return user?.role === "admin"
+      ? "Admin Dashboard"
+      : user?.role === "manager"
+      ? "Manager Dashboard"
+      : "Employee Dashboard";
+  }, [user]);
 
-//       </div>
+  // ========================
+  // FETCH DATA
+  // ========================
+  const fetchDashboard = async () => {
+    try {
+      const [usersRes, leadsRes, dealsRes] = await Promise.all([
+        api.get("/users"),
+        api.get("/leads"),
+        api.get("/crm/deals"),
+      ]);
 
-//       {/* MAIN GRID */}
-//       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      const users = usersRes.data?.data || [];
+      const leads = leadsRes.data?.data?.leads || [];
+      const deals = dealsRes.data?.data || [];
 
-//         {/* ANALYTICS */}
-//         <div className="p-5 bg-gray-900 border border-gray-800 shadow-md lg:col-span-2 rounded-xl">
+      const revenue = deals.reduce((a, b) => a + (b.value || 0), 0);
 
-//           <div className="flex items-center justify-between mb-4">
-//             <h2 className="font-semibold text-white">
-//               Performance Overview
-//             </h2>
+      setStats({
+        users: users.length,
+        leads: leads.length,
+        deals: deals.length,
+        revenue,
+        active: users.filter((u) => u.isActive).length,
+      });
+    } catch (err) {
+      setError("Dashboard load failed");
 
-//             <select className="px-2 py-1 text-sm text-gray-300 bg-gray-800 border border-gray-700 rounded-lg">
-//               <option>Last 7 days</option>
-//               <option>Last 30 days</option>
-//             </select>
-//           </div>
+      if (err.response?.status === 401) {
+        await logoutUser();
+      }
+    }
+  };
 
-//           <div className="flex items-center justify-center h-64 text-gray-500">
-//             📊 Chart coming soon
-//           </div>
-//         </div>
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
 
-//         {/* ACTIVITY */}
-//         <div className="p-5 bg-gray-900 border border-gray-800 shadow-md rounded-xl">
-//           <h2 className="mb-4 font-semibold text-white">
-//             Recent Activity
-//           </h2>
+  // ========================
+  // KPI CONFIG
+  // ========================
+  const kpis = useMemo(() => {
+    if (user?.role === "admin") {
+      return [
+        { title: "Users", value: stats.users, icon: <Users /> },
+        { title: "Active Users", value: stats.active, icon: <Activity /> },
+        { title: "Leads", value: stats.leads, icon: <Target /> },
+        { title: "Deals", value: stats.deals, icon: <Briefcase /> },
+        { title: "Revenue", value: `₹${stats.revenue}`, icon: <DollarSign /> },
+      ];
+    }
 
-//           <div className="space-y-3 text-sm">
-//             <Activity text="New lead added" time="2 mins ago" />
-//             <Activity text="Campaign launched" time="10 mins ago" />
-//             <Activity text="Deal closed" time="1 hour ago" />
-//             <Activity text="New user registered" time="3 hours ago" />
-//           </div>
-//         </div>
+    if (user?.role === "manager") {
+      return [
+        { title: "Team Leads", value: stats.leads, icon: <Target /> },
+        { title: "Team Deals", value: stats.deals, icon: <Briefcase /> },
+        { title: "Revenue", value: `₹${stats.revenue}`, icon: <TrendingUp /> },
+      ];
+    }
 
-//       </div>
+    return [
+      { title: "My Leads", value: stats.leads, icon: <Target /> },
+      { title: "My Deals", value: stats.deals, icon: <Briefcase /> },
+    ];
+  }, [stats, user]);
 
-//       {/* BOTTOM CARDS */}
-//       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+  return (
+    <div className="min-h-screen text-white bg-[#0B0F19]">
 
-//         <SmallCard title="Tasks Pending" value="8" />
-//         <SmallCard title="Follow-ups Today" value="14" />
+      {/* TOP BAR */}
+      <div className="flex items-center justify-between px-6 py-5 border-b border-gray-800">
+        <div>
+          <h1 className="text-2xl font-bold">{title}</h1>
+          <p className="text-sm text-gray-400">
+            Welcome back, {user?.name}
+          </p>
+        </div>
 
-//       </div>
+        <div className="flex items-center gap-2 px-3 py-1 bg-gray-800 rounded-full">
+          <ShieldCheck size={16} />
+          {user?.role?.toUpperCase()}
+        </div>
+      </div>
 
-//     </div>
-//   );
-// }
+      {/* COMPANY PROFILE CARD */}
+      <div className="p-6">
+        <div className="p-5 mb-6 border border-gray-800 rounded-2xl bg-white/5 backdrop-blur">
+          <div className="flex items-center gap-3">
+            <Building2 className="text-blue-400" />
+            <div>
+              <h2 className="text-lg font-semibold">Company Overview</h2>
+              <p className="text-sm text-gray-400">
+                Multi-tenant SaaS CRM System
+              </p>
+            </div>
+          </div>
+        </div>
 
-// /* =========================
-//    COMPONENTS
-// ========================= */
+        {/* ERROR */}
+        {error && (
+          <div className="p-3 mb-4 text-red-400 border border-red-500 rounded-lg bg-red-500/10">
+            {error}
+          </div>
+        )}
 
-// function Card({ title, value, growth }) {
-//   return (
-//     <div className="p-5 transition bg-gray-900 border border-gray-800 shadow-sm rounded-xl hover:shadow-lg hover:border-gray-700">
+        {/* KPI GRID */}
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {kpis.map((k, i) => (
+            <Card key={i} {...k} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-//       <p className="text-sm text-gray-400">{title}</p>
+/* =========================
+   CARD UI
+========================= */
+function Card({ title, value, icon }) {
+  return (
+    <div className="relative p-5 transition border border-gray-800 rounded-2xl bg-white/5 hover:scale-[1.02]">
 
-//       <h2 className="mt-2 text-3xl font-bold text-white">
-//         {value}
-//       </h2>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-400">{title}</p>
+        <div className="text-blue-400">{icon}</div>
+      </div>
 
-//       <p className="mt-2 text-sm text-green-400">
-//         {growth} this week
-//       </p>
-//     </div>
-//   );
-// }
+      <h2 className="mt-2 text-2xl font-bold">{value}</h2>
 
-// function SmallCard({ title, value }) {
-//   return (
-//     <div className="p-5 bg-gray-900 border border-gray-800 shadow-sm rounded-xl">
-
-//       <p className="text-sm text-gray-400">{title}</p>
-
-//       <h2 className="mt-2 text-2xl font-semibold text-white">
-//         {value}
-//       </h2>
-//     </div>
-//   );
-// }
-
-// function Activity({ text, time }) {
-//   return (
-//     <div className="flex items-center justify-between px-3 py-2 transition bg-gray-800 rounded-lg hover:bg-gray-700">
-
-//       <span className="text-gray-300">{text}</span>
-
-//       <span className="text-xs text-gray-500">{time}</span>
-//     </div>
-//   );
-// }
+      <div className="absolute inset-0 opacity-0 rounded-2xl bg-gradient-to-r from-blue-500/0 to-blue-500/10 hover:opacity-100"></div>
+    </div>
+  );
+}

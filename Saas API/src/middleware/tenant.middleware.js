@@ -1,34 +1,49 @@
-// module.exports = function tenantMiddleware(req, res, next) {
-//   try {
-//     // 🔐 Ensure user exists (must come after auth middleware)
-//     if (!req.user) {
-//       return res.status(401).json({
-//         success: false,
-//         message: "Unauthorized - No user found",
-//       });
-//     }
+module.exports = function tenantMiddleware(req, res, next) {
+  try {
+    // 🔐 Must come after auth middleware
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - user not found",
+      });
+    }
 
-//     // 🏢 Ensure companyId exists (multi-tenant check)
-//     if (!req.user.companyId) {
-//       return res.status(403).json({
-//         success: false,
-//         message: "Access denied - No company assigned",
-//       });
-//     }
+    // 🏢 Ensure tenant exists (SAAS CORE RULE)
+    if (!req.user.tenantId) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied - tenant not assigned",
+      });
+    }
 
-//     // ✅ Attach tenant info globally
-//     req.tenantId = req.user.companyId;
+    // ✅ Normalize tenant context (GLOBAL SAFE WAY)
+    req.tenant = {
+      id: req.user.tenantId,
+      role: req.user.role,
+      userId: req.user.id,
+    };
 
-//     // (optional) normalize for DB queries
-//     req.query.companyId = req.user.companyId;
+    // 🔥 DO NOT mutate req.query directly (safe SaaS rule)
+    // Instead expose a clean filter object
+    req.tenantFilter = {
+      tenantId: req.user.tenantId,
+      isDeleted: false,
+    };
 
-//     next();
-//   } catch (error) {
-//     console.error("Tenant Middleware Error:", error);
+    // 👇 optional scoped filter helper (for CRM / leads / users)
+    req.buildTenantQuery = (extra = {}) => ({
+      tenantId: req.user.tenantId,
+      isDeleted: false,
+      ...extra,
+    });
 
-//     return res.status(500).json({
-//       success: false,
-//       message: "Tenant middleware failure",
-//     });
-//   }
-// };
+    next();
+  } catch (error) {
+    console.error("Tenant Middleware Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Tenant middleware failed",
+    });
+  }
+};
