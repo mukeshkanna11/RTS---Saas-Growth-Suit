@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /* -------------------------------
-   SAFE STORAGE HELPERS
+   SAFE STORAGE
 -------------------------------- */
 const getStoredUser = () => {
   try {
@@ -20,11 +20,9 @@ const getStoredToken = () => localStorage.getItem("accessToken");
 export const useAuthStore = create((set) => ({
   user: getStoredUser(),
   token: getStoredToken(),
-  loading: false, // ❌ removed blocking loader
+  loading: false,
 
-  /* -------------------------------
-     INIT (NO UI BLOCKING)
-  -------------------------------- */
+  /* INIT */
   init: () => {
     set({
       user: getStoredUser(),
@@ -33,12 +31,15 @@ export const useAuthStore = create((set) => ({
     });
   },
 
-  /* -------------------------------
-     LOGIN
-  -------------------------------- */
+  /* LOGIN */
   login: ({ user, accessToken }) => {
-    localStorage.setItem("accessToken", accessToken);
-    localStorage.setItem("user", JSON.stringify(user));
+    if (accessToken) {
+      localStorage.setItem("accessToken", accessToken);
+    }
+
+    if (user) {
+      localStorage.setItem("user", JSON.stringify(user));
+    }
 
     set({
       user,
@@ -47,11 +48,10 @@ export const useAuthStore = create((set) => ({
     });
   },
 
-  /* -------------------------------
-     LOGOUT
-  -------------------------------- */
+  /* LOGOUT */
   logout: () => {
     localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
 
     set({

@@ -2,7 +2,18 @@ import API from "./axios";
 import { useAuthStore } from "../store/authStore";
 
 /* =========================
-   SAVE AUTH (central helper)
+   SAFE AUTH NORMALIZER
+========================= */
+const normalizeAuth = (data) => {
+  return {
+    user: data?.user || null,
+    accessToken: data?.accessToken || data?.token || null,
+    refreshToken: data?.refreshToken || null,
+  };
+};
+
+/* =========================
+   SAVE AUTH
 ========================= */
 const setAuth = ({ user, accessToken, refreshToken }) => {
   const store = useAuthStore.getState();
@@ -15,6 +26,10 @@ const setAuth = ({ user, accessToken, refreshToken }) => {
     localStorage.setItem("refreshToken", refreshToken);
   }
 
+  if (user) {
+    localStorage.setItem("user", JSON.stringify(user));
+  }
+
   store.login({ user, accessToken });
 };
 
@@ -24,13 +39,15 @@ const setAuth = ({ user, accessToken, refreshToken }) => {
 export const loginUser = async (data) => {
   const res = await API.post("/auth/login", data);
 
-  const { accessToken, refreshToken, user } = res.data?.data || {};
+  console.log("LOGIN RESPONSE:", res.data); // 🔍 debug
 
-  if (!accessToken || !user) {
+  const normalized = normalizeAuth(res.data?.data);
+
+  if (!normalized.accessToken || !normalized.user) {
     throw new Error("Invalid login response");
   }
 
-  setAuth({ user, accessToken, refreshToken });
+  setAuth(normalized);
 
   return res.data;
 };
@@ -41,19 +58,21 @@ export const loginUser = async (data) => {
 export const registerUser = async (data) => {
   const res = await API.post("/auth/register", data);
 
-  const { accessToken, refreshToken, user } = res.data?.data || {};
+  console.log("REGISTER RESPONSE:", res.data); // 🔍 debug
 
-  if (!accessToken || !user) {
+  const normalized = normalizeAuth(res.data?.data);
+
+  if (!normalized.accessToken || !normalized.user) {
     throw new Error("Invalid register response");
   }
 
-  setAuth({ user, accessToken, refreshToken });
+  setAuth(normalized);
 
   return res.data;
 };
 
 /* =========================
-   LOGOUT (SAFE + CLEAN)
+   LOGOUT
 ========================= */
 export const logoutUser = async () => {
   try {
@@ -63,13 +82,14 @@ export const logoutUser = async () => {
   } finally {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
+    localStorage.removeItem("user");
 
     useAuthStore.getState().logout();
   }
 };
 
 /* =========================
-   LOAD USER (BOOT AUTH)
+   LOAD USER
 ========================= */
 export const loadUser = async () => {
   try {
@@ -97,6 +117,7 @@ export const loadUser = async () => {
 
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
+    localStorage.removeItem("user");
 
     useAuthStore.getState().logout();
 
