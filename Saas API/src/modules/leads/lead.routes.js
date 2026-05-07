@@ -1,7 +1,25 @@
 const express = require("express");
 const router = express.Router();
 
-const controller = require("./lead.controller");
+const {
+  createLead,
+  getLeads,
+  getLeadById,
+  updateLead,
+  deleteLead,
+  assignLead,
+  updateStatus,
+  addFollowUp,
+  addNote,
+  addActivity,
+  convertLead,
+  importCSV,
+  getPipelineStats,
+  getTodayFollowUps,
+  getTeamLeads,
+  getMyLeads,
+} = require("./lead.controller");
+
 const validate = require("../../middleware/validate.middleware");
 const { protect, authorize } = require("../../middleware/auth.middleware");
 const upload = require("../../middleware/upload");
@@ -17,123 +35,148 @@ const {
   addActivitySchema,
 } = require("./lead.validation");
 
+// ======================================================
 // 🔐 GLOBAL AUTH
+// ======================================================
 router.use(protect);
 
-// ----------------------
-// 📊 STATS
-// ----------------------
+// ======================================================
+// 📊 DASHBOARD / STATS
+// ======================================================
 router.get(
   "/pipeline",
   authorize("admin", "manager"),
-  controller.getPipelineStats
+  getPipelineStats
 );
 
-router.get("/followups/today", controller.getTodayFollowUps);
+router.get(
+  "/followups/today",
+  getTodayFollowUps
+);
 
-// ----------------------
-// 📂 IMPORT
-// ----------------------
+// ======================================================
+// 👥 ROLE BASED LEADS
+// ======================================================
+
+// Manager → Team Leads
+router.get(
+  "/team",
+  authorize("manager", "admin"),
+  getTeamLeads
+);
+
+// Employee → Own Leads
+router.get(
+  "/my",
+  getMyLeads
+);
+
+// ======================================================
+// 📂 IMPORT CSV
+// ======================================================
 router.post(
   "/import",
   authorize("admin", "manager"),
   upload.single("file"),
-  controller.importCSV
+  importCSV
 );
 
-// ----------------------
-// 🟢 CREATE
-// ----------------------
+// ======================================================
+// 🟢 CREATE LEAD
+// ======================================================
 router.post(
   "/",
   authorize("admin", "manager"),
   validate(createLeadSchema),
-  controller.createLead
+  createLead
 );
 
-// ----------------------
-// 📥 GET
-// ----------------------
+// ======================================================
+// 📥 GET LEADS
+// ======================================================
 router.get(
   "/",
   validate(getLeadsQuerySchema, "query"),
-  controller.getLeads
+  getLeads
 );
 
-router.get("/:id", controller.getLeadById);
+router.get(
+  "/:id",
+  getLeadById
+);
 
-// ----------------------
-// ✏️ UPDATE
-// ----------------------
+// ======================================================
+// ✏️ UPDATE LEAD
+// ======================================================
 router.patch(
   "/:id",
   authorize("admin", "manager"),
   validate(updateLeadSchema),
-  controller.updateLead
+  updateLead
 );
 
-// ----------------------
-// 👤 ASSIGN
-// ----------------------
+// ======================================================
+// 👤 ASSIGN LEAD
+// ======================================================
 router.patch(
   "/:id/assign",
   authorize("admin", "manager"),
   validate(assignLeadSchema),
-  controller.assignLead
+  assignLead
 );
 
-// ----------------------
-// 🔄 STATUS
-// ----------------------
+// ======================================================
+// 🔄 UPDATE STATUS
+// ======================================================
 router.patch(
   "/:id/status",
   validate(updateStatusSchema),
-  controller.updateStatus
+  updateStatus
 );
 
-// ----------------------
+// ======================================================
 // 🔔 FOLLOW UP
-// ----------------------
+// ======================================================
 router.patch(
   "/:id/followup",
   validate(followUpSchema),
-  controller.addFollowUp
+  addFollowUp
 );
 
-// ----------------------
-// 📝 NOTES
-// ----------------------
+// ======================================================
+// 📝 ADD NOTE
+// ======================================================
 router.post(
   "/:id/notes",
   validate(addNoteSchema),
-  controller.addNote
+  addNote
 );
 
-// ----------------------
-// 📜 ACTIVITY
-// ----------------------
+// ======================================================
+// 📜 ADD ACTIVITY
+// ======================================================
 router.post(
   "/:id/activity",
   validate(addActivitySchema),
-  controller.addActivity
+  addActivity
 );
 
-// ----------------------
-// 🔥 CONVERT
-// ----------------------
+// ======================================================
+// 🔥 CONVERT LEAD
+// ======================================================
 router.patch(
   "/:id/convert",
   authorize("admin", "manager"),
-  controller.convertLead
+  convertLead
 );
 
-// ----------------------
-// ❌ DELETE
-// ----------------------
+// ======================================================
+// ❌ DELETE LEAD
+// ======================================================
 router.delete(
   "/:id",
   authorize("admin"),
-  controller.deleteLead
+  deleteLead
 );
 
 module.exports = router;
