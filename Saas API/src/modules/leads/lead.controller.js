@@ -57,29 +57,34 @@ const buildAccessFilter = (user) => {
 // =====================================================
 exports.createLead = async (req, res, next) => {
   try {
-    // -------------------------------
-    // 🔐 SAFE USER EXTRACTION (DIRECT FROM MIDDLEWARE)
-    // -------------------------------
+
+    // =====================================================
+    // 🔐 SAFE USER EXTRACTION
+    // =====================================================
     const user = req.user;
 
     if (!user || !user.id) {
-      return fail(res, "Unauthorized - user missing from auth middleware", 401);
+      return fail(
+        res,
+        "Unauthorized - user missing from auth middleware",
+        401
+      );
     }
 
     if (!user.tenantId) {
       return fail(res, "Unauthorized - tenant missing", 401);
     }
 
-    // -------------------------------
+    // =====================================================
     // 🚫 ROLE CHECK
-    // -------------------------------
+    // =====================================================
     if (user.role === "employee") {
       return fail(res, "Not allowed", 403);
     }
 
-    // -------------------------------
-    // 🟢 BUILD LEAD PAYLOAD (SAFELY)
-    // -------------------------------
+    // =====================================================
+    // 🟢 BUILD LEAD PAYLOAD
+    // =====================================================
     const leadPayload = {
       ...req.body,
 
@@ -93,20 +98,33 @@ exports.createLead = async (req, res, next) => {
           : req.body.managerId || null,
 
       assignedTo: req.body.assignedTo || null,
+
+      status: req.body.status || "new",
+
+      pipelineStage:
+        req.body.pipelineStage || "New",
+
+      convertedToCustomer: false,
+
+      isDeleted: false,
+
+      isEmailSent: false,
+
+      isWhatsAppSent: false,
     };
 
-    // -------------------------------
+    // =====================================================
     // 🟢 CREATE LEAD
-    // -------------------------------
+    // =====================================================
     const lead = await leadService.createLead(
       leadPayload,
       user.tenantId,
       user
     );
 
-    // -------------------------------
-    // 🔥 AUTOMATION (NON-BLOCKING)
-    // -------------------------------
+    // =====================================================
+    // 🔥 AUTOMATION
+    // =====================================================
     setImmediate(() => {
       runLeadAutomation(
         {
@@ -114,17 +132,28 @@ exports.createLead = async (req, res, next) => {
           trigger: "lead_created",
         },
         user
-      ).catch(() => {});
+      ).catch((err) => {
+        console.error(
+          "Automation Error:",
+          err.message
+        );
+      });
     });
 
-    // -------------------------------
+    // =====================================================
     // ✅ RESPONSE
-    // -------------------------------
-    return success(res, lead, "Lead created");
+    // =====================================================
+    return success(
+      res,
+      lead,
+      "Lead created successfully"
+    );
+
   } catch (err) {
     next(err);
   }
 };
+
 
 // =====================================================
 // 📥 GET ALL LEADS
@@ -447,5 +476,49 @@ exports.deleteLead = async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+  }
+};
+
+
+exports.getMyLeads = async (req, res) => {
+  try {
+
+    const leads = await Lead.find({
+      assignedTo: req.user._id,
+    });
+
+    res.json({
+      success: true,
+      data: leads,
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+exports.getTeamLeads = async (req, res) => {
+  try {
+
+    const leads = await Lead.find({
+      $or: [
+        { createdBy: req.user._id },
+        { managerId: req.user._id }
+      ]
+    });
+
+    res.json({
+      success: true,
+      data: leads,
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
