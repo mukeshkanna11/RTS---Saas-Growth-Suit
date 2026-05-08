@@ -1,10 +1,23 @@
+// =======================================================
+// analytics.routes.js
+// ENTERPRISE SAAS ROUTES
+// =======================================================
+
 const express = require("express");
+
 const router = express.Router();
 
 const controller = require("./analytics.controller");
-const { protect, authorize } = require("../../middleware/auth.middleware");
 
-// CREATE
+const {
+  protect,
+  authorize,
+} = require("../../middleware/auth.middleware");
+
+// =======================================================
+// CREATE METRIC
+// =======================================================
+
 router.post(
   "/",
   protect,
@@ -12,16 +25,87 @@ router.post(
   controller.createMetric
 );
 
-// GET ALL
-router.get("/", protect, controller.getMetrics);
+// =======================================================
+// GET DASHBOARD SUMMARY
+// =======================================================
 
-// SUMMARY
-router.get("/summary", protect, controller.getDashboardSummary);
+router.get(
+  "/summary",
+  protect,
+  authorize("admin", "manager", "employee"),
+  controller.getDashboardSummary
+);
 
-// TREND
-router.get("/revenue-trend", protect, controller.getRevenueTrend);
+// =======================================================
+// GET REVENUE TREND
+// =======================================================
 
-// DELETE
+router.get(
+  "/revenue-trend",
+  protect,
+  authorize("admin", "manager"),
+  controller.getRevenueTrend
+);
+
+// =======================================================
+// GET CATEGORY ANALYTICS
+// =======================================================
+
+router.get(
+  "/category/:category",
+  protect,
+  authorize("admin", "manager"),
+  controller.getMetrics
+);
+
+// =======================================================
+// GET SINGLE METRIC
+// =======================================================
+
+router.get(
+  "/:id",
+  protect,
+  authorize("admin", "manager", "employee"),
+  controller.getMetricById
+);
+
+// =======================================================
+// GET ALL METRICS
+// =======================================================
+
+router.get(
+  "/",
+  protect,
+  authorize("admin", "manager", "employee"),
+  controller.getMetrics
+);
+
+// =======================================================
+// UPDATE METRIC
+// =======================================================
+
+router.put(
+  "/:id",
+  protect,
+  authorize("admin", "manager"),
+  controller.updateMetric
+);
+
+// =======================================================
+// ARCHIVE METRIC
+// =======================================================
+
+router.patch(
+  "/archive/:id",
+  protect,
+  authorize("admin", "manager"),
+  controller.archiveMetric
+);
+
+// =======================================================
+// DELETE METRIC
+// =======================================================
+
 router.delete(
   "/:id",
   protect,
