@@ -33,13 +33,17 @@ app.use(
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
+
+  // Production Frontends
   "https://readytechsaas.netlify.app",
+  "https://readytech-growth-suit.vercel.app",
+
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow Postman / Mobile Apps / Server-to-server
+  origin: (origin, callback) => {
+    // Allow Postman / Mobile Apps / SSR / Curl
     if (!origin) {
       return callback(null, true);
     }
@@ -49,14 +53,28 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    // Allow all Netlify preview deployments
-    if (origin.endsWith(".netlify.app")) {
+    // Allow ALL Netlify Deploy Previews
+    if (
+      origin.includes(".netlify.app")
+    ) {
       return callback(null, true);
     }
 
-    console.error("❌ CORS BLOCKED:", origin);
+    // Allow ALL Vercel Preview Deployments
+    if (
+      origin.includes(".vercel.app")
+    ) {
+      return callback(null, true);
+    }
 
-    return callback(new Error("Not allowed by CORS"));
+    console.error(
+      "❌ CORS BLOCKED:",
+      origin
+    );
+
+    return callback(
+      new Error("Not allowed by CORS")
+    );
   },
 
   credentials: true,
@@ -78,13 +96,15 @@ const corsOptions = {
     "Authorization",
   ],
 
-  exposedHeaders: ["set-cookie"],
+  exposedHeaders: [
+    "set-cookie",
+    "authorization",
+  ],
 
   optionsSuccessStatus: 200,
 };
 
 app.use(cors(corsOptions));
-
 // =======================================================
 // EXTRA CORS SAFETY
 // =======================================================
