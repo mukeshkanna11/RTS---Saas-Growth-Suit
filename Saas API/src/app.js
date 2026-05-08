@@ -1,6 +1,6 @@
 // =======================================================
 // src/app.js
-// PRODUCTION-GRADE SAAS EXPRESS APP
+// PRODUCTION-GRADE SAAS EXPRESS APP (FINAL FIXED VERSION)
 // =======================================================
 
 const express = require("express");
@@ -14,7 +14,7 @@ const { ipKeyGenerator } = require("express-rate-limit");
 const app = express();
 
 // =======================================================
-// TRUST PROXY (RENDER / NGINX / HEROKU SAFE)
+// TRUST PROXY (RENDER / VERCEL / NETLIFY SAFE)
 // =======================================================
 app.set("trust proxy", 1);
 
@@ -28,143 +28,102 @@ app.use(
 );
 
 // =======================================================
-// CORS (PRODUCTION SAFE)
-// =======================================================
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-
-  // Production Frontends
-  "https://readytechsaas.netlify.app",
-  "https://readytech-growth-suit.vercel.app",
-
-  process.env.CLIENT_URL,
-].filter(Boolean);
-
-const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow Postman / Mobile Apps / SSR / Curl
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    // Exact allowed origins
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    // Allow ALL Netlify Deploy Previews
-    if (
-      origin.includes(".netlify.app")
-    ) {
-      return callback(null, true);
-    }
-
-    // Allow ALL Vercel Preview Deployments
-    if (
-      origin.includes(".vercel.app")
-    ) {
-      return callback(null, true);
-    }
-
-    console.error(
-      "❌ CORS BLOCKED:",
-      origin
-    );
-
-    return callback(
-      new Error("Not allowed by CORS")
-    );
-  },
-
-  credentials: true,
-
-  methods: [
-    "GET",
-    "POST",
-    "PUT",
-    "PATCH",
-    "DELETE",
-    "OPTIONS",
-  ],
-
-  allowedHeaders: [
-    "Origin",
-    "X-Requested-With",
-    "Content-Type",
-    "Accept",
-    "Authorization",
-  ],
-
-  exposedHeaders: [
-    "set-cookie",
-    "authorization",
-  ],
-
-  optionsSuccessStatus: 200,
-};
-
-app.use(cors(corsOptions));
-// =======================================================
-// EXTRA CORS SAFETY
-// =======================================================
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Credentials", "true");
-  next();
-});
-
-// =======================================================
 // BODY PARSER
 // =======================================================
 app.use(express.json({ limit: "20kb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // =======================================================
-// PERFORMANCE
+// COMPRESSION (PERFORMANCE)
 // =======================================================
 app.use(compression());
 
 // =======================================================
 // LOGGING
 // =======================================================
-if (process.env.NODE_ENV !== "production") {
-  app.use(morgan("dev"));
-} else {
-  app.use(morgan("combined"));
-}
+app.use(
+  morgan(process.env.NODE_ENV === "production" ? "combined" : "dev")
+);
+
+// =======================================================
+// CORS - FULLY FIXED FOR ALL DEVICES
+// =======================================================
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+
+  // Production Frontends
+  "https://readytech-growth-suit.vercel.app",
+  "https://readytechsaas.netlify.app",
+
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // allow mobile apps / postman / server-to-server
+    if (!origin) return callback(null, true);
+
+    const isAllowed =
+      allowedOrigins.includes(origin) ||
+      origin.endsWith(".vercel.app") ||
+      origin.endsWith(".netlify.app");
+
+    if (isAllowed) {
+      return callback(null, true);
+    }
+
+    console.log("❌ CORS BLOCKED:", origin);
+    return callback(new Error("CORS not allowed"));
+  },
+
+  credentials: true,
+
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Origin",
+    "Accept",
+    "X-Requested-With",
+  ],
+};
+
+app.use(cors(corsOptions));
+
+// =======================================================
+// IMPORTANT: HANDLE PRE-FLIGHT REQUESTS
+// =======================================================
+app.options("*", cors(corsOptions));
+
+// =======================================================
+// DISABLE HEADER LEAK (SECURITY)
+// =======================================================
+app.disable("x-powered-by");
 
 // =======================================================
 // RATE LIMITERS
 // =======================================================
+
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: process.env.RATE_LIMIT_MAX || 200,
+  keyGenerator: ipKeyGenerator,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: ipKeyGenerator,
-
-  message: {
-    success: false,
-    message: "Too many requests. Please try again later.",
-  },
 });
 
 const loginLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 5,
+  keyGenerator: ipKeyGenerator,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: ipKeyGenerator,
-
-  message: {
-    success: false,
-    message: "Too many login attempts. Please try again later.",
-  },
 });
 
-// =======================================================
-// APPLY GLOBAL API LIMITER
-// =======================================================
+// Apply global limiter
 app.use(apiLimiter);
 
 // =======================================================
@@ -187,31 +146,33 @@ app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
     message: "ReadyTech SaaS API Running 🚀",
-    environment: process.env.NODE_ENV || "development",
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// =======================================================
-// HEALTH CHECK
-// =======================================================
-app.get("/api/v1/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    uptime: process.uptime(),
     environment: process.env.NODE_ENV,
     timestamp: new Date().toISOString(),
   });
 });
 
 // =======================================================
-// AUTH ROUTES
+// HEALTH CHECK (IMPORTANT FOR FRONTEND)
 // =======================================================
-app.use("/api/v1/auth/login", loginLimiter);
-app.use("/api/v1/auth", authRoutes);
+app.get("/api/v1/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    uptime: process.uptime(),
+    status: "OK",
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // =======================================================
-// API MODULE ROUTES
+// AUTH ROUTES (FIX LOGIN LIMITER PROPERLY)
+// =======================================================
+app.use("/api/v1/auth", authRoutes);
+
+// IMPORTANT: apply limiter inside route file OR here safely
+app.use("/api/v1/auth/login", loginLimiter);
+
+// =======================================================
+// MODULE ROUTES
 // =======================================================
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/company", companyRoutes);
@@ -236,27 +197,22 @@ app.use((req, res) => {
 // GLOBAL ERROR HANDLER
 // =======================================================
 app.use((err, req, res, next) => {
-  console.error("🔥 SERVER ERROR:");
-  console.error(err);
+  console.error("🔥 ERROR:", err.message);
 
-  // CORS errors
-  if (err.message === "Not allowed by CORS") {
+  if (err.message === "CORS not allowed") {
     return res.status(403).json({
       success: false,
-      message: "CORS policy blocked this request",
+      message: "CORS blocked this request",
     });
   }
 
   res.status(err.status || 500).json({
     success: false,
     message: err.message || "Internal Server Error",
-    ...(process.env.NODE_ENV !== "production" && {
-      stack: err.stack,
-    }),
   });
 });
 
 // =======================================================
-// EXPORT APP
+// EXPORT
 // =======================================================
 module.exports = app;
