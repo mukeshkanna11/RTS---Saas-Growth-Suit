@@ -1,36 +1,145 @@
 // src/pages/CRM.jsx
-import { useMemo, useState } from "react";
+
+import { useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import useCRM from "../hooks/useCRM";
+import {
+  Search,
+  Plus,
+  Trash2,
+  Pencil,
+  DollarSign,
+  User2,
+  Briefcase,
+} from "lucide-react";
+
 import API from "../api";
+import { useAuthStore } from "../store/authStore";
 
 import Button from "../components/Button";
 import Input from "../components/Input";
 import { Card, CardContent } from "../components/Card";
 
 export default function CRM() {
-  const { contacts, deals, activities, notes, loading, refresh } = useCRM();
+  const user = useAuthStore((s) => s.user);
 
-  const [form, setForm] = useState({ name: "", email: "" });
+  // =====================================================
+  // STATES
+  // =====================================================
+
+  const [contacts, setContacts] = useState([]);
+  const [deals, setDeals] = useState([]);
+  const [activities, setActivities] = useState([]);
+  const [notes, setNotes] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+  });
+
   const [editId, setEditId] = useState(null);
+
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
 
-  const stages = ["new", "contacted", "qualified", "proposal", "won", "lost"];
+  // =====================================================
+  // PIPELINE STAGES
+  // =====================================================
 
-  // ---------------- FILTER ----------------
+  const stages = [
+    "new",
+    "contacted",
+    "qualified",
+    "proposal",
+    "negotiation",
+    "won",
+    "lost",
+  ];
+
+  // =====================================================
+  // FETCH CRM DATA
+  // =====================================================
+
+  const fetchCRM = async () => {
+    try {
+      setLoading(true);
+
+      let contactsRes;
+      let dealsRes;
+
+      // =========================================
+      // ADMIN
+      // =========================================
+
+      if (user?.role === "admin") {
+        [contactsRes, dealsRes] = await Promise.all([
+          API.get("/crm/contacts"),
+          API.get("/crm/deals"),
+        ]);
+      }
+
+      // =========================================
+      // MANAGER
+      // =========================================
+
+      else if (user?.role === "manager") {
+        [contactsRes, dealsRes] = await Promise.all([
+          API.get("/crm/contacts/team"),
+          API.get("/crm/deals/team"),
+        ]);
+      }
+
+      // =========================================
+      // EMPLOYEE
+      // =========================================
+
+      else {
+        [contactsRes, dealsRes] = await Promise.all([
+          API.get("/crm/contacts/my"),
+          API.get("/crm/deals/my"),
+        ]);
+      }
+
+      setContacts(contactsRes?.data?.data || []);
+      setDeals(dealsRes?.data?.data || []);
+
+      setActivities([]);
+      setNotes([]);
+    } catch (err) {
+      console.log(err);
+
+      setError("Failed to load CRM data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCRM();
+  }, []);
+
+  // =====================================================
+  // FILTER CONTACTS
+  // =====================================================
+
   const filtered = useMemo(() => {
     return (contacts || []).filter((c) =>
       c?.name?.toLowerCase().includes(search.toLowerCase())
     );
   }, [contacts, search]);
 
-  // ---------------- SAVE CONTACT ----------------
-  const saveContact = async () => {
-    if (!form.name) return setError("Name is required");
+  // =====================================================
+  // SAVE CONTACT
+  // =====================================================
 
+  const saveContact = async () => {
     try {
       setError("");
+
+      if (!form.name.trim()) {
+        return setError("Name required");
+      }
 
       if (editId) {
         await API.put(`/crm/contacts/${editId}`, form);
@@ -38,274 +147,400 @@ export default function CRM() {
         await API.post("/crm/contacts", form);
       }
 
-      setForm({ name: "", email: "" });
+      setForm({
+        name: "",
+        email: "",
+      });
+
       setEditId(null);
-      refresh();
+
+      fetchCRM();
     } catch (err) {
       setError("Failed to save contact");
     }
   };
 
-  // ---------------- DELETE ----------------
+  // =====================================================
+  // DELETE CONTACT
+  // =====================================================
+
   const removeContact = async (id) => {
     try {
       await API.delete(`/crm/contacts/${id}`);
-      refresh();
-    } catch {
+
+      fetchCRM();
+    } catch (err) {
       setError("Delete failed");
     }
   };
 
-  // ---------------- EDIT ----------------
+  // =====================================================
+  // EDIT CONTACT
+  // =====================================================
+
   const edit = (c) => {
-    setForm({ name: c?.name || "", email: c?.email || "" });
+    setForm({
+      name: c?.name || "",
+      email: c?.email || "",
+    });
+
     setEditId(c?._id);
   };
 
-  // ---------------- DRAG DROP ----------------
+  // =====================================================
+  // UPDATE DEAL STAGE
+  // =====================================================
+
   const updateDealStage = async (id, stage) => {
     try {
-      await API.patch(`/crm/deals/${id}/stage`, { stage });
-      refresh();
-    } catch {
-      setError("Deal update failed");
+      await API.put(`/crm/deals/${id}/stage`, {
+        stage,
+      });
+
+      fetchCRM();
+    } catch (err) {
+      setError("Deal stage update failed");
     }
   };
 
-  // ---------------- GROUP DEALS ----------------
-  const groupedDeals = useMemo(() => {
-    const safeDeals = deals || [];
+  // =====================================================
+  // GROUP DEALS
+  // =====================================================
 
+  const groupedDeals = useMemo(() => {
     return stages.reduce((acc, stage) => {
-      acc[stage] = safeDeals.filter((d) => d?.stage === stage);
+      acc[stage] = (deals || []).filter((d) => d?.stage === stage);
+
       return acc;
     }, {});
   }, [deals]);
 
+  // =====================================================
+  // TOTAL REVENUE
+  // =====================================================
+
+  const totalRevenue = useMemo(() => {
+    return (deals || []).reduce(
+      (sum, d) => sum + Number(d?.value || 0),
+      0
+    );
+  }, [deals]);
+
+  // =====================================================
+  // UI
+  // =====================================================
+
   return (
-    <div className="min-h-screen p-6 text-white bg-black">
+    <div className="min-h-screen text-white">
 
+      {/* ================================================= */}
       {/* HEADER */}
-      <div className="flex justify-between mb-6">
-        <h1 className="text-3xl font-bold">🚀 CRM v20 Enterprise</h1>
+      {/* ================================================= */}
 
-        <div className="text-gray-400">
-          Contacts: {contacts?.length || 0} | Deals: {deals?.length || 0}
+      <div className="flex flex-col gap-4 mb-8 md:flex-row md:items-center md:justify-between">
+
+        <div>
+          <h1 className="text-3xl font-bold">
+            CRM Workspace
+          </h1>
+
+          <p className="mt-1 text-sm text-gray-400 capitalize">
+            {user?.role} CRM Management
+          </p>
+        </div>
+
+        <div className="flex gap-3">
+
+          <div className="px-4 py-3 border bg-white/5 border-white/10 rounded-2xl">
+            <p className="text-xs text-gray-400">
+              Contacts
+            </p>
+
+            <h3 className="text-xl font-bold">
+              {contacts.length}
+            </h3>
+          </div>
+
+          <div className="px-4 py-3 border bg-white/5 border-white/10 rounded-2xl">
+            <p className="text-xs text-gray-400">
+              Deals
+            </p>
+
+            <h3 className="text-xl font-bold">
+              {deals.length}
+            </h3>
+          </div>
+
+          <div className="px-4 py-3 border bg-white/5 border-white/10 rounded-2xl">
+            <p className="text-xs text-gray-400">
+              Revenue
+            </p>
+
+            <h3 className="text-xl font-bold text-green-400">
+              ₹ {totalRevenue.toLocaleString()}
+            </h3>
+          </div>
+
         </div>
       </div>
 
+      {/* ================================================= */}
       {/* ERROR */}
+      {/* ================================================= */}
+
       {error && (
-        <div className="p-2 mb-4 text-red-400 border border-red-600 rounded">
+        <div className="p-3 mb-5 text-sm text-red-300 border border-red-500 rounded-xl bg-red-500/10">
           {error}
         </div>
       )}
 
+      {/* ================================================= */}
       {/* SEARCH + FORM */}
-      <div className="grid gap-3 mb-6 md:grid-cols-3">
-        <Input
-          placeholder="Search contacts..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      {/* ================================================= */}
 
-        <Input
-          placeholder="Name"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-        />
+      <div className="grid gap-3 p-4 mb-8 border md:grid-cols-4 bg-white/5 border-white/10 rounded-2xl">
 
-        <div className="flex gap-2">
-          <Input
-            placeholder="Email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
+        <div className="relative">
+          <Search
+            size={16}
+            className="absolute text-gray-500 left-3 top-3"
           />
 
-          <Button onClick={saveContact}>
-            {editId ? "Update" : "Add"}
-          </Button>
+          <Input
+            placeholder="Search contact..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
+
+        <Input
+          placeholder="Contact Name"
+          value={form.name}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              name: e.target.value,
+            })
+          }
+        />
+
+        <Input
+          placeholder="Email Address"
+          value={form.email}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              email: e.target.value,
+            })
+          }
+        />
+
+        <Button onClick={saveContact}>
+          <Plus size={16} />
+          {editId ? "Update" : "Create"}
+        </Button>
+
       </div>
 
+      {/* ================================================= */}
       {/* CONTACTS */}
-      <h2 className="mb-3 text-xl">👤 Contacts</h2>
+      {/* ================================================= */}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {loading ? (
-          <p className="text-gray-400">Loading...</p>
-        ) : filtered.length === 0 ? (
-          <p className="text-gray-500">No contacts found</p>
-        ) : (
-          filtered.map((c) => (
-            <motion.div key={c?._id} whileHover={{ scale: 1.05 }}>
-              <Card>
-                <CardContent>
-                  <h3>{c?.name}</h3>
-                  <p className="text-gray-400">{c?.email}</p>
+      <div className="mb-10">
 
-                  <div className="flex justify-between mt-3 text-sm">
-                    <button onClick={() => edit(c)} className="text-blue-400">
-                      Edit
-                    </button>
-
-                    <button
-                      onClick={() => removeContact(c?._id)}
-                      className="text-red-400"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))
-        )}
-      </div>
-
-     {/* PIPELINE - PREMIUM SAAS v20 */}
-{/* PIPELINE - PRO MAX SAAS LEVEL */}
-<h2 className="mt-10 mb-4 text-lg font-semibold text-gray-200">
-  💰 Deal Pipeline
-</h2>
-
-<div className="flex gap-3 pb-4 overflow-x-auto">
-
-  {stages.map((stage) => {
-    const dealsInStage = groupedDeals[stage] || [];
-
-    // 💰 total revenue per stage
-    const totalValue = dealsInStage.reduce(
-      (sum, d) => sum + (Number(d?.value) || 0),
-      0
-    );
-
-    return (
-      <div
-        key={stage}
-        className="min-w-[240px] max-w-[240px] bg-gray-900 border border-gray-800 rounded-xl flex flex-col shadow-md"
-      >
-
-        {/* HEADER */}
-        <div className="sticky top-0 z-10 p-2 bg-gray-900 border-b border-gray-800">
-
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold tracking-wider text-blue-300 uppercase">
-              {stage}
-            </h3>
-
-            <span className="text-[10px] text-gray-400">
-              {dealsInStage.length}
-            </span>
-          </div>
-
-          {/* KPI */}
-          <p className="text-[11px] text-green-400 mt-1">
-            ₹ {totalValue.toLocaleString()}
-          </p>
+        <div className="flex items-center gap-2 mb-4">
+          <User2 size={18} />
+          <h2 className="text-xl font-semibold">
+            Contacts
+          </h2>
         </div>
 
-        {/* BODY */}
-        <div className="p-2 space-y-2 overflow-y-auto max-h-[420px]">
+        <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
 
-          {dealsInStage.map((d) => {
-            // 🔥 priority logic (simple SaaS scoring)
-            const value = Number(d?.value || 0);
-            const priority =
-              value > 100000 ? "hot" : value > 50000 ? "warm" : "cold";
+          {loading ? (
+            <p className="text-gray-400">
+              Loading...
+            </p>
+          ) : filtered.length === 0 ? (
+            <p className="text-gray-500">
+              No contacts found
+            </p>
+          ) : (
+            filtered.map((c) => (
+              <motion.div
+                key={c?._id}
+                whileHover={{ scale: 1.02 }}
+              >
+                <Card className="border border-white/10 bg-white/5 rounded-2xl">
 
-            const priorityColor =
-              priority === "hot"
-                ? "border-red-500 text-red-300"
-                : priority === "warm"
-                ? "border-yellow-500 text-yellow-300"
-                : "border-blue-500 text-blue-300";
+                  <CardContent className="p-5">
+
+                    <div className="flex items-center justify-between">
+
+                      <div>
+                        <h3 className="font-semibold">
+                          {c?.name}
+                        </h3>
+
+                        <p className="mt-1 text-sm text-gray-400">
+                          {c?.email}
+                        </p>
+                      </div>
+
+                      <div className="flex gap-2">
+
+                        <button
+                          onClick={() => edit(c)}
+                          className="p-2 rounded-lg hover:bg-blue-500/20"
+                        >
+                          <Pencil
+                            size={16}
+                            className="text-blue-400"
+                          />
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            removeContact(c?._id)
+                          }
+                          className="p-2 rounded-lg hover:bg-red-500/20"
+                        >
+                          <Trash2
+                            size={16}
+                            className="text-red-400"
+                          />
+                        </button>
+
+                      </div>
+                    </div>
+
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* ================================================= */}
+      {/* DEAL PIPELINE */}
+      {/* ================================================= */}
+
+      <div>
+
+        <div className="flex items-center gap-2 mb-5">
+          <Briefcase size={18} />
+          <h2 className="text-xl font-semibold">
+            Deal Pipeline
+          </h2>
+        </div>
+
+        <div className="flex gap-4 pb-3 overflow-x-auto">
+
+          {stages.map((stage) => {
+            const dealsInStage =
+              groupedDeals[stage] || [];
+
+            const totalValue = dealsInStage.reduce(
+              (sum, d) =>
+                sum + Number(d?.value || 0),
+              0
+            );
 
             return (
               <div
-                key={d?._id}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData("dealId", d?._id);
-                  e.currentTarget.classList.add("opacity-50");
-                }}
-                onDragEnd={(e) => {
-                  e.currentTarget.classList.remove("opacity-50");
-                }}
+                key={stage}
+                className="min-w-[300px] bg-[#0F172A] border border-white/10 rounded-2xl"
                 onDrop={(e) => {
-                  const id = e.dataTransfer.getData("dealId");
+                  const id =
+                    e.dataTransfer.getData("dealId");
+
                   updateDealStage(id, stage);
                 }}
-                onDragOver={(e) => e.preventDefault()}
-                className={`p-2 rounded-lg bg-gray-800 border cursor-grab hover:scale-[1.02] transition transform ${priorityColor}`}
+                onDragOver={(e) =>
+                  e.preventDefault()
+                }
               >
 
-                {/* TITLE */}
-                <p className="text-sm font-medium text-white truncate">
-                  {d?.title}
-                </p>
+                {/* HEADER */}
 
-                {/* META */}
-                <div className="flex items-center justify-between mt-1">
+                <div className="p-4 border-b border-white/10">
 
-                  <span className="text-xs text-gray-300">
-                    ₹ {value.toLocaleString()}
-                  </span>
+                  <div className="flex items-center justify-between">
 
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-black/40 border border-gray-700">
-                    {priority.toUpperCase()}
-                  </span>
+                    <h3 className="text-sm font-bold tracking-wide uppercase">
+                      {stage}
+                    </h3>
 
+                    <span className="px-2 py-1 text-xs rounded-full bg-white/10">
+                      {dealsInStage.length}
+                    </span>
+
+                  </div>
+
+                  <div className="flex items-center gap-1 mt-2 text-green-400">
+
+                    <DollarSign size={14} />
+
+                    <span className="text-sm">
+                      ₹ {totalValue.toLocaleString()}
+                    </span>
+
+                  </div>
                 </div>
 
+                {/* DEALS */}
+
+                <div className="p-3 space-y-3 min-h-[500px]">
+
+                  {dealsInStage.map((d) => (
+                    <motion.div
+                      key={d?._id}
+                      draggable
+                      whileHover={{ scale: 1.02 }}
+                      className="p-4 border cursor-grab border-white/10 rounded-xl bg-white/5"
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(
+                          "dealId",
+                          d?._id
+                        );
+                      }}
+                    >
+
+                      <h4 className="font-medium">
+                        {d?.title}
+                      </h4>
+
+                      <div className="flex items-center justify-between mt-3">
+
+                        <p className="text-sm text-gray-300">
+                          ₹{" "}
+                          {Number(
+                            d?.value || 0
+                          ).toLocaleString()}
+                        </p>
+
+                        <span className="px-2 py-1 text-xs border rounded-full border-white/10 bg-black/30">
+                          {d?.probability || 0}%
+                        </span>
+
+                      </div>
+
+                    </motion.div>
+                  ))}
+
+                  {dealsInStage.length === 0 && (
+                    <div className="flex items-center justify-center h-24 text-sm text-gray-500 border border-dashed rounded-xl border-white/10">
+                      No Deals
+                    </div>
+                  )}
+
+                </div>
               </div>
             );
           })}
-
-          {/* EMPTY STATE */}
-          {dealsInStage.length === 0 && (
-            <div className="py-6 text-xs text-center text-gray-500 border border-gray-700 border-dashed rounded-lg">
-              Drop deals here
-            </div>
-          )}
-
         </div>
-      </div>
-    );
-  })}
-
-</div>
-
-      {/* ACTIVITY */}
-      <h2 className="mt-10 mb-3 text-xl">📌 Activity Timeline</h2>
-
-      <div className="space-y-3">
-        {(activities || []).map((a) => (
-          <Card key={a?._id}>
-            <CardContent>
-              <p>{a?.title}</p>
-              <p className="text-xs text-gray-400">
-                {a?.type} •{" "}
-                {a?.createdAt
-                  ? new Date(a.createdAt).toLocaleString()
-                  : ""}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* NOTES */}
-      <h2 className="mt-10 mb-3 text-xl">📝 Notes</h2>
-
-      <div className="grid gap-3 md:grid-cols-3">
-        {(notes || []).map((n) => (
-          <Card key={n?._id}>
-            <CardContent>
-              <p>{n?.content}</p>
-            </CardContent>
-          </Card>
-        ))}
       </div>
     </div>
   );
