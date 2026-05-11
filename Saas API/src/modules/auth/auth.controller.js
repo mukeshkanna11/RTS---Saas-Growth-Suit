@@ -41,6 +41,9 @@ exports.register = async (req, res) => {
 /* ===============================
    🔐 LOGIN CONTROLLER (FIXED)
 =============================== */
+/* ===============================
+   🔐 LOGIN CONTROLLER
+=============================== */
 exports.login = async (req, res) => {
   try {
     const result = loginSchema.safeParse(req.body);
@@ -55,26 +58,69 @@ exports.login = async (req, res) => {
 
     const data = await authService.login(result.data);
 
-    // ✅ FIXED CHECK
+    // =========================================
+    // VALIDATION
+    // =========================================
+
     if (!data?.token || !data?.user) {
-      return fail(res, "Login service returned invalid response", 500);
+      return fail(
+        res,
+        "Login service returned invalid response",
+        500
+      );
     }
 
     if (!data.user.tenantId) {
-      return fail(res, "Tenant not assigned to user", 400);
+      return fail(
+        res,
+        "Tenant not assigned to user",
+        400
+      );
     }
 
-    return success(res, data, "Login successful");
+    // =========================================
+    // COOKIE SETTINGS
+    // =========================================
+
+    const isProduction =
+      process.env.NODE_ENV === "production";
+
+   res.cookie("refreshToken", data.refreshToken, {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite:
+    process.env.NODE_ENV === "production"
+      ? "none"
+      : "lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+});
+
+    // =========================================
+    // RESPONSE
+    // =========================================
+
+    return success(
+      res,
+      {
+        token: data.token,
+        user: data.user,
+      },
+      "Login successful"
+    );
   } catch (err) {
     console.error("LOGIN ERROR:", err);
 
     return res.status(err.statusCode || 401).json({
       success: false,
-      message: err.message || "Invalid credentials",
+      message:
+        err.message || "Invalid credentials",
     });
   }
 };
 
+/* ===============================
+   🚪 LOGOUT CONTROLLER
+=============================== */
 /* ===============================
    🚪 LOGOUT CONTROLLER
 =============================== */
@@ -83,18 +129,38 @@ exports.logout = async (req, res) => {
     const userId = req.user?.id;
 
     if (!userId) {
-      return fail(res, "Unauthorized access", 401);
+      return fail(
+        res,
+        "Unauthorized access",
+        401
+      );
     }
 
     await authService.logout(userId);
 
-    return success(res, null, "Logged out successfully");
+    // CLEAR COOKIE
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure:
+        process.env.NODE_ENV === "production",
+      sameSite:
+        process.env.NODE_ENV === "production"
+          ? "none"
+          : "lax",
+    });
+
+    return success(
+      res,
+      null,
+      "Logged out successfully"
+    );
   } catch (err) {
     console.error("LOGOUT ERROR:", err);
 
     return res.status(err.statusCode || 500).json({
       success: false,
-      message: err.message || "Logout failed",
+      message:
+        err.message || "Logout failed",
     });
   }
 };

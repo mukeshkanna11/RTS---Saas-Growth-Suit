@@ -1,14 +1,15 @@
 // =======================================================
 // src/api/axios.js
 // ENTERPRISE SAAS AXIOS CLIENT
-// FULLY OPTIMIZED + CORS SAFE
+// FINAL PRODUCTION VERSION
 // =======================================================
 
 import axios from "axios";
 
 // =======================================================
-// ENV
+// BASE URL
 // =======================================================
+
 const BASE_URL =
   import.meta.env.VITE_API_URL ||
   "https://rts-saas-growth-suit-1.onrender.com";
@@ -16,13 +17,13 @@ const BASE_URL =
 // =======================================================
 // AXIOS INSTANCE
 // =======================================================
+
 const API = axios.create({
   baseURL: `${BASE_URL}/api/v1`,
 
-  // JWT auth only
-  withCredentials: false,
+  // IMPORTANT FOR COOKIES + MOBILE AUTH
+  withCredentials: true,
 
-  // safer timeout
   timeout: 30000,
 
   headers: {
@@ -34,11 +35,13 @@ const API = axios.create({
 // =======================================================
 // TOKEN HELPERS
 // =======================================================
+
 const getAccessToken = () => {
   try {
     return localStorage.getItem("accessToken");
   } catch (error) {
-    console.error("❌ Access token read failed:", error);
+    console.error("❌ Token Read Error:", error);
+
     return null;
   }
 };
@@ -46,67 +49,74 @@ const getAccessToken = () => {
 const clearAuthData = () => {
   try {
     localStorage.removeItem("accessToken");
+
     localStorage.removeItem("refreshToken");
+
     localStorage.removeItem("user");
   } catch (error) {
-    console.error("❌ Auth cleanup failed:", error);
+    console.error("❌ Auth Cleanup Error:", error);
   }
 };
 
 // =======================================================
 // REQUEST INTERCEPTOR
 // =======================================================
+
 API.interceptors.request.use(
   (config) => {
-    const token = getAccessToken();
+    try {
+      const token = getAccessToken();
 
-    // ensure headers exists
-    config.headers = config.headers || {};
+      config.headers = config.headers || {};
 
-    // ===================================================
-    // AUTHORIZATION
-    // ===================================================
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      // ================================================
+      // AUTH TOKEN
+      // ================================================
+
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+
+      // ================================================
+      // REMOVE PROBLEMATIC HEADERS
+      // ================================================
+
+      delete config.headers["x-request-time"];
+
+      return config;
+    } catch (error) {
+      console.error("❌ REQUEST INTERCEPTOR ERROR:", error);
+
+      return config;
     }
-
-    // ===================================================
-    // REMOVE PROBLEMATIC HEADERS
-    // ===================================================
-    delete config.headers["x-request-time"];
-
-    return config;
   },
 
   (error) => {
-    console.error("❌ Request Error:", error);
+    console.error("❌ REQUEST ERROR:", error);
 
-    return Promise.reject({
-      success: false,
-      message: "Request failed before reaching server.",
-    });
+    return Promise.reject(error);
   }
 );
 
 // =======================================================
 // RESPONSE INTERCEPTOR
 // =======================================================
+
 API.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
 
   async (error) => {
-    // ===================================================
-    // NETWORK / CORS / BACKEND DOWN
-    // ===================================================
+    // ================================================
+    // NETWORK / CORS / SERVER DOWN
+    // ================================================
+
     if (!error.response) {
-      console.error("🌐 Network / CORS Error:", error);
+      console.error("🌐 NETWORK ERROR:", error);
 
       return Promise.reject({
         success: false,
         message:
-          "Unable to connect to server. Backend may be down or blocked by CORS.",
+          "Unable to connect to server. Please try again later.",
       });
     }
 
@@ -117,41 +127,48 @@ API.interceptors.response.use(
       error.response?.data?.error ||
       "Something went wrong";
 
-    console.error(`❌ API ERROR [${status}] →`, message);
+    console.error(`❌ API ERROR [${status}]`, message);
 
-    // ===================================================
+    // ================================================
     // UNAUTHORIZED
-    // ===================================================
+    // ================================================
+
     if (status === 401) {
       clearAuthData();
 
       const currentPath = window.location.pathname;
 
       // avoid redirect loop
-      if (currentPath !== "/login" && currentPath !== "/") {
+      if (
+        currentPath !== "/login" &&
+        currentPath !== "/"
+      ) {
         window.location.href = "/login";
       }
     }
 
-    // ===================================================
+    // ================================================
     // FORBIDDEN
-    // ===================================================
+    // ================================================
+
     if (status === 403) {
-      console.error("⛔ Access Denied");
+      console.error("⛔ ACCESS DENIED");
     }
 
-    // ===================================================
+    // ================================================
     // VALIDATION ERROR
-    // ===================================================
+    // ================================================
+
     if (status === 422) {
-      console.error("⚠️ Validation Error");
+      console.error("⚠️ VALIDATION ERROR");
     }
 
-    // ===================================================
+    // ================================================
     // SERVER ERROR
-    // ===================================================
+    // ================================================
+
     if (status >= 500) {
-      console.error("🔥 Internal Server Error");
+      console.error("🔥 SERVER ERROR");
     }
 
     return Promise.reject({
@@ -164,7 +181,7 @@ API.interceptors.response.use(
 );
 
 // =======================================================
-// API HELPERS
+// AUTH HELPERS
 // =======================================================
 
 export const setAuthToken = (token) => {
@@ -173,18 +190,20 @@ export const setAuthToken = (token) => {
       localStorage.setItem("accessToken", token);
     }
   } catch (error) {
-    console.error("❌ Failed to save token:", error);
+    console.error("❌ SAVE TOKEN ERROR:", error);
   }
 };
 
 export const logoutUser = () => {
   clearAuthData();
+
   window.location.href = "/login";
 };
 
 // =======================================================
-// HEALTH CHECK
+// BACKEND HEALTH CHECK
 // =======================================================
+
 export const checkBackendHealth = async () => {
   try {
     const response = await API.get("/health");
@@ -204,4 +223,5 @@ export const checkBackendHealth = async () => {
 // =======================================================
 // EXPORT
 // =======================================================
+
 export default API;

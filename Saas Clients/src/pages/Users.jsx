@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-import API from "../api";
+import API from "../api/axios";
 
 import {
   Users as UsersIcon,
