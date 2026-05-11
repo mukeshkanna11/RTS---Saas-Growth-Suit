@@ -77,15 +77,50 @@ const protect = async (req, res, next) => {
     // TOKEN
     // ==========================================
 
-    const token = extractToken(req);
+    // =======================================================
+// EXTRACT TOKEN
+// SUPPORTS:
+// 1. Bearer Token
+// 2. Cookies
+// 3. Fallback Headers
+// =======================================================
 
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message:
-          "Authorization token missing",
-      });
+const extractToken = (req) => {
+  try {
+    // ==========================================
+    // BEARER TOKEN
+    // ==========================================
+
+    if (
+      req.headers.authorization &&
+      req.headers.authorization.startsWith("Bearer ")
+    ) {
+      return req.headers.authorization.split(" ")[1];
     }
+
+    // ==========================================
+    // COOKIE TOKEN
+    // ==========================================
+
+    if (req.cookies?.token) {
+      return req.cookies.token;
+    }
+
+    // ==========================================
+    // CUSTOM HEADER TOKEN
+    // ==========================================
+
+    if (req.headers["x-access-token"]) {
+      return req.headers["x-access-token"];
+    }
+
+    return null;
+  } catch (err) {
+    console.error("TOKEN EXTRACT ERROR:", err);
+
+    return null;
+  }
+};
 
     // ==========================================
     // VERIFY TOKEN

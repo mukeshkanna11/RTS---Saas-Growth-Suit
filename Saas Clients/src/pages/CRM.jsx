@@ -12,7 +12,7 @@ import {
   Briefcase,
 } from "lucide-react";
 
-import API from "../api";
+import API from "../api/axios";
 import { useAuthStore } from "../store/authStore";
 
 import Button from "../components/Button";

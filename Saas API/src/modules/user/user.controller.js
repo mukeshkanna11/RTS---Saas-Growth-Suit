@@ -5,6 +5,13 @@ const userService = require("./user.service");
 ========================================= */
 exports.getUsersController = async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
     const result = await userService.getAllUsers(
       req.user.tenantId,
       req.user,
@@ -17,6 +24,8 @@ exports.getUsersController = async (req, res) => {
       pagination: result.pagination,
     });
   } catch (err) {
+    console.error("GET USERS ERROR:", err);
+
     return res.status(500).json({
       success: false,
       message: err.message,
