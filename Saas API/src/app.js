@@ -1,6 +1,7 @@
 // =======================================================
 // src/app.js
-// PRODUCTION-GRADE SAAS EXPRESS APP (FINAL FIXED VERSION)
+// PRODUCTION-GRADE SAAS EXPRESS APP
+// FINAL STABLE VERSION (VERCEL + RENDER + MOBILE SAFE)
 // =======================================================
 
 const express = require("express");
@@ -9,12 +10,13 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const compression = require("compression");
 const rateLimit = require("express-rate-limit");
+const cookieParser = require("cookie-parser");
 const { ipKeyGenerator } = require("express-rate-limit");
 
 const app = express();
 
 // =======================================================
-// TRUST PROXY (RENDER / VERCEL / NETLIFY SAFE)
+// TRUST PROXY (RENDER / VERCEL SAFE)
 // =======================================================
 app.set("trust proxy", 1);
 
@@ -28,32 +30,42 @@ app.use(
 );
 
 // =======================================================
+// DISABLE X-POWERED-BY
+// =======================================================
+app.disable("x-powered-by");
+
+// =======================================================
 // BODY PARSER
 // =======================================================
 app.use(express.json({ limit: "20kb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // =======================================================
-// COMPRESSION (PERFORMANCE)
+// COOKIE PARSER
+// =======================================================
+app.use(cookieParser());
+
+// =======================================================
+// COMPRESSION
 // =======================================================
 app.use(compression());
 
 // =======================================================
-// LOGGING
+// LOGGER
 // =======================================================
 app.use(
   morgan(process.env.NODE_ENV === "production" ? "combined" : "dev")
 );
 
 // =======================================================
-// CORS - FULLY FIXED FOR ALL DEVICES
+// CORS CONFIGURATION
 // =======================================================
 
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
 
-  // Production Frontends
+  // Production Frontend
   "https://readytech-growth-suit.vercel.app",
   "https://readytechsaas.netlify.app",
 
@@ -62,25 +74,33 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // allow mobile apps / postman / server-to-server
-    if (!origin) return callback(null, true);
-
-    const isAllowed =
-      allowedOrigins.includes(origin) ||
-      origin.endsWith(".vercel.app") ||
-      origin.endsWith(".netlify.app");
-
-    if (isAllowed) {
+    // Allow requests without origin
+    // (mobile apps, postman, server-to-server)
+    if (!origin) {
       return callback(null, true);
     }
 
-    console.log("❌ CORS BLOCKED:", origin);
-    return callback(new Error("CORS not allowed"));
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    console.log("❌ BLOCKED BY CORS:", origin);
+
+    return callback(
+      new Error(`CORS not allowed for origin: ${origin}`)
+    );
   },
 
   credentials: true,
 
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  methods: [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+  ],
 
   allowedHeaders: [
     "Content-Type",
@@ -94,41 +114,59 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // =======================================================
-// IMPORTANT: HANDLE PRE-FLIGHT REQUESTS
+// HANDLE PREFLIGHT
 // =======================================================
 app.options("*", cors(corsOptions));
-
-// =======================================================
-// DISABLE HEADER LEAK (SECURITY)
-// =======================================================
-app.disable("x-powered-by");
 
 // =======================================================
 // RATE LIMITERS
 // =======================================================
 
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: process.env.RATE_LIMIT_MAX || 200,
-  keyGenerator: ipKeyGenerator,
+  windowMs: 15 * 60 * 1000, // 15 mins
+
+  max: Number(process.env.RATE_LIMIT_MAX) || 200,
+
+  keyGenerator: (req) => {
+    return ipKeyGenerator(req);
+  },
+
   standardHeaders: true,
   legacyHeaders: false,
+
+  message: {
+    success: false,
+    message: "Too many requests, please try again later.",
+  },
 });
 
 const loginLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
+  windowMs: 10 * 60 * 1000, // 10 mins
+
   max: 5,
-  keyGenerator: ipKeyGenerator,
+
+  keyGenerator: (req) => {
+    return ipKeyGenerator(req);
+  },
+
   standardHeaders: true,
   legacyHeaders: false,
+
+  message: {
+    success: false,
+    message: "Too many login attempts. Please try later.",
+  },
 });
 
-// Apply global limiter
-app.use(apiLimiter);
+// =======================================================
+// APPLY GLOBAL LIMITER
+// =======================================================
+app.use("/api", apiLimiter);
 
 // =======================================================
 // ROUTES IMPORT
 // =======================================================
+
 const authRoutes = require("./modules/auth/auth.routes");
 const userRoutes = require("./modules/user/user.routes");
 const companyRoutes = require("./modules/company/company.routes");
@@ -152,42 +190,50 @@ app.get("/", (req, res) => {
 });
 
 // =======================================================
-// HEALTH CHECK (IMPORTANT FOR FRONTEND)
+// HEALTH CHECK
 // =======================================================
 app.get("/api/v1/health", (req, res) => {
   res.status(200).json({
     success: true,
-    uptime: process.uptime(),
     status: "OK",
+    uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });
 });
 
 // =======================================================
-// AUTH ROUTES (FIX LOGIN LIMITER PROPERLY)
+// AUTH ROUTES
 // =======================================================
-app.use("/api/v1/auth", authRoutes);
 
-// IMPORTANT: apply limiter inside route file OR here safely
+// Apply login limiter BEFORE auth routes
 app.use("/api/v1/auth/login", loginLimiter);
 
+app.use("/api/v1/auth", authRoutes);
+
 // =======================================================
-// MODULE ROUTES
+// API ROUTES
 // =======================================================
 app.use("/api/v1/users", userRoutes);
+
 app.use("/api/v1/company", companyRoutes);
+
 app.use("/api/v1/leads", leadRoutes);
+
 app.use("/api/v1/crm", crmRoutes);
+
 app.use("/api/v1/marketing", marketingRoutes);
+
 app.use("/api/v1/automation", automationRoutes);
+
 app.use("/api/v1/analytics", analyticsRoutes);
+
 app.use("/api/v1/subscription", subscriptionRoutes);
 
 // =======================================================
 // 404 HANDLER
 // =======================================================
 app.use((req, res) => {
-  res.status(404).json({
+  return res.status(404).json({
     success: false,
     message: `Route not found: ${req.originalUrl}`,
   });
@@ -197,22 +243,61 @@ app.use((req, res) => {
 // GLOBAL ERROR HANDLER
 // =======================================================
 app.use((err, req, res, next) => {
-  console.error("🔥 ERROR:", err.message);
+  console.error("🔥 SERVER ERROR:", err);
 
-  if (err.message === "CORS not allowed") {
+  // CORS ERROR
+  if (err.message?.includes("CORS")) {
     return res.status(403).json({
       success: false,
-      message: "CORS blocked this request",
+      message: err.message,
     });
   }
 
-  res.status(err.status || 500).json({
+  // JWT ERROR
+  if (err.name === "JsonWebTokenError") {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid token",
+    });
+  }
+
+  // JWT EXPIRED
+  if (err.name === "TokenExpiredError") {
+    return res.status(401).json({
+      success: false,
+      message: "Token expired",
+    });
+  }
+
+  // MONGOOSE BAD OBJECT ID
+  if (err.name === "CastError") {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid resource ID",
+    });
+  }
+
+  // MONGOOSE VALIDATION ERROR
+  if (err.name === "ValidationError") {
+    return res.status(400).json({
+      success: false,
+      message: Object.values(err.errors)
+        .map((val) => val.message)
+        .join(", "),
+    });
+  }
+
+  // DEFAULT ERROR
+  return res.status(err.status || 500).json({
     success: false,
-    message: err.message || "Internal Server Error",
+    message:
+      process.env.NODE_ENV === "production"
+        ? "Internal Server Error"
+        : err.message,
   });
 });
 
 // =======================================================
-// EXPORT
+// EXPORT APP
 // =======================================================
 module.exports = app;

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import API from "../api";
+import API from "../api/axios";
 import { useAuthStore } from "../store/authStore";
 
 export default function Leads() {
