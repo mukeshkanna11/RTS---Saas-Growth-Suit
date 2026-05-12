@@ -32,28 +32,31 @@ async init() {
     }
 
     this.transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
+      host: process.env.SMTP_HOST, // smtp.gmail.com
 
-  port: Number(process.env.SMTP_PORT),
+      port: Number(process.env.SMTP_PORT), // 587
 
-  secure: false,
+      secure: false, // MUST be false for 587
 
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
+      requireTLS: true,
 
-  family: 4,
+      auth: {
+        user,
+        pass,
+      },
 
-  tls: {
-    rejectUnauthorized: false,
-  },
+      family: 4, // FORCE IPv4 (fixes ENETUNREACH issues)
 
-  connectionTimeout: 30000,
-  greetingTimeout: 30000,
-  socketTimeout: 30000,
-});
+      tls: {
+        rejectUnauthorized: false,
+      },
 
+      connectionTimeout: 60000,
+      greetingTimeout: 60000,
+      socketTimeout: 60000,
+    });
+
+    // ✅ VERIFY CONNECTION (important)
     await this.transporter.verify();
 
     this.ready = true;
@@ -61,15 +64,15 @@ async init() {
     console.log("✅ EMAIL SERVICE READY");
 
   } catch (err) {
-
     this.ready = false;
 
-    console.error(
-      "❌ EMAIL INIT FAILED:",
-      err.message
-    );
+    console.error("❌ EMAIL INIT FAILED:", err.message);
+
+    // DO NOT crash server
   }
 }
+
+   
 
   // ======================================================
   // ENSURE READY
