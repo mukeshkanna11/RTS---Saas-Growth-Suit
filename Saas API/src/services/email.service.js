@@ -28,9 +28,13 @@ class EmailService {
       }
 
      this.transporter = nodemailer.createTransport({
+  service: "gmail",
+
   host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
+
+  port: 465,
+
+  secure: true,
 
   family: 4,
 
@@ -43,9 +47,9 @@ class EmailService {
     rejectUnauthorized: false,
   },
 
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
+  connectionTimeout: 30000,
+  greetingTimeout: 30000,
+  socketTimeout: 30000,
 });
 
       await this.transporter.verify();
@@ -80,70 +84,56 @@ class EmailService {
   // ======================================================
 
   async sendMail({
-    to,
-    subject,
-    html,
-    text,
-    attachments = [],
-  }) {
-    await this.ensureReady();
+  to,
+  subject,
+  html,
+  text,
+  attachments = [],
+}) {
+  await this.ensureReady();
 
-    try {
+  try {
+    console.log("=================================");
+    console.log("📨 TRYING TO SEND EMAIL");
+    console.log("TO:", to);
+    console.log("SUBJECT:", subject);
+    console.log("=================================");
 
-      console.log("=================================");
-      console.log("📨 TRYING TO SEND EMAIL");
-      console.log("TO:", to);
-      console.log("SUBJECT:", subject);
-      console.log("=================================");
-
-      if (!this.transporter) {
-        throw new Error(
-          "SMTP transporter not initialized"
-        );
-      }
-
-      const info =
-        await this.transporter.sendMail({
-          from:
-            process.env.SMTP_FROM ||
-            process.env.SMTP_USER,
-
-          to,
-          subject,
-          html,
-          text,
-          attachments,
-        });
-
-      console.log(
-        "✅ EMAIL SENT SUCCESS"
-      );
-
-      console.log(
-        "MESSAGE ID:",
-        info.messageId
-      );
-
-      return {
-        success: true,
-        messageId: info.messageId,
-      };
-
-    } catch (err) {
-
-      console.error(
-        "❌ EMAIL SEND FAILED:"
-      );
-
-      console.error(err);
-
-      return {
-        success: false,
-        error: err.message,
-      };
+    if (!this.transporter) {
+      throw new Error("Transporter not initialized");
     }
-  }
 
+    const info = await this.transporter.sendMail({
+      from:
+        process.env.SMTP_FROM ||
+        process.env.SMTP_USER,
+
+      to,
+      subject,
+      html,
+      text,
+      attachments,
+    });
+
+    console.log("✅ EMAIL SENT SUCCESS");
+    console.log("MESSAGE ID:", info.messageId);
+
+    return {
+      success: true,
+      messageId: info.messageId,
+    };
+
+  } catch (err) {
+
+    console.error("❌ EMAIL SEND FAILED");
+    console.error(err);
+
+    return {
+      success: false,
+      error: err.message,
+    };
+  }
+}
   // ======================================================
   // SEND SUBSCRIPTION LEAD
   // ======================================================
