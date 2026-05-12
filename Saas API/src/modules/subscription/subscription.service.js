@@ -1,10 +1,22 @@
-// ======================================================
-// SUBSCRIPTION SERVICE (PRODUCTION-READY SAAS CORE)
-// ======================================================
-
 const mongoose = require("mongoose");
 const Subscription = require("./subscription.model");
 const { getPlan } = require("./subscription.plans");
+
+// ======================================================
+// HELPERS (ENTERPRISE SAFE)
+// ======================================================
+const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
+
+class ServiceError extends Error {
+  constructor(message, code = 400) {
+    super(message);
+    this.code = code;
+  }
+}
+
+const throwError = (msg, code = 400) => {
+  throw new ServiceError(msg, code);
+};
 
 // ======================================================
 // CREATE SUBSCRIPTION INTENT
@@ -15,15 +27,16 @@ const createSubscriptionIntent = async ({
   clientEmail,
   plan,
   billingCycle = "monthly",
+  userId,
+  meta = {},
 }) => {
-  const selectedPlan = getPlan(plan);
-
-  if (!selectedPlan) {
-    throw new Error("Invalid subscription plan");
+  if (!isValidId(companyId)) {
+    throwError("Invalid company ID");
   }
 
-  if (!mongoose.Types.ObjectId.isValid(companyId)) {
-    throw new Error("Invalid company ID");
+  const selectedPlan = getPlan(plan);
+  if (!selectedPlan) {
+    throwError("Invalid subscription plan");
   }
 
   const amount =
@@ -33,46 +46,69 @@ const createSubscriptionIntent = async ({
 
   const subscription = await Subscription.create({
     companyId,
+    userId,
     clientName,
     clientEmail,
     plan: selectedPlan.id,
     billingCycle,
     amount,
+
     status: "pending",
     paymentStatus: "pending",
+
     projectsIncluded: selectedPlan.limits.projectsIncluded,
     teamMembers: selectedPlan.limits.teamMembers,
+    storageGB: selectedPlan.limits.storageGB,
+    apiRequestsPerMonth: selectedPlan.limits.apiRequestsPerMonth,
+
     modules: selectedPlan.modules,
+
+    meta: {
+      source: meta.source || "api",
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    },
   });
 
   return subscription;
 };
 
 // ======================================================
-// CONFIRM PAYMENT
+// CONFIRM PAYMENT (INVOICE READY)
 // ======================================================
-const confirmPayment = async ({ subscriptionId, transactionId }) => {
-  if (!mongoose.Types.ObjectId.isValid(subscriptionId)) {
-    throw new Error("Invalid subscription ID");
+const confirmPayment = async ({
+  subscriptionId,
+  transactionId,
+  paymentGateway = "manual",
+}) => {
+  if (!isValidId(subscriptionId)) {
+    throwError("Invalid subscription ID");
   }
 
   const subscription = await Subscription.findById(subscriptionId);
-
   if (!subscription) {
-    throw new Error("Subscription not found");
+    throwError("Subscription not found", 404);
   }
+
+  const invoiceId = "INV-" + Date.now();
 
   subscription.paymentStatus = "paid";
   subscription.status = "active";
   subscription.transactionId = transactionId;
+  subscription.paymentGateway = paymentGateway;
+
+  subscription.invoice = {
+    invoiceId,
+    generatedAt: new Date(),
+  };
+
+  subscription.lastPaymentDate = new Date();
 
   const renewal = new Date();
-
-  if (subscription.billingCycle === "yearly") {
-    renewal.setFullYear(renewal.getFullYear() + 1);
-  } else {
-    renewal.setMonth(renewal.getMonth() + 1);
-  }
+  renewal.setMonth(
+    renewal.getMonth() +
+      (subscription.billingCycle === "yearly" ? 12 : 1)
+  );
 
   subscription.renewalDate = renewal;
 
@@ -82,60 +118,62 @@ const confirmPayment = async ({ subscriptionId, transactionId }) => {
 };
 
 // ======================================================
-// GET CURRENT USER SUBSCRIPTION
+// GET CURRENT USER SUBSCRIPTION (MULTI-TENANT SAFE)
 // ======================================================
 const getMySubscription = async ({ companyId, email }) => {
   let query = null;
 
-  if (companyId && mongoose.Types.ObjectId.isValid(companyId)) {
+  if (companyId && isValidId(companyId)) {
     query = { companyId };
   } else if (email) {
     query = { clientEmail: email };
-  } else {
-    throw new Error("Missing subscription lookup info");
+  }
+
+  if (!query) {
+    throwError("Missing subscription lookup info");
   }
 
   const subscription = await Subscription.findOne(query)
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
 
   if (!subscription) {
-    throw new Error("Subscription not found");
+    throwError("Subscription not found", 404);
   }
 
   return subscription;
 };
 
 // ======================================================
-// GET ALL SUBSCRIPTIONS
+// GET ALL SUBSCRIPTIONS (ADMIN ONLY)
 // ======================================================
 const getAllSubscriptions = async () => {
-  return await Subscription.find()
-    .populate("companyId")
-    .sort({ createdAt: -1 });
+  return Subscription.find({ isDeleted: false })
+    .populate("companyId userId")
+    .sort({ createdAt: -1 })
+    .lean();
 };
 
 // ======================================================
-// CHANGE PLAN
+// CHANGE PLAN (SAFE UPGRADE)
 // ======================================================
 const changePlan = async ({
   subscriptionId,
   plan,
   billingCycle = "monthly",
 }) => {
-  if (!mongoose.Types.ObjectId.isValid(subscriptionId)) {
-    throw new Error("Invalid subscription ID");
+  if (!isValidId(subscriptionId)) {
+    throwError("Invalid subscription ID");
   }
 
   const subscription = await Subscription.findById(subscriptionId);
-
   if (!subscription) {
-    throw new Error("Subscription not found");
+    throwError("Subscription not found", 404);
   }
 
   const selectedPlan = getPlan(plan);
-
   if (!selectedPlan) {
-    throw new Error("Invalid plan");
+    throwError("Invalid plan");
   }
 
   const amount =
@@ -146,8 +184,13 @@ const changePlan = async ({
   subscription.plan = selectedPlan.id;
   subscription.billingCycle = billingCycle;
   subscription.amount = amount;
+
   subscription.projectsIncluded = selectedPlan.limits.projectsIncluded;
   subscription.teamMembers = selectedPlan.limits.teamMembers;
+  subscription.storageGB = selectedPlan.limits.storageGB;
+  subscription.apiRequestsPerMonth =
+    selectedPlan.limits.apiRequestsPerMonth;
+
   subscription.modules = selectedPlan.modules;
 
   await subscription.save();
@@ -156,21 +199,24 @@ const changePlan = async ({
 };
 
 // ======================================================
-// CANCEL SUBSCRIPTION
+// CANCEL SUBSCRIPTION (SOFT DELETE READY)
 // ======================================================
 const cancelSubscription = async (subscriptionId) => {
-  if (!mongoose.Types.ObjectId.isValid(subscriptionId)) {
-    throw new Error("Invalid subscription ID");
+  if (!isValidId(subscriptionId)) {
+    throwError("Invalid subscription ID");
   }
 
   const subscription = await Subscription.findByIdAndUpdate(
     subscriptionId,
-    { status: "cancelled" },
+    {
+      status: "cancelled",
+      cancelledAt: new Date(),
+    },
     { new: true }
   );
 
   if (!subscription) {
-    throw new Error("Subscription not found");
+    throwError("Subscription not found", 404);
   }
 
   return subscription;
@@ -180,54 +226,60 @@ const cancelSubscription = async (subscriptionId) => {
 // REACTIVATE SUBSCRIPTION
 // ======================================================
 const reactivateSubscription = async (subscriptionId) => {
-  if (!mongoose.Types.ObjectId.isValid(subscriptionId)) {
-    throw new Error("Invalid subscription ID");
+  if (!isValidId(subscriptionId)) {
+    throwError("Invalid subscription ID");
   }
 
   const subscription = await Subscription.findByIdAndUpdate(
     subscriptionId,
-    { status: "active" },
+    {
+      status: "active",
+      reactivatedAt: new Date(),
+    },
     { new: true }
   );
 
   if (!subscription) {
-    throw new Error("Subscription not found");
+    throwError("Subscription not found", 404);
   }
 
   return subscription;
 };
 
 // ======================================================
-// ANALYTICS
+// ANALYTICS (HIGH PERFORMANCE)
 // ======================================================
 const getAnalytics = async () => {
-  const totalSubscriptions = await Subscription.countDocuments();
-
-  const activeSubscriptions = await Subscription.countDocuments({
-    status: "active",
-  });
-
-  const cancelledSubscriptions = await Subscription.countDocuments({
-    status: "cancelled",
-  });
-
-  const revenue = await Subscription.aggregate([
-    {
-      $group: {
-        _id: null,
-        totalRevenue: { $sum: "$amount" },
+  const [
+    totalSubscriptions,
+    activeSubscriptions,
+    cancelledSubscriptions,
+    revenue,
+  ] = await Promise.all([
+    Subscription.countDocuments({ isDeleted: false }),
+    Subscription.countDocuments({ status: "active" }),
+    Subscription.countDocuments({ status: "cancelled" }),
+    Subscription.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: "$amount" },
+        },
       },
-    },
+    ]),
   ]);
 
   return {
     totalSubscriptions,
     activeSubscriptions,
     cancelledSubscriptions,
-    totalRevenue: revenue[0]?.totalRevenue || 0,
+    totalRevenue: revenue?.[0]?.totalRevenue || 0,
   };
 };
 
+// ======================================================
+// EXPORTS
+// ======================================================
 module.exports = {
   createSubscriptionIntent,
   confirmPayment,
@@ -237,4 +289,5 @@ module.exports = {
   cancelSubscription,
   reactivateSubscription,
   getAnalytics,
+  ServiceError,
 };
