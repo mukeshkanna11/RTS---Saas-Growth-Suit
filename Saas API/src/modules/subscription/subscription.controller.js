@@ -650,8 +650,6 @@ exports.analytics = async (req, res) => { try { const [total, active, cancelled,
 
 exports.upgradeRequest = async (req, res) => {
   try {
-    console.log("🔥 UPGRADE REQUEST RECEIVED");
-    console.log(req.body);
 
     const {
       name,
@@ -664,21 +662,8 @@ exports.upgradeRequest = async (req, res) => {
       billingCycle,
     } = req.body;
 
-    // ================= VALIDATION =================
-
-    if (!name || !email || !plan || !billingCycle) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "name, email, plan and billingCycle are required",
-      });
-    }
-
-    // ================= ADMIN EMAIL =================
-
-    let adminEmailResult = null;
-
-    adminEmailResult =
+    // SEND ADMIN MAIL
+    const admin =
       await EmailService.sendSubscriptionLead({
         name,
         email,
@@ -690,52 +675,33 @@ exports.upgradeRequest = async (req, res) => {
         billingCycle,
       });
 
-    console.log(
-      "📩 ADMIN EMAIL RESULT:",
-      adminEmailResult
-    );
-
-    // ================= CUSTOMER EMAIL =================
-
-    let customerEmailResult = null;
-
-    customerEmailResult =
+    // SEND CUSTOMER MAIL
+    const customer =
       await EmailService.sendCustomerConfirmation({
         email,
         name,
         plan,
       });
 
-    console.log(
-      "📩 CUSTOMER EMAIL RESULT:",
-      customerEmailResult
-    );
-
-    // ================= RESPONSE =================
-
+    // IMPORTANT
     return res.status(200).json({
       success: true,
       message:
         "Upgrade request submitted successfully",
 
       emailStatus: {
-        admin: adminEmailResult,
-        customer: customerEmailResult,
+        admin,
+        customer,
       },
     });
 
   } catch (err) {
 
-    console.error(
-      "❌ UPGRADE REQUEST ERROR:",
-      err
-    );
+    console.error(err);
 
     return res.status(500).json({
       success: false,
-      message:
-        err.message ||
-        "Internal server error",
+      message: err.message,
     });
   }
 };
