@@ -17,31 +17,33 @@ class EmailService {
   // INIT SMTP
   // ======================================================
 
-  async init() {
-    try {
-      const user = process.env.SMTP_USER;
-      const pass = process.env.SMTP_PASS;
+  // ======================================================
+// INIT SMTP
+// ======================================================
 
-      if (!user || !pass) {
-        console.warn("⚠ SMTP credentials missing");
-        return;
-      }
+async init() {
+  try {
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
 
-     this.transporter = nodemailer.createTransport({
-  service: "gmail",
+    if (!user || !pass) {
+      console.warn("⚠ SMTP credentials missing");
+      return;
+    }
 
-  host: "smtp.gmail.com",
+    this.transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
 
-  port: 465,
+  port: Number(process.env.SMTP_PORT),
 
-  secure: true,
-
-  family: 4,
+  secure: false,
 
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+
+  family: 4,
 
   tls: {
     rejectUnauthorized: false,
@@ -52,24 +54,22 @@ class EmailService {
   socketTimeout: 30000,
 });
 
-      await this.transporter.verify();
+    await this.transporter.verify();
 
-      this.ready = true;
+    this.ready = true;
 
-      console.log(
-        "✅ EMAIL SERVICE READY"
-      );
+    console.log("✅ EMAIL SERVICE READY");
 
-    } catch (err) {
+  } catch (err) {
 
-      this.ready = false;
+    this.ready = false;
 
-      console.error(
-        "❌ EMAIL INIT FAILED:",
-        err.message
-      );
-    }
+    console.error(
+      "❌ EMAIL INIT FAILED:",
+      err.message
+    );
   }
+}
 
   // ======================================================
   // ENSURE READY
