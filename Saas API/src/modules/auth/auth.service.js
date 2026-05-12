@@ -4,7 +4,6 @@ const User = require("../user/user.model");
 const Company = require("../company/company.model");
 const crypto = require("crypto");
 
-/* ================= ERROR CLASS ================= */
 class AppError extends Error {
   constructor(message, statusCode = 400) {
     super(message);
@@ -12,42 +11,33 @@ class AppError extends Error {
   }
 }
 
-/* ================= TOKEN GENERATOR ================= */
+/* ================= TOKEN ================= */
 const generateTokens = (user) => {
-  if (!user?.tenantId) {
-    throw new AppError("Tenant missing in user - cannot generate token", 500);
-  }
-
   const payload = {
     id: user._id.toString(),
-    tenantId: user.tenantId.toString(),
+    tenantId: user.tenantId,
     role: user.role,
   };
 
-  const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
+  const token = jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: "1d",
   });
 
   const refreshToken = jwt.sign(
-    {
-      id: user._id.toString(),
-      tenantId: user.tenantId.toString(),
-      ver: crypto.randomUUID(),
-    },
+    { id: user._id.toString(), ver: crypto.randomUUID() },
     process.env.JWT_REFRESH_SECRET,
     { expiresIn: "7d" }
   );
 
-  return { accessToken, refreshToken };
+  return { token, refreshToken };
 };
 
-/* ================= SANITIZE USER ================= */
+/* ================= SANITIZE ================= */
 const sanitizeUser = (user) => {
   const obj = user.toObject ? user.toObject() : user;
 
   delete obj.password;
   delete obj.refreshToken;
-  delete obj.__v;
 
   return obj;
 };
@@ -86,29 +76,20 @@ exports.register = async (data) => {
   return {
     user: sanitizeUser(user),
     company,
-    token: tokens.accessToken, // ✅ unified
+    token: tokens.token,
   };
 };
 
-/* ================= LOGIN (FULLY FIXED) ================= */
+/* ================= LOGIN ================= */
 exports.login = async ({ email, password }) => {
   const cleanEmail = email.toLowerCase().trim();
 
   const user = await User.findOne({ email: cleanEmail }).select("+password");
 
-  if (!user) {
-    throw new AppError("Invalid credentials", 401);
-  }
-
-  if (!user.tenantId) {
-    throw new AppError("User not assigned to tenant", 400);
-  }
+  if (!user) throw new AppError("Invalid credentials", 401);
 
   const match = await bcrypt.compare(password, user.password);
-
-  if (!match) {
-    throw new AppError("Invalid credentials", 401);
-  }
+  if (!match) throw new AppError("Invalid credentials", 401);
 
   const tokens = generateTokens(user);
 
@@ -117,7 +98,7 @@ exports.login = async ({ email, password }) => {
 
   return {
     user: sanitizeUser(user),
-    token: tokens.accessToken, // ✅ FIXED (important)
+    token: tokens.token,
   };
 };
 
