@@ -1,7 +1,6 @@
 // =======================================================
 // src/api/axios.js
-// ENTERPRISE SAAS AXIOS CLIENT
-// FINAL PRODUCTION VERSION
+// PRODUCTION SAFE + DEBUG IMPROVED AXIOS
 // =======================================================
 
 import axios from "axios";
@@ -14,18 +13,10 @@ const BASE_URL =
   import.meta.env.VITE_API_URL ||
   "https://rts-saas-growth-suit-1.onrender.com";
 
-// =======================================================
-// AXIOS INSTANCE
-// =======================================================
-
 const API = axios.create({
   baseURL: `${BASE_URL}/api/v1`,
-
-  // IMPORTANT FOR COOKIES + MOBILE AUTH
   withCredentials: true,
-
   timeout: 30000,
-
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -33,28 +24,14 @@ const API = axios.create({
 });
 
 // =======================================================
-// TOKEN HELPERS
+// TOKEN HANDLER
 // =======================================================
 
-const getAccessToken = () => {
+const getToken = () => {
   try {
     return localStorage.getItem("accessToken");
-  } catch (error) {
-    console.error("❌ Token Read Error:", error);
-
+  } catch (err) {
     return null;
-  }
-};
-
-const clearAuthData = () => {
-  try {
-    localStorage.removeItem("accessToken");
-
-    localStorage.removeItem("refreshToken");
-
-    localStorage.removeItem("user");
-  } catch (error) {
-    console.error("❌ Auth Cleanup Error:", error);
   }
 };
 
@@ -64,164 +41,78 @@ const clearAuthData = () => {
 
 API.interceptors.request.use(
   (config) => {
-    try {
-      const token = getAccessToken();
+    const token = getToken();
 
-      config.headers = config.headers || {};
-
-      // ================================================
-      // AUTH TOKEN
-      // ================================================
-
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-
-      // ================================================
-      // REMOVE PROBLEMATIC HEADERS
-      // ================================================
-
-      delete config.headers["x-request-time"];
-
-      return config;
-    } catch (error) {
-      console.error("❌ REQUEST INTERCEPTOR ERROR:", error);
-
-      return config;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-  },
 
+    return config;
+  },
   (error) => {
     console.error("❌ REQUEST ERROR:", error);
-
     return Promise.reject(error);
   }
 );
 
 // =======================================================
-// RESPONSE INTERCEPTOR
+// RESPONSE INTERCEPTOR (IMPROVED)
 // =======================================================
 
 API.interceptors.response.use(
-  (response) => response,
-
-  async (error) => {
-    // ================================================
-    // NETWORK / CORS / SERVER DOWN
-    // ================================================
-
+  (response) => {
+    return response;
+  },
+  (error) => {
+    // ===============================
+    // CASE 1: NO RESPONSE FROM SERVER
+    // ===============================
     if (!error.response) {
-      console.error("🌐 NETWORK ERROR:", error);
+      console.error("🔥 NETWORK ERROR (No Response from Server)");
+      console.error("Check backend URL / internet / CORS");
 
       return Promise.reject({
         success: false,
-        message:
-          "Unable to connect to server. Please try again later.",
+        status: 0,
+        message: "Network Error: Server not reachable",
+        data: null,
       });
     }
 
+    // ===============================
+    // CASE 2: SERVER RESPONDED
+    // ===============================
     const status = error.response.status;
-
     const message =
-      error.response?.data?.message ||
-      error.response?.data?.error ||
-      "Something went wrong";
+      error.response.data?.message ||
+      error.message ||
+      "API Error";
 
     console.error(`❌ API ERROR [${status}]`, message);
 
-    // ================================================
-    // UNAUTHORIZED
-    // ================================================
-
+    // ===============================
+    // AUTO LOGOUT (ONLY IF TOKEN INVALID)
+    // ===============================
     if (status === 401) {
-      clearAuthData();
+      const token = localStorage.getItem("accessToken");
 
-      const currentPath = window.location.pathname;
+      if (token) {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("user");
 
-      // avoid redirect loop
-      if (
-        currentPath !== "/login" &&
-        currentPath !== "/"
-      ) {
-        window.location.href = "/login";
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
       }
-    }
-
-    // ================================================
-    // FORBIDDEN
-    // ================================================
-
-    if (status === 403) {
-      console.error("⛔ ACCESS DENIED");
-    }
-
-    // ================================================
-    // VALIDATION ERROR
-    // ================================================
-
-    if (status === 422) {
-      console.error("⚠️ VALIDATION ERROR");
-    }
-
-    // ================================================
-    // SERVER ERROR
-    // ================================================
-
-    if (status >= 500) {
-      console.error("🔥 SERVER ERROR");
     }
 
     return Promise.reject({
       success: false,
       status,
       message,
-      data: error.response?.data || null,
+      data: error.response.data || null,
     });
   }
 );
-
-// =======================================================
-// AUTH HELPERS
-// =======================================================
-
-export const setAuthToken = (token) => {
-  try {
-    if (token) {
-      localStorage.setItem("accessToken", token);
-    }
-  } catch (error) {
-    console.error("❌ SAVE TOKEN ERROR:", error);
-  }
-};
-
-export const logoutUser = () => {
-  clearAuthData();
-
-  window.location.href = "/login";
-};
-
-// =======================================================
-// BACKEND HEALTH CHECK
-// =======================================================
-
-export const checkBackendHealth = async () => {
-  try {
-    const response = await API.get("/health");
-
-    return {
-      success: true,
-      data: response.data,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: "Backend unreachable",
-    };
-  }
-};
-
-// =======================================================
-// EXPORT
-// =======================================================
 
 export default API;
