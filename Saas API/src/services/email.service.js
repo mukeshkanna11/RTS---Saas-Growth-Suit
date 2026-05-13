@@ -1,9 +1,10 @@
 // ======================================================
 // services/email.service.js
-// PRODUCTION READY SAAS EMAIL SERVICE
+// PRODUCTION READY SAAS EMAIL SERVICE (FIXED)
 // ======================================================
 
 const nodemailer = require("nodemailer");
+require("dns").setDefaultResultOrder("ipv4first"); // 🔥 IMPORTANT FIX FOR RENDER + GMAIL
 
 class EmailService {
   constructor() {
@@ -14,65 +15,55 @@ class EmailService {
   }
 
   // ======================================================
-  // INIT SMTP
+  // INIT SMTP (NON-BLOCKING SAFE)
   // ======================================================
 
-  // ======================================================
-// INIT SMTP
-// ======================================================
+  async init() {
+    try {
+      const user = process.env.SMTP_USER;
+      const pass = process.env.SMTP_PASS;
 
-async init() {
-  try {
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
+      if (!user || !pass) {
+        console.warn("⚠ SMTP credentials missing");
+        return;
+      }
 
-    if (!user || !pass) {
-      console.warn("⚠ SMTP credentials missing");
-      return;
+      this.transporter = nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+
+        auth: {
+          user,
+          pass,
+        },
+
+        requireTLS: true,
+
+        connectionTimeout: 60000,
+        socketTimeout: 60000,
+        greetingTimeout: 60000,
+      });
+
+      // ✅ Non-blocking verify (DO NOT BREAK APP START)
+      this.transporter.verify()
+        .then(() => {
+          this.ready = true;
+          console.log("✅ SMTP READY");
+        })
+        .catch((err) => {
+          this.ready = false;
+          console.warn("⚠ SMTP VERIFY FAILED (ignored):", err.message);
+        });
+
+    } catch (err) {
+      this.ready = false;
+      console.error("❌ EMAIL INIT FAILED:", err.message);
     }
-
-    this.transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-
-      port: 587,
-
-      secure: false,
-
-      auth: {
-        user,
-        pass,
-      },
-
-      family: 4, // 🔥 IMPORTANT (forces IPv4)
-
-      tls: {
-        rejectUnauthorized: false,
-      },
-
-      requireTLS: true,
-
-      connectionTimeout: 60000,
-      socketTimeout: 60000,
-      greetingTimeout: 60000,
-    });
-
-    await this.transporter.verify();
-
-    this.ready = true;
-
-    console.log("✅ EMAIL SERVICE READY");
-
-  } catch (err) {
-    this.ready = false;
-
-    console.error("❌ EMAIL INIT FAILED:", err.message);
   }
-}
-
-   
 
   // ======================================================
-  // ENSURE READY
+  // ENSURE INIT DONE
   // ======================================================
 
   async ensureReady() {
@@ -80,156 +71,99 @@ async init() {
   }
 
   // ======================================================
-  // CORE SEND MAIL
+  // CORE SEND MAIL (FAIL SAFE)
   // ======================================================
 
   async sendMail({
-  to,
-  subject,
-  html,
-  text,
-  attachments = [],
-}) {
-  await this.ensureReady();
+    to,
+    subject,
+    html,
+    text,
+    attachments = [],
+  }) {
+    await this.ensureReady();
 
-  try {
-    console.log("=================================");
-    console.log("📨 TRYING TO SEND EMAIL");
-    console.log("TO:", to);
-    console.log("SUBJECT:", subject);
-    console.log("=================================");
+    try {
+      if (!this.transporter) {
+        return {
+          success: false,
+          error: "Transporter not initialized",
+        };
+      }
 
-    if (!this.transporter) {
-      throw new Error("Transporter not initialized");
+      const info = await this.transporter.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to,
+        subject,
+        html,
+        text,
+        attachments,
+      });
+
+      return {
+        success: true,
+        messageId: info.messageId,
+      };
+
+    } catch (err) {
+      console.error("❌ EMAIL SEND FAILED:", err.message);
+
+      // ❌ NEVER THROW ERROR (SAAS SAFE)
+      return {
+        success: false,
+        error: err.message,
+      };
     }
-
-    const info = await this.transporter.sendMail({
-      from:
-        process.env.SMTP_FROM ||
-        process.env.SMTP_USER,
-
-      to,
-      subject,
-      html,
-      text,
-      attachments,
-    });
-
-    console.log("✅ EMAIL SENT SUCCESS");
-    console.log("MESSAGE ID:", info.messageId);
-
-    return {
-      success: true,
-      messageId: info.messageId,
-    };
-
-  } catch (err) {
-
-    console.error("❌ EMAIL SEND FAILED");
-    console.error(err);
-
-    return {
-      success: false,
-      error: err.message,
-    };
   }
-}
+
   // ======================================================
-  // SEND SUBSCRIPTION LEAD
+  // SUBSCRIPTION LEAD EMAIL
   // ======================================================
 
   async sendSubscriptionLead(data) {
-
     return await this.sendMail({
-      to:
-        process.env.COMPANY_MAIL ||
-        process.env.ADMIN_EMAIL,
-
-      subject:
-        `🚀 New Subscription Lead - ${data.plan}`,
-
-      html:
-        this.templates.upgradeLead(data),
+      to: process.env.COMPANY_MAIL || process.env.ADMIN_EMAIL,
+      subject: `🚀 New Subscription Lead - ${data.plan}`,
+      html: this.templates.upgradeLead(data),
     });
   }
 
   // ======================================================
-  // SEND CUSTOMER CONFIRMATION
+  // CUSTOMER CONFIRMATION EMAIL
   // ======================================================
 
-  async sendCustomerConfirmation({
-    email,
-    name,
-    plan,
-  }) {
-
+  async sendCustomerConfirmation({ email, name, plan }) {
     return await this.sendMail({
       to: email,
-
-      subject:
-        "✅ Upgrade Request Received",
-
-      html:
-        this.templates.customerConfirmation({
-          name,
-          plan,
-        }),
+      subject: "✅ Upgrade Request Received",
+      html: this.templates.customerConfirmation({ name, plan }),
     });
   }
 
   // ======================================================
-  // SEND PAYMENT SUCCESS
+  // PAYMENT SUCCESS EMAIL
   // ======================================================
 
-  async sendPaymentSuccess({
-    email,
-    name,
-    amount,
-    plan,
-  }) {
-
+  async sendPaymentSuccess({ email, name, amount, plan }) {
     return await this.sendMail({
       to: email,
-
-      subject:
-        "💳 Payment Successful",
-
-      html:
-        this.templates.paymentSuccess({
-          name,
-          amount,
-          plan,
-        }),
+      subject: "💳 Payment Successful",
+      html: this.templates.paymentSuccess({ name, amount, plan }),
     });
   }
 
   // ======================================================
-  // SEND INVOICE MAIL
+  // INVOICE EMAIL
   // ======================================================
 
-  async sendInvoiceMail({
-    email,
-    name,
-    invoiceId,
-    filePath,
-  }) {
-
+  async sendInvoiceMail({ email, name, invoiceId, filePath }) {
     return await this.sendMail({
       to: email,
-
-      subject:
-        `📄 Invoice ${invoiceId}`,
-
-      html:
-        this.templates.invoiceMail({
-          name,
-          invoiceId,
-        }),
-
+      subject: `📄 Invoice ${invoiceId}`,
+      html: this.templates.invoiceMail({ name, invoiceId }),
       attachments: [
         {
-          filename:
-            `${invoiceId}.pdf`,
+          filename: `${invoiceId}.pdf`,
           path: filePath,
         },
       ],
@@ -237,161 +171,58 @@ async init() {
   }
 
   // ======================================================
-  // TEMPLATES
+  // EMAIL TEMPLATES
   // ======================================================
 
   templates = {
-
-    // ==================================================
-    // ADMIN LEAD
-    // ==================================================
-
     upgradeLead: (data) => `
-      <div style="
-        font-family: Arial;
-        padding: 20px;
-        line-height: 1.8;
-      ">
-        <h2>
-          🚀 New Subscription Lead
-        </h2>
+      <div style="font-family: Arial; padding: 20px; line-height: 1.8;">
+        <h2>🚀 New Subscription Lead</h2>
 
-        <p>
-          <b>Name:</b>
-          ${data.name || "N/A"}
-        </p>
-
-        <p>
-          <b>Email:</b>
-          ${data.email || "N/A"}
-        </p>
-
-        <p>
-          <b>Phone:</b>
-          ${data.phone || "N/A"}
-        </p>
-
-        <p>
-          <b>Company:</b>
-          ${data.company || "N/A"}
-        </p>
-
-        <p>
-          <b>Address:</b>
-          ${data.address || "N/A"}
-        </p>
-
-        <p>
-          <b>Notes:</b>
-          ${data.notes || "N/A"}
-        </p>
+        <p><b>Name:</b> ${data.name || "N/A"}</p>
+        <p><b>Email:</b> ${data.email || "N/A"}</p>
+        <p><b>Phone:</b> ${data.phone || "N/A"}</p>
+        <p><b>Company:</b> ${data.company || "N/A"}</p>
+        <p><b>Address:</b> ${data.address || "N/A"}</p>
+        <p><b>Notes:</b> ${data.notes || "N/A"}</p>
 
         <hr />
 
-        <p>
-          <b>Plan:</b>
-          ${data.plan}
-        </p>
-
-        <p>
-          <b>Billing:</b>
-          ${data.billingCycle}
-        </p>
+        <p><b>Plan:</b> ${data.plan}</p>
+        <p><b>Billing:</b> ${data.billingCycle}</p>
       </div>
     `,
 
-    // ==================================================
-    // CUSTOMER CONFIRM
-    // ==================================================
+    customerConfirmation: ({ name, plan }) => `
+      <div style="font-family: Arial; padding: 20px;">
+        <h2>Hi ${name} 👋</h2>
 
-    customerConfirmation: ({
-      name,
-      plan,
-    }) => `
-      <div style="
-        font-family: Arial;
-        padding: 20px;
-      ">
-        <h2>
-          Hi ${name} 👋
-        </h2>
+        <p>Your request for <b>${plan}</b> plan has been received.</p>
 
-        <p>
-          Your request for
-          <b>${plan}</b>
-          plan has been received.
-        </p>
-
-        <p>
-          Our team will contact you shortly.
-        </p>
+        <p>Our team will contact you shortly.</p>
 
         <hr />
-
-        <p>
-          ReadyTech Solutions 🚀
-        </p>
+        <p>ReadyTech Solutions 🚀</p>
       </div>
     `,
 
-    // ==================================================
-    // PAYMENT SUCCESS
-    // ==================================================
+    paymentSuccess: ({ name, amount, plan }) => `
+      <div style="font-family: Arial; padding: 20px;">
+        <h2>💳 Payment Successful</h2>
 
-    paymentSuccess: ({
-      name,
-      amount,
-      plan,
-    }) => `
-      <div style="
-        font-family: Arial;
-        padding: 20px;
-      ">
-        <h2>
-          💳 Payment Successful
-        </h2>
-
-        <p>
-          Hello ${name},
-        </p>
-
-        <p>
-          Payment received for
-          <b>${plan}</b>.
-        </p>
-
-        <p>
-          Amount:
-          <b>₹${amount}</b>
-        </p>
+        <p>Hello ${name},</p>
+        <p>Payment received for <b>${plan}</b>.</p>
+        <p>Amount: <b>₹${amount}</b></p>
       </div>
     `,
 
-    // ==================================================
-    // INVOICE
-    // ==================================================
+    invoiceMail: ({ name, invoiceId }) => `
+      <div style="font-family: Arial; padding: 20px;">
+        <h2>📄 Invoice Attached</h2>
 
-    invoiceMail: ({
-      name,
-      invoiceId,
-    }) => `
-      <div style="
-        font-family: Arial;
-        padding: 20px;
-      ">
-        <h2>
-          📄 Invoice Attached
-        </h2>
+        <p>Hello ${name},</p>
 
-        <p>
-          Hello ${name},
-        </p>
-
-        <p>
-          Invoice
-          <b>${invoiceId}</b>
-          attached with this mail.
-        </p>
+        <p>Invoice <b>${invoiceId}</b> attached.</p>
       </div>
     `,
   };
@@ -403,11 +234,9 @@ async init() {
   getStatus() {
     return {
       ready: this.ready,
-      hasTransporter:
-        !!this.transporter,
+      hasTransporter: !!this.transporter,
     };
   }
 }
 
-module.exports =
-  new EmailService();
+module.exports = new EmailService();
