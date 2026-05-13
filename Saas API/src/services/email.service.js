@@ -1,114 +1,44 @@
 // ======================================================
 // services/email.service.js
-// PRODUCTION READY SAAS EMAIL SERVICE (FIXED)
+// SAAS-GRADE RESEND EMAIL SERVICE (PRODUCTION READY)
 // ======================================================
 
-const nodemailer = require("nodemailer");
-require("dns").setDefaultResultOrder("ipv4first"); // 🔥 IMPORTANT FIX FOR RENDER + GMAIL
+const { Resend } = require("resend");
 
 class EmailService {
   constructor() {
-    this.transporter = null;
-    this.ready = false;
-
-    this.initPromise = this.init();
-  }
-
-  // ======================================================
-  // INIT SMTP (NON-BLOCKING SAFE)
-  // ======================================================
-
-  async init() {
-    try {
-      const user = process.env.SMTP_USER;
-      const pass = process.env.SMTP_PASS;
-
-      if (!user || !pass) {
-        console.warn("⚠ SMTP credentials missing");
-        return;
-      }
-
-      this.transporter = nodemailer.createTransport({
-        host: "smtp.gmail.com",
-        port: 587,
-        secure: false,
-
-        auth: {
-          user,
-          pass,
-        },
-
-        requireTLS: true,
-
-        connectionTimeout: 60000,
-        socketTimeout: 60000,
-        greetingTimeout: 60000,
-      });
-
-      // ✅ Non-blocking verify (DO NOT BREAK APP START)
-      this.transporter.verify()
-        .then(() => {
-          this.ready = true;
-          console.log("✅ SMTP READY");
-        })
-        .catch((err) => {
-          this.ready = false;
-          console.warn("⚠ SMTP VERIFY FAILED (ignored):", err.message);
-        });
-
-    } catch (err) {
-      this.ready = false;
-      console.error("❌ EMAIL INIT FAILED:", err.message);
+    if (!process.env.RESEND_API_KEY) {
+      console.error("❌ RESEND_API_KEY missing in .env");
     }
+
+    this.resend = new Resend(process.env.RESEND_API_KEY);
   }
 
   // ======================================================
-  // ENSURE INIT DONE
+  // CORE EMAIL SENDER
   // ======================================================
 
-  async ensureReady() {
-    await this.initPromise;
-  }
-
-  // ======================================================
-  // CORE SEND MAIL (FAIL SAFE)
-  // ======================================================
-
-  async sendMail({
-    to,
-    subject,
-    html,
-    text,
-    attachments = [],
-  }) {
-    await this.ensureReady();
-
+  async sendMail({ to, subject, html }) {
     try {
-      if (!this.transporter) {
-        return {
-          success: false,
-          error: "Transporter not initialized",
-        };
-      }
+      if (!to) throw new Error("Recipient email missing");
 
-      const info = await this.transporter.sendMail({
-        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      const result = await this.resend.emails.send({
+        from: process.env.EMAIL_FROM || "ReadyTech <onboarding@resend.dev>",
         to,
         subject,
         html,
-        text,
-        attachments,
       });
+
+      console.log("✅ EMAIL SENT:", result?.id);
 
       return {
         success: true,
-        messageId: info.messageId,
+        id: result.id,
       };
 
     } catch (err) {
-      console.error("❌ EMAIL SEND FAILED:", err.message);
+      console.error("❌ EMAIL FAILED:", err.message);
 
-      // ❌ NEVER THROW ERROR (SAAS SAFE)
       return {
         success: false,
         error: err.message,
@@ -117,23 +47,33 @@ class EmailService {
   }
 
   // ======================================================
-  // SUBSCRIPTION LEAD EMAIL
+  // SUBSCRIPTION LEAD (ADMIN)
   // ======================================================
 
   async sendSubscriptionLead(data) {
-    return await this.sendMail({
-      to: process.env.COMPANY_MAIL || process.env.ADMIN_EMAIL,
+    const adminEmail =
+      process.env.ADMIN_EMAIL || process.env.COMPANY_MAIL;
+
+    if (!adminEmail) {
+      return {
+        success: false,
+        error: "Admin email not configured",
+      };
+    }
+
+    return this.sendMail({
+      to: adminEmail,
       subject: `🚀 New Subscription Lead - ${data.plan}`,
       html: this.templates.upgradeLead(data),
     });
   }
 
   // ======================================================
-  // CUSTOMER CONFIRMATION EMAIL
+  // CUSTOMER CONFIRMATION
   // ======================================================
 
   async sendCustomerConfirmation({ email, name, plan }) {
-    return await this.sendMail({
+    return this.sendMail({
       to: email,
       subject: "✅ Upgrade Request Received",
       html: this.templates.customerConfirmation({ name, plan }),
@@ -141,11 +81,11 @@ class EmailService {
   }
 
   // ======================================================
-  // PAYMENT SUCCESS EMAIL
+  // PAYMENT SUCCESS
   // ======================================================
 
   async sendPaymentSuccess({ email, name, amount, plan }) {
-    return await this.sendMail({
+    return this.sendMail({
       to: email,
       subject: "💳 Payment Successful",
       html: this.templates.paymentSuccess({ name, amount, plan }),
@@ -156,38 +96,26 @@ class EmailService {
   // INVOICE EMAIL
   // ======================================================
 
-  async sendInvoiceMail({ email, name, invoiceId, filePath }) {
-    return await this.sendMail({
+  async sendInvoiceMail({ email, name, invoiceId }) {
+    return this.sendMail({
       to: email,
       subject: `📄 Invoice ${invoiceId}`,
       html: this.templates.invoiceMail({ name, invoiceId }),
-      attachments: [
-        {
-          filename: `${invoiceId}.pdf`,
-          path: filePath,
-        },
-      ],
     });
   }
 
   // ======================================================
-  // EMAIL TEMPLATES
+  // TEMPLATES
   // ======================================================
 
   templates = {
     upgradeLead: (data) => `
-      <div style="font-family: Arial; padding: 20px; line-height: 1.8;">
+      <div style="font-family: Arial; padding: 20px;">
         <h2>🚀 New Subscription Lead</h2>
-
-        <p><b>Name:</b> ${data.name || "N/A"}</p>
-        <p><b>Email:</b> ${data.email || "N/A"}</p>
-        <p><b>Phone:</b> ${data.phone || "N/A"}</p>
-        <p><b>Company:</b> ${data.company || "N/A"}</p>
-        <p><b>Address:</b> ${data.address || "N/A"}</p>
-        <p><b>Notes:</b> ${data.notes || "N/A"}</p>
-
-        <hr />
-
+        <p><b>Name:</b> ${data.name}</p>
+        <p><b>Email:</b> ${data.email}</p>
+        <p><b>Phone:</b> ${data.phone}</p>
+        <p><b>Company:</b> ${data.company}</p>
         <p><b>Plan:</b> ${data.plan}</p>
         <p><b>Billing:</b> ${data.billingCycle}</p>
       </div>
@@ -196,33 +124,25 @@ class EmailService {
     customerConfirmation: ({ name, plan }) => `
       <div style="font-family: Arial; padding: 20px;">
         <h2>Hi ${name} 👋</h2>
-
         <p>Your request for <b>${plan}</b> plan has been received.</p>
-
         <p>Our team will contact you shortly.</p>
-
-        <hr />
-        <p>ReadyTech Solutions 🚀</p>
       </div>
     `,
 
     paymentSuccess: ({ name, amount, plan }) => `
       <div style="font-family: Arial; padding: 20px;">
         <h2>💳 Payment Successful</h2>
-
         <p>Hello ${name},</p>
         <p>Payment received for <b>${plan}</b>.</p>
-        <p>Amount: <b>₹${amount}</b></p>
+        <p>Amount: ₹${amount}</p>
       </div>
     `,
 
     invoiceMail: ({ name, invoiceId }) => `
       <div style="font-family: Arial; padding: 20px;">
         <h2>📄 Invoice Attached</h2>
-
         <p>Hello ${name},</p>
-
-        <p>Invoice <b>${invoiceId}</b> attached.</p>
+        <p>Invoice <b>${invoiceId}</b> generated successfully.</p>
       </div>
     `,
   };
@@ -233,8 +153,9 @@ class EmailService {
 
   getStatus() {
     return {
-      ready: this.ready,
-      hasTransporter: !!this.transporter,
+      provider: "resend",
+      status: "active",
+      apiKeyExists: !!process.env.RESEND_API_KEY,
     };
   }
 }
