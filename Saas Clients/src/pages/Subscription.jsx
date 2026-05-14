@@ -1,4 +1,10 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+
+// ======================================================
+// FULLY REBUILT PREMIUM SAAS SUBSCRIPTION PAGE
+// PERFECT ALIGNMENT + RESPONSIVE STRUCTURE
+// ENTERPRISE LEVEL UI
+// ======================================================
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -22,11 +28,39 @@ import {
   User,
   Download,
   Sparkles,
+  Globe,
+  Zap,
+  ArrowRight,
+  Star,
+  Briefcase,
+  Clock3,
+  BarChart3,
+  Wallet,
+  Layers3,
+  CircleDollarSign,
+  ChevronRight,
+  BadgeCheck,
+  MessageSquare,
 } from "lucide-react";
 
 export default function Subscription() {
   // ======================================================
-  // BASE API
+  // COMPANY DETAILS
+  // ======================================================
+
+  const COMPANY = {
+    name: "ReadyTechSolutions",
+    tagline:
+      "Enterprise-grade SaaS automation platform for modern businesses.",
+    email: "info@readytechsolutions.in",
+    phone: "+91  70107 97721",
+    website: "https://readytechsolutions.in/",
+    address:
+      "Coimbatore, Tamil Nadu, India",
+  };
+
+  // ======================================================
+  // API
   // ======================================================
 
   const BASE_URL =
@@ -63,9 +97,6 @@ export default function Subscription() {
   const [formLoading, setFormLoading] =
     useState(false);
 
-  const [message, setMessage] =
-    useState("");
-
   const [upgradeForm, setUpgradeForm] =
     useState({
       name: "",
@@ -75,10 +106,6 @@ export default function Subscription() {
       address: "",
       notes: "",
     });
-
-  // ======================================================
-  // TOKEN
-  // ======================================================
 
   const token =
     localStorage.getItem("accessToken");
@@ -112,7 +139,7 @@ export default function Subscription() {
   }, [API]);
 
   // ======================================================
-  // PLANS
+  // PREMIUM PLANS
   // ======================================================
 
   const plans = useMemo(
@@ -124,19 +151,25 @@ export default function Subscription() {
         yearly: 29999,
         icon: Rocket,
         badge: "Startup Ready",
+        highlight: "Best for startups",
         description:
-          "Perfect for startups and small businesses.",
+          "Launch and manage your SaaS operations with essential automation tools.",
 
         features: [
           "5 Projects",
           "5 Team Members",
           "CRM Dashboard",
           "Lead Management",
-          "Basic Analytics",
+          "Analytics Dashboard",
+          "Email Automation",
+          "Customer Support",
         ],
 
-        color:
-          "from-cyan-500/20 via-blue-500/10 to-indigo-500/20 border-cyan-500/20",
+        gradient:
+          "from-cyan-500/20 via-blue-500/10 to-indigo-500/20",
+
+        border:
+          "border-cyan-500/20",
       },
 
       {
@@ -146,19 +179,25 @@ export default function Subscription() {
         yearly: 79999,
         icon: Crown,
         badge: "Most Popular",
+        highlight: "Fast growing businesses",
         description:
-          "Automation and scaling tools for growing teams.",
+          "Advanced AI-powered growth automation for scaling SaaS companies.",
 
         features: [
           "20 Projects",
           "20 Team Members",
-          "Campaign Builder",
           "AI Automation",
-          "Advanced Analytics",
+          "Advanced Reports",
+          "Campaign Builder",
+          "Priority Support",
+          "Custom Branding",
         ],
 
-        color:
-          "from-purple-500/20 via-pink-500/10 to-fuchsia-500/20 border-purple-500/20",
+        gradient:
+          "from-purple-500/20 via-pink-500/10 to-fuchsia-500/20",
+
+        border:
+          "border-purple-500/30",
       },
 
       {
@@ -168,19 +207,25 @@ export default function Subscription() {
         yearly: 199999,
         icon: Building2,
         badge: "Enterprise Scale",
+        highlight: "Unlimited scalability",
         description:
-          "Unlimited scale with advanced security and integrations.",
+          "Enterprise-grade infrastructure with security, integrations and priority services.",
 
         features: [
           "Unlimited Projects",
           "Unlimited Team",
           "ERP Modules",
           "Custom Integrations",
-          "Priority Support",
+          "Dedicated Manager",
+          "24/7 Premium Support",
+          "Advanced Security",
         ],
 
-        color:
-          "from-amber-500/20 via-orange-500/10 to-yellow-500/20 border-amber-500/20",
+        gradient:
+          "from-amber-500/20 via-orange-500/10 to-yellow-500/20",
+
+        border:
+          "border-amber-500/20",
       },
     ],
     []
@@ -228,7 +273,7 @@ export default function Subscription() {
   }, [api]);
 
   // ======================================================
-  // OPEN MODAL
+  // MODAL
   // ======================================================
 
   const openUpgradeModal = (plan) => {
@@ -237,80 +282,54 @@ export default function Subscription() {
   };
 
   // ======================================================
-  // UPGRADE REQUEST
+  // SUBMIT REQUEST
   // ======================================================
 
   const submitUpgradeRequest = async () => {
-  try {
+    try {
+      setFormLoading(true);
 
-    setFormLoading(true);
+      const payload = {
+        ...upgradeForm,
+        plan: selectedPlan,
+        billingCycle,
+      };
 
-    const payload = {
-      ...upgradeForm,
-      plan: selectedPlan,
-      billingCycle,
-    };
-
-    console.log(
-      "🚀 SENDING PAYLOAD:",
-      payload
-    );
-
-    console.log(
-      "🌐 API URL:",
-      `${API}/subscription/upgrade-request`
-    );
-
-    const res = await api.post(
-      "/subscription/upgrade-request",
-      payload
-    );
-
-    console.log(
-      "✅ UPGRADE RESPONSE:",
-      res.data
-    );
-
-    if (res.data.success) {
-      alert(
-        "Upgrade request sent successfully ✅"
+      const res = await api.post(
+        "/subscription/upgrade-request",
+        payload
       );
 
-      setShowUpgradeModal(false);
+      if (res.data.success) {
+        alert(
+          "Upgrade request sent successfully ✅"
+        );
 
-      setUpgradeForm({
-        name: "",
-        email: "",
-        phone: "",
-        company: "",
-        address: "",
-        notes: "",
-      });
+        setShowUpgradeModal(false);
+
+        setUpgradeForm({
+          name: "",
+          email: "",
+          phone: "",
+          company: "",
+          address: "",
+          notes: "",
+        });
+      }
+    } catch (err) {
+      console.error(err);
+
+      alert(
+        err?.response?.data?.message ||
+          "Request failed"
+      );
+    } finally {
+      setFormLoading(false);
     }
-
-  } catch (err) {
-
-    console.error(
-      "❌ UPGRADE ERROR:",
-      err
-    );
-
-    console.error(
-      err?.response?.data
-    );
-
-    alert(
-      err?.response?.data?.message ||
-      "Request failed"
-    );
-
-  } finally {
-    setFormLoading(false);
-  }
-};
+  };
 
   // ======================================================
-  // CANCEL SUBSCRIPTION
+  // CANCEL
   // ======================================================
 
   const cancelSubscription =
@@ -403,7 +422,7 @@ export default function Subscription() {
     };
 
   // ======================================================
-  // LOAD
+  // INITIAL LOAD
   // ======================================================
 
   useEffect(() => {
@@ -421,311 +440,470 @@ export default function Subscription() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#050816] text-white flex items-center justify-center">
-        <div className="flex items-center gap-3 text-lg">
-          <Loader2 className="animate-spin" />
-          Loading subscription dashboard...
+    <div className="min-h-screen bg-[#020617] text-white overflow-hidden relative">
+      {/* PREMIUM BACKGROUND */}
+
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-200px] left-[-120px] w-[500px] h-[500px] rounded-full bg-cyan-500/10 blur-[140px]" />
+
+        <div className="absolute bottom-[-200px] right-[-120px] w-[500px] h-[500px] rounded-full bg-purple-500/10 blur-[140px]" />
+
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px]" />
+      </div>
+
+      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-8 lg:py-10">
+      <div className="min-h-screen bg-[#030712] text-white flex items-center justify-center overflow-hidden relative">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(6,182,212,0.15),transparent_40%)]" />
+
+        <div className="z-10 flex flex-col items-center gap-5">
+          <div className="p-6 border rounded-full bg-cyan-500/10 border-cyan-500/20">
+            <Loader2 className="animate-spin text-cyan-400" size={42} />
+          </div>
+
+          <div className="text-center">
+            <h2 className="text-2xl font-bold">
+              Loading Premium Dashboard
+            </h2>
+
+            <p className="mt-2 text-slate-400">
+              Preparing your SaaS workspace...
+            </p>
+          </div>
         </div>
       </div>
+    </div>
+    </div>
     );
   }
 
-  // ======================================================
-  // UI
-  // ======================================================
-
   return (
-    <div className="min-h-screen bg-[#050816] text-white px-6 py-8">
-      {/* HEADER */}
+    <div className="min-h-screen bg-[#030712] text-white overflow-hidden">
+      {/* BACKGROUND */}
 
-      <div className="flex flex-col gap-4 mb-10 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-4xl font-bold">
-            Subscription Dashboard
-          </h1>
+      <div className="fixed inset-0 pointer-events-none opacity-30">
+        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-cyan-500/20 blur-[140px] rounded-full" />
 
-          <p className="mt-2 text-slate-400">
-            Manage plans, invoices,
-            billing and enterprise growth.
-          </p>
-        </div>
-
-        <button
-          onClick={fetchData}
-          className="flex items-center gap-2 px-5 py-3 transition rounded-2xl bg-slate-800 hover:bg-slate-700"
-        >
-          <RefreshCcw size={18} />
-          Refresh
-        </button>
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-purple-500/20 blur-[140px] rounded-full" />
       </div>
 
-      {/* CURRENT PLAN */}
+      <div className="relative z-10 px-6 py-8 lg:px-12">
+        {/* HERO */}
 
-      <div className="p-6 mb-10 border rounded-3xl border-cyan-500/20 bg-slate-900/70">
-        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-slate-400">
-              Current Subscription
-            </p>
+        <div className="grid grid-cols-1 xl:grid-cols-[1.45fr_0.75fr] gap-8 items-stretch mb-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="relative flex flex-col justify-between overflow-hidden border border-cyan-500/10 rounded-[36px] bg-gradient-to-br from-[#0f172a]/95 via-[#111827]/95 to-[#020617] p-8 lg:p-10 shadow-[0_0_80px_rgba(6,182,212,0.08)] backdrop-blur-3xl"
+          >
+            <div className="absolute top-[-60px] right-[-60px] w-72 h-72 bg-cyan-500/20 blur-[120px] rounded-full" />
 
-            <h2 className="mt-2 text-3xl font-bold capitalize">
-              {currentPlan?.plan ||
-                "No Active Plan"}
-            </h2>
+            <div className="absolute bottom-[-80px] left-[-80px] w-72 h-72 bg-blue-500/10 blur-[120px] rounded-full" />
 
-            <div className="flex flex-wrap gap-3 mt-4">
-              <Badge>
-                Status:
-                {" "}
-                {currentPlan?.status ||
-                  "inactive"}
-              </Badge>
+            <div className="relative z-10">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                <div className="max-w-3xl">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 text-xs font-semibold tracking-[3px] uppercase border rounded-full bg-cyan-500/10 border-cyan-400/20 text-cyan-300">
+                    <Sparkles size={14} />
+                    Premium SaaS Platform
+                  </div>
 
-              <Badge>
-                Billing:
-                {" "}
-                {currentPlan?.billingCycle ||
-                  "monthly"}
-              </Badge>
+                  <h1 className="text-4xl sm:text-4xl xl:text-4xl font-black leading-[1.1] tracking-tight text-white">
+                    {COMPANY.name}
+                  </h1>
 
-              <Badge>
-                Team:
-                {" "}
-                {currentPlan?.teamMembers ||
-                  0}
-              </Badge>
+                  <p className="max-w-2xl mt-6 text-base leading-8 sm:text-lg text-slate-300">
+                    {COMPANY.tagline}
+                  </p>
+                </div>
+
+                <div className="hidden xl:flex items-center justify-center min-w-[90px] h-[90px] rounded-[28px] border border-cyan-400/20 bg-cyan-500/10 backdrop-blur-xl shadow-lg shadow-cyan-500/10">
+                  <Sparkles className="text-cyan-300" size={38} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-5 mt-10 md:grid-cols-3">
+                <FeatureCard
+                  icon={Zap}
+                  title="AI Automation"
+                  value="Smart Workflows"
+                />
+
+                <FeatureCard
+                  icon={ShieldCheck}
+                  title="Enterprise Security"
+                  value="Protected Systems"
+                />
+
+                <FeatureCard
+                  icon={BarChart3}
+                  title="Real-time Insights"
+                  value="Advanced Analytics"
+                />
+              </div>
+            </div>
+
+            <div className="relative z-10 flex flex-col gap-5 pt-10 mt-10 border-t border-white/10 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
+                <div className="flex items-center gap-2 px-4 py-2 border rounded-2xl bg-white/5 border-white/10">
+                  <ShieldCheck size={16} className="text-cyan-300" />
+                  Enterprise Ready
+                </div>
+
+                <div className="flex items-center gap-2 px-4 py-2 border rounded-2xl bg-white/5 border-white/10">
+                  <Users size={16} className="text-cyan-300" />
+                  Trusted by Teams
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-4">
+                <button
+                  onClick={fetchData}
+                  className="flex items-center justify-center gap-2 px-6 py-4 font-semibold text-black transition-all duration-300 rounded-2xl bg-cyan-400 hover:bg-cyan-300 hover:scale-[1.02] shadow-lg shadow-cyan-500/20"
+                >
+                  <RefreshCcw size={18} />
+                  Refresh Dashboard
+                </button>
+
+                <button className="flex items-center justify-center gap-2 px-6 py-4 transition-all duration-300 border rounded-2xl border-white/10 bg-white/5 hover:bg-white/10 hover:border-cyan-400/20">
+                  <Globe size={18} className="text-cyan-300" />
+                  Visit Website
+                </button>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* COMPANY CARD */}
+
+          <motion.div
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="border rounded-[32px] border-white/10 bg-white/5 backdrop-blur-2xl p-8"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <p className="text-slate-400">
+                  Company Overview
+                </p>
+
+                <h2 className="mt-2 text-3xl font-bold">
+                  Premium Support
+                </h2>
+              </div>
+
+              <div className="p-4 text-black rounded-2xl bg-cyan-400">
+                <BadgeCheck />
+              </div>
+            </div>
+
+            <div className="space-y-5">
+              <InfoRow
+                icon={Mail}
+                label="Email"
+                value={COMPANY.email}
+              />
+
+              <InfoRow
+                icon={Phone}
+                label="Phone"
+                value={COMPANY.phone}
+              />
+
+              <InfoRow
+                icon={Globe}
+                label="Website"
+                value={COMPANY.website}
+              />
+
+              <InfoRow
+                icon={Building2}
+                label="Location"
+                value={COMPANY.address}
+              />
+            </div>
+
+            <div className="p-5 mt-8 border rounded-3xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border-cyan-500/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-400">
+                    Dedicated Account Manager
+                  </p>
+
+                  <h3 className="mt-1 text-xl font-bold">
+                    Enterprise Ready
+                  </h3>
+                </div>
+
+                <ChevronRight className="text-cyan-400" />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* CURRENT PLAN */}
+
+        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] mb-10">
+          <div className="relative overflow-hidden border rounded-[32px] border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 to-slate-900 p-8">
+            <div className="absolute right-0 top-0 w-52 h-52 bg-cyan-400/10 blur-[120px]" />
+
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="inline-flex items-center gap-2 px-4 py-2 mb-4 text-sm border rounded-full bg-cyan-500/10 border-cyan-500/20 text-cyan-300">
+                  <Sparkles size={16} />
+                  Active Subscription
+                </div>
+
+                <h2 className="text-4xl font-black capitalize">
+                  {currentPlan?.plan ||
+                    "No Active Plan"}
+                </h2>
+
+                <p className="max-w-xl mt-3 leading-7 text-slate-400">
+                  Manage billing, invoices, renewals and enterprise tools from your premium dashboard.
+                </p>
+
+                <div className="flex flex-wrap gap-3 mt-6">
+                  <Badge>
+                    Status: {currentPlan?.status || "inactive"}
+                  </Badge>
+
+                  <Badge>
+                    Billing: {currentPlan?.billingCycle || "monthly"}
+                  </Badge>
+
+                  <Badge>
+                    Team: {currentPlan?.teamMembers || 0}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="flex flex-col w-full gap-4 lg:w-auto">
+                <button
+                  onClick={downloadInvoice}
+                  className="flex items-center justify-center gap-2 px-6 py-4 font-semibold text-black transition rounded-2xl bg-cyan-400 hover:bg-cyan-300"
+                >
+                  <Download size={18} />
+
+                  {actionLoading ===
+                  "invoice"
+                    ? "Downloading..."
+                    : "Download Invoice"}
+                </button>
+
+                <button
+                  onClick={cancelSubscription}
+                  className="flex items-center justify-center gap-2 px-6 py-4 font-semibold transition rounded-2xl bg-red-500/90 hover:bg-red-500"
+                >
+                  <XCircle size={18} />
+
+                  {actionLoading ===
+                  "cancel"
+                    ? "Cancelling..."
+                    : "Cancel Subscription"}
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-4">
-            <button
-              onClick={downloadInvoice}
-              className="flex items-center gap-2 px-5 py-3 font-semibold text-black transition bg-cyan-400 rounded-2xl hover:bg-cyan-300"
-            >
-              <Download size={18} />
+          {/* QUICK STATS */}
 
-              {actionLoading ===
-              "invoice"
-                ? "Downloading..."
-                : "Download Invoice"}
-            </button>
+          <div className="grid gap-5 md:grid-cols-2">
+            <StatCard
+              icon={Wallet}
+              title="Revenue"
+              value={`₹${analytics?.totalRevenue || 0}`}
+            />
 
-            <button
-              onClick={
-                cancelSubscription
+            <StatCard
+              icon={Users}
+              title="Subscribers"
+              value={analytics?.totalSubscriptions || 0}
+            />
+
+            <StatCard
+              icon={Activity}
+              title="Active"
+              value={analytics?.activeSubscriptions || 0}
+            />
+
+            <StatCard
+              icon={Clock3}
+              title="Renewal"
+              value={
+                currentPlan?.renewalDate
+                  ? new Date(
+                      currentPlan.renewalDate
+                    ).toLocaleDateString()
+                  : "N/A"
               }
-              className="flex items-center gap-2 px-5 py-3 font-semibold transition bg-red-600 rounded-2xl hover:bg-red-500"
-            >
-              <XCircle size={18} />
-
-              {actionLoading ===
-              "cancel"
-                ? "Cancelling..."
-                : "Cancel"}
-            </button>
+            />
           </div>
         </div>
-      </div>
 
-      {/* STATS */}
+        {/* BILLING TOGGLE */}
 
-      <div className="grid gap-6 mb-12 md:grid-cols-4">
-        <StatCard
-          icon={CreditCard}
-          title="Current Plan"
-          value={
-            currentPlan?.plan ||
-            "No Plan"
-          }
-        />
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-10">
+          <div>
+            <p className="text-slate-400">
+              Flexible Pricing Plans
+            </p>
 
-        <StatCard
-          icon={Activity}
-          title="Status"
-          value={
-            currentPlan?.status ||
-            "Inactive"
-          }
-        />
+            <h2 className="mt-2 text-3xl font-bold">
+              Choose Your Premium Plan
+            </h2>
+          </div>
 
-        <StatCard
-          icon={CalendarDays}
-          title="Renewal Date"
-          value={
-            currentPlan?.renewalDate
-              ? new Date(
-                  currentPlan.renewalDate
-                ).toLocaleDateString()
-              : "N/A"
-          }
-        />
-
-        <StatCard
-          icon={Users}
-          title="Team Members"
-          value={
-            currentPlan?.teamMembers ||
-            0
-          }
-        />
-      </div>
-
-      {/* ANALYTICS */}
-
-      <div className="grid gap-6 mb-12 md:grid-cols-4">
-        <StatCard
-          icon={TrendingUp}
-          title="Revenue"
-          value={`₹${
-            analytics?.totalRevenue ||
-            0
-          }`}
-        />
-
-        <StatCard
-          icon={Users}
-          title="Subscriptions"
-          value={
-            analytics?.totalSubscriptions ||
-            0
-          }
-        />
-
-        <StatCard
-          icon={CheckCircle2}
-          title="Active"
-          value={
-            analytics?.activeSubscriptions ||
-            0
-          }
-        />
-
-        <StatCard
-          icon={ShieldCheck}
-          title="Cancelled"
-          value={
-            analytics?.cancelledSubscriptions ||
-            0
-          }
-        />
-      </div>
-
-      {/* BILLING TOGGLE */}
-
-      <div className="flex items-center gap-3 mb-10">
-        {["monthly", "yearly"].map(
-          (cycle) => (
-            <button
-              key={cycle}
-              onClick={() =>
-                setBillingCycle(
-                  cycle
-                )
-              }
-              className={`px-5 py-2 rounded-xl capitalize transition ${
-                billingCycle === cycle
-                  ? "bg-cyan-400 text-black"
-                  : "bg-slate-800"
-              }`}
-            >
-              {cycle}
-            </button>
-          )
-        )}
-      </div>
-
-      {/* PLAN CARDS */}
-
-      <div className="grid gap-8 md:grid-cols-3">
-        {plans.map((plan, idx) => {
-          const price =
-            billingCycle ===
-            "monthly"
-              ? plan.monthly
-              : plan.yearly;
-
-          return (
-            <motion.div
-              key={plan.key}
-              initial={{
-                opacity: 0,
-                y: 40,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              transition={{
-                delay: idx * 0.12,
-              }}
-              className={`rounded-3xl border bg-gradient-to-br ${plan.color} p-7 backdrop-blur-xl`}
-            >
-              <div className="flex items-center justify-between mb-5">
-                <plan.icon size={30} />
-
-                <span className="px-3 py-1 text-xs rounded-full bg-white/10">
-                  {plan.badge}
-                </span>
-              </div>
-
-              <h3 className="text-2xl font-bold">
-                {plan.name}
-              </h3>
-
-              <p className="mt-2 text-slate-300">
-                {plan.description}
-              </p>
-
-              <div className="mt-6">
-                <span className="text-4xl font-bold">
-                  ₹{price}
-                </span>
-
-                <span className="text-slate-400">
-                  /
-                  {billingCycle ===
-                  "monthly"
-                    ? "month"
-                    : "year"}
-                </span>
-              </div>
-
-              <div className="mt-6 space-y-3">
-                {plan.features.map(
-                  (
-                    feature,
-                    index
-                  ) => (
-                    <div
-                      key={index}
-                      className="flex items-center gap-3"
-                    >
-                      <CheckCircle2
-                        className="text-green-400"
-                        size={18}
-                      />
-
-                      <span className="text-sm">
-                        {feature}
-                      </span>
-                    </div>
-                  )
-                )}
-              </div>
-
+          <div className="flex items-center gap-3 p-2 border rounded-2xl border-white/10 bg-white/5 backdrop-blur-xl">
+            {[
+              "monthly",
+              "yearly",
+            ].map((cycle) => (
               <button
+                key={cycle}
                 onClick={() =>
-                  openUpgradeModal(
-                    plan.key
-                  )
+                  setBillingCycle(cycle)
                 }
-                className="w-full py-3 mt-8 font-semibold text-black transition rounded-2xl bg-cyan-400 hover:bg-cyan-300"
+                className={`px-6 py-3 rounded-xl capitalize transition-all font-semibold ${
+                  billingCycle === cycle
+                    ? "bg-cyan-400 text-black"
+                    : "text-slate-300 hover:bg-white/5"
+                }`}
               >
-                Upgrade Plan
+                {cycle}
               </button>
-            </motion.div>
-          );
-        })}
+            ))}
+          </div>
+        </div>
+
+        {/* PLAN CARDS */}
+
+        <div className="grid gap-8 xl:grid-cols-3 mb-14">
+          {plans.map((plan, idx) => {
+            const price =
+              billingCycle ===
+              "monthly"
+                ? plan.monthly
+                : plan.yearly;
+
+            return (
+              <motion.div
+                key={plan.key}
+                initial={{
+                  opacity: 0,
+                  y: 50,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+                transition={{
+                  delay: idx * 0.15,
+                }}
+                whileHover={{
+                  y: -10,
+                }}
+                className={`relative overflow-hidden rounded-[34px] border ${plan.border} bg-gradient-to-br ${plan.gradient} backdrop-blur-2xl p-8`}
+              >
+                <div className="absolute right-0 top-0 w-48 h-48 bg-white/5 rounded-full blur-[80px]" />
+
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center justify-center border w-14 h-14 rounded-2xl bg-white/10 border-white/10">
+                    <plan.icon size={28} />
+                  </div>
+
+                  <span className="px-4 py-2 text-xs border rounded-full bg-white/10 border-white/10">
+                    {plan.badge}
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="text-3xl font-black">
+                    {plan.name}
+                  </h3>
+
+                  <p className="mt-2 text-sm text-cyan-300">
+                    {plan.highlight}
+                  </p>
+
+                  <p className="mt-4 leading-7 text-slate-300">
+                    {plan.description}
+                  </p>
+                </div>
+
+                <div className="flex items-end gap-2 mt-8">
+                  <span className="text-5xl font-black">
+                    ₹{price}
+                  </span>
+
+                  <span className="pb-2 text-slate-400">
+                    /
+                    {billingCycle ===
+                    "monthly"
+                      ? "month"
+                      : "year"}
+                  </span>
+                </div>
+
+                <div className="mt-8 space-y-4">
+                  {plan.features.map(
+                    (
+                      feature,
+                      index
+                    ) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-3"
+                      >
+                        <CheckCircle2
+                          className="text-green-400"
+                          size={18}
+                        />
+
+                        <span className="text-sm text-slate-200">
+                          {feature}
+                        </span>
+                      </div>
+                    )
+                  )}
+                </div>
+
+                <button
+                  onClick={() =>
+                    openUpgradeModal(
+                      plan.key
+                    )
+                  }
+                  className="flex items-center justify-center w-full gap-2 py-4 mt-8 font-bold text-black transition-all rounded-2xl bg-cyan-400 hover:bg-cyan-300"
+                >
+                  Upgrade Plan
+                  <ArrowRight size={18} />
+                </button>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* ENTERPRISE SECTION */}
+
+        <div className="grid gap-8 lg:grid-cols-3 mb-14">
+          <PremiumInfoCard
+            icon={Layers3}
+            title="Enterprise Integrations"
+            desc="Connect CRM, ERP, automation tools and analytics systems seamlessly."
+          />
+
+          <PremiumInfoCard
+            icon={CircleDollarSign}
+            title="Revenue Optimization"
+            desc="Track recurring revenue, churn and customer lifetime value with precision."
+          />
+
+          <PremiumInfoCard
+            icon={MessageSquare}
+            title="24/7 Support"
+            desc="Dedicated support engineers and onboarding specialists for enterprise customers."
+          />
+        </div>
       </div>
 
       {/* MODAL */}
@@ -733,7 +911,7 @@ export default function Subscription() {
       <AnimatePresence>
         {showUpgradeModal && (
           <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/70"
+            className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm"
             initial={{
               opacity: 0,
             }}
@@ -747,147 +925,142 @@ export default function Subscription() {
             <motion.div
               initial={{
                 scale: 0.9,
+                opacity: 0,
               }}
               animate={{
                 scale: 1,
+                opacity: 1,
               }}
               exit={{
                 scale: 0.9,
+                opacity: 0,
               }}
-              className="w-full max-w-2xl p-8 border rounded-3xl bg-slate-900 border-slate-700"
+              className="relative w-full max-w-3xl overflow-hidden border rounded-[36px] bg-[#0B1220] border-white/10"
             >
-              <div className="flex items-center gap-3 mb-6">
-                <Sparkles className="text-cyan-400" />
+              <div className="absolute top-0 right-0 w-60 h-60 bg-cyan-500/10 blur-[120px]" />
 
-                <h2 className="text-3xl font-bold capitalize">
-                  Upgrade -
-                  {" "}
-                  {selectedPlan}
-                </h2>
-              </div>
+              <div className="relative z-10 p-8 lg:p-10">
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="flex items-center justify-center w-16 h-16 text-black rounded-3xl bg-cyan-400">
+                    <Sparkles size={28} />
+                  </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <InputField
-                  icon={User}
-                  placeholder="Full Name"
-                  value={
-                    upgradeForm.name
-                  }
+                  <div>
+                    <h2 className="text-4xl font-black capitalize">
+                      Upgrade - {selectedPlan}
+                    </h2>
+
+                    <p className="mt-2 text-slate-400">
+                      Complete your enterprise upgrade request.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-5 md:grid-cols-2">
+                  <InputField
+                    icon={User}
+                    placeholder="Full Name"
+                    value={upgradeForm.name}
+                    onChange={(e) =>
+                      setUpgradeForm({
+                        ...upgradeForm,
+                        name:
+                          e.target.value,
+                      })
+                    }
+                  />
+
+                  <InputField
+                    icon={Mail}
+                    placeholder="Email Address"
+                    value={upgradeForm.email}
+                    onChange={(e) =>
+                      setUpgradeForm({
+                        ...upgradeForm,
+                        email:
+                          e.target.value,
+                      })
+                    }
+                  />
+
+                  <InputField
+                    icon={Phone}
+                    placeholder="Phone Number"
+                    value={upgradeForm.phone}
+                    onChange={(e) =>
+                      setUpgradeForm({
+                        ...upgradeForm,
+                        phone:
+                          e.target.value,
+                      })
+                    }
+                  />
+
+                  <InputField
+                    icon={Briefcase}
+                    placeholder="Company Name"
+                    value={upgradeForm.company}
+                    onChange={(e) =>
+                      setUpgradeForm({
+                        ...upgradeForm,
+                        company:
+                          e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <textarea
+                  rows="4"
+                  placeholder="Company Address"
+                  className="w-full p-5 mt-5 border outline-none rounded-3xl bg-white/5 border-white/10 focus:border-cyan-400/40"
+                  value={upgradeForm.address}
                   onChange={(e) =>
                     setUpgradeForm({
                       ...upgradeForm,
-                      name:
-                        e.target
-                          .value,
+                      address:
+                        e.target.value,
                     })
                   }
                 />
 
-                <InputField
-                  icon={Mail}
-                  placeholder="Email"
-                  value={
-                    upgradeForm.email
-                  }
+                <textarea
+                  rows="4"
+                  placeholder="Additional Notes"
+                  className="w-full p-5 mt-5 border outline-none rounded-3xl bg-white/5 border-white/10 focus:border-cyan-400/40"
+                  value={upgradeForm.notes}
                   onChange={(e) =>
                     setUpgradeForm({
                       ...upgradeForm,
-                      email:
-                        e.target
-                          .value,
+                      notes:
+                        e.target.value,
                     })
                   }
                 />
 
-                <InputField
-                  icon={Phone}
-                  placeholder="Phone"
-                  value={
-                    upgradeForm.phone
-                  }
-                  onChange={(e) =>
-                    setUpgradeForm({
-                      ...upgradeForm,
-                      phone:
-                        e.target
-                          .value,
-                    })
-                  }
-                />
+                <div className="grid gap-4 mt-8 md:grid-cols-2">
+                  <button
+                    onClick={submitUpgradeRequest}
+                    className="flex items-center justify-center gap-2 py-4 font-bold text-black transition rounded-2xl bg-cyan-400 hover:bg-cyan-300"
+                  >
+                    <Send size={18} />
 
-                <InputField
-                  icon={Building2}
-                  placeholder="Company"
-                  value={
-                    upgradeForm.company
-                  }
-                  onChange={(e) =>
-                    setUpgradeForm({
-                      ...upgradeForm,
-                      company:
-                        e.target
-                          .value,
-                    })
-                  }
-                />
-              </div>
+                    {formLoading
+                      ? "Sending Request..."
+                      : "Send Upgrade Request"}
+                  </button>
 
-              <textarea
-                rows="3"
-                placeholder="Address"
-                className="w-full p-4 mt-4 outline-none rounded-2xl bg-slate-800"
-                value={
-                  upgradeForm.address
-                }
-                onChange={(e) =>
-                  setUpgradeForm({
-                    ...upgradeForm,
-                    address:
-                      e.target.value,
-                  })
-                }
-              />
-
-              <textarea
-                rows="3"
-                placeholder="Additional Notes"
-                className="w-full p-4 mt-4 outline-none rounded-2xl bg-slate-800"
-                value={
-                  upgradeForm.notes
-                }
-                onChange={(e) =>
-                  setUpgradeForm({
-                    ...upgradeForm,
-                    notes:
-                      e.target.value,
-                  })
-                }
-              />
-
-              <div className="flex gap-4 mt-6">
-                <button
-                  onClick={
-                    submitUpgradeRequest
-                  }
-                  className="flex items-center justify-center flex-1 gap-2 py-3 font-bold text-black transition rounded-2xl bg-cyan-400 hover:bg-cyan-300"
-                >
-                  <Send size={18} />
-
-                  {formLoading
-                    ? "Sending..."
-                    : "Send Request"}
-                </button>
-
-                <button
-                  onClick={() =>
-                    setShowUpgradeModal(
-                      false
-                    )
-                  }
-                  className="flex-1 py-3 transition rounded-2xl bg-slate-700 hover:bg-slate-600"
-                >
-                  Close
-                </button>
+                  <button
+                    onClick={() =>
+                      setShowUpgradeModal(
+                        false
+                      )
+                    }
+                    className="py-4 font-semibold transition border rounded-2xl border-white/10 bg-white/5 hover:bg-white/10"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
@@ -906,15 +1079,14 @@ function InputField({
   ...props
 }) {
   return (
-    <div className="flex items-center gap-3 p-4 rounded-2xl bg-slate-800">
-      <Icon
-        size={18}
-        className="text-cyan-400"
-      />
+    <div className="flex items-center gap-4 p-5 transition-all border rounded-3xl bg-white/5 border-white/10 focus-within:border-cyan-400/40">
+      <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-cyan-500/10 text-cyan-400">
+        <Icon size={18} />
+      </div>
 
       <input
         {...props}
-        className="w-full bg-transparent outline-none"
+        className="w-full bg-transparent outline-none placeholder:text-slate-500"
       />
     </div>
   );
@@ -930,17 +1102,28 @@ function StatCard({
   value,
 }) {
   return (
-    <div className="p-6 border rounded-3xl bg-slate-900/80 border-slate-800">
-      <Icon className="mb-3 text-cyan-400" />
+    <motion.div
+      whileHover={{
+        y: -5,
+      }}
+      className="relative overflow-hidden p-6 border rounded-[28px] bg-white/5 border-white/10 backdrop-blur-2xl"
+    >
+      <div className="absolute top-0 right-0 w-28 h-28 bg-cyan-500/10 blur-[60px]" />
 
-      <p className="text-slate-400">
-        {title}
-      </p>
+      <div className="relative z-10">
+        <div className="flex items-center justify-center mb-5 w-14 h-14 rounded-2xl bg-cyan-500/10 text-cyan-400">
+          <Icon />
+        </div>
 
-      <h3 className="text-2xl font-bold capitalize">
-        {value}
-      </h3>
-    </div>
+        <p className="text-slate-400">
+          {title}
+        </p>
+
+        <h3 className="mt-2 text-3xl font-black capitalize">
+          {value}
+        </h3>
+      </div>
+    </motion.div>
   );
 }
 
@@ -950,8 +1133,102 @@ function StatCard({
 
 function Badge({ children }) {
   return (
-    <span className="px-3 py-1 text-sm border rounded-full bg-cyan-500/10 border-cyan-500/20">
+    <span className="px-4 py-2 text-sm border rounded-full bg-cyan-500/10 border-cyan-500/20 text-cyan-200">
       {children}
     </span>
+  );
+}
+
+// ======================================================
+// FEATURE CARD
+// ======================================================
+
+function FeatureCard({
+  icon: Icon,
+  title,
+  value,
+}) {
+  return (
+    <div className="p-5 border rounded-3xl bg-white/5 border-white/10 backdrop-blur-xl">
+      <div className="flex items-center justify-center w-12 h-12 mb-4 rounded-2xl bg-cyan-500/10 text-cyan-400">
+        <Icon size={20} />
+      </div>
+
+      <p className="text-sm text-slate-400">
+        {title}
+      </p>
+
+      <h3 className="mt-2 text-lg font-bold">
+        {value}
+      </h3>
+    </div>
+  );
+}
+
+// ======================================================
+// INFO ROW
+// ======================================================
+
+function InfoRow({
+  icon: Icon,
+  label,
+  value,
+}) {
+  return (
+    <div className="flex items-center gap-4 p-4 border rounded-2xl bg-white/5 border-white/5">
+      <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-cyan-500/10 text-cyan-400">
+        <Icon size={18} />
+      </div>
+
+      <div>
+        <p className="text-sm text-slate-400">
+          {label}
+        </p>
+
+        <h3 className="mt-1 font-semibold">
+          {value}
+        </h3>
+      </div>
+    </div>
+  );
+}
+
+// ======================================================
+// PREMIUM INFO CARD
+// ======================================================
+
+function PremiumInfoCard({
+  icon: Icon,
+  title,
+  desc,
+}) {
+  return (
+    <motion.div
+      whileHover={{
+        y: -8,
+      }}
+      className="relative overflow-hidden p-8 border rounded-[32px] bg-white/5 border-white/10 backdrop-blur-2xl"
+    >
+      <div className="absolute top-0 right-0 w-36 h-36 bg-cyan-500/10 blur-[80px]" />
+
+      <div className="relative z-10">
+        <div className="flex items-center justify-center w-16 h-16 mb-6 rounded-3xl bg-cyan-500/10 text-cyan-400">
+          <Icon size={28} />
+        </div>
+
+        <h3 className="text-2xl font-bold">
+          {title}
+        </h3>
+
+        <p className="mt-4 leading-7 text-slate-400">
+          {desc}
+        </p>
+
+        <button className="flex items-center gap-2 mt-6 font-semibold transition-all text-cyan-300 hover:text-cyan-200">
+          Learn More
+          <ArrowRight size={16} />
+        </button>
+      </div>
+    </motion.div>
   );
 }
