@@ -1,22 +1,74 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+// =======================================================
+// src/pages/Leads.jsx
+// READYTECH SOLUTIONS - ULTRA PREMIUM LEADS WORKSPACE
+// ENTERPRISE SAAS LEAD MANAGEMENT PLATFORM
+// FULL PREMIUM UI / UX EXPERIENCE
+// =======================================================
+
+import {
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+} from "react";
+
+import { motion } from "framer-motion";
+
+import {
+  Search,
+  Plus,
+  Trash2,
+  Upload,
+  Users,
+  TrendingUp,
+  Target,
+  Sparkles,
+  Building2,
+  Activity,
+  ShieldCheck,
+  Briefcase,
+  Phone,
+  Mail,
+  Crown,
+  CheckCircle2,
+  Filter,
+  BarChart3,
+  Flame,
+  RefreshCcw,
+} from "lucide-react";
+
 import API from "../api/axios";
 import { useAuthStore } from "../store/authStore";
 
 export default function Leads() {
-  /* ================= AUTH ================= */
-  const token = useAuthStore((s) => s.token);
-  const logout = useAuthStore((s) => s.logout);
+  // =====================================================
+  // AUTH
+  // =====================================================
 
-  /* ================= STATES ================= */
+  const token = useAuthStore((s) => s.token);
+
+  // =====================================================
+  // STATES
+  // =====================================================
+
   const [leads, setLeads] = useState([]);
-  const [loading, setLoading] = useState(false);
+
+  const [loading, setLoading] =
+    useState(false);
+
   const [file, setFile] = useState(null);
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [search, setSearch] =
+    useState("");
 
-  const [showModal, setShowModal] = useState(false);
-  const [formError, setFormError] = useState("");
+  const [statusFilter, setStatusFilter] =
+    useState("all");
+
+  const [showModal, setShowModal] =
+    useState(false);
+
+  const [formError, setFormError] =
+    useState("");
 
   const [form, setForm] = useState({
     name: "",
@@ -30,610 +82,1223 @@ export default function Leads() {
     tags: [],
   });
 
-  /* ================= FETCH LEADS ================= */
+  // =====================================================
+  // FETCH LEADS
+  // =====================================================
+
   const fetchLeads = useCallback(async () => {
-    if (!token) {
-      console.warn("⚠️ No token, skipping fetch");
-      return;
-    }
+    if (!token) return;
 
     try {
       setLoading(true);
 
       const res = await API.get("/leads");
 
-      console.log("✅ API RESPONSE:", res.data);
-
-      const leadsData = res?.data?.data?.leads || [];
+      const leadsData =
+        res?.data?.data?.leads || [];
 
       setLeads(leadsData);
-
     } catch (err) {
-      console.error("❌ Fetch error:", err?.response?.data || err.message);
+      console.error(err);
       setLeads([]);
     } finally {
       setLoading(false);
     }
   }, [token]);
 
-  /* ================= AUTO FETCH ================= */
+  // =====================================================
+  // EFFECT
+  // =====================================================
+
   useEffect(() => {
-    if (token) {
-      fetchLeads();
-    }
-  }, [token, fetchLeads]);
+    fetchLeads();
+  }, [fetchLeads]);
 
-  /* ================= CREATE ================= */
+  // =====================================================
+  // CREATE LEAD
+  // =====================================================
+
   const handleCreateLead = async () => {
-  try {
-    setFormError("");
-
-    if (!form.name.trim()) {
-      setFormError("Name required");
-      return;
-    }
-
-    if (!/^[0-9]{10}$/.test(form.phone)) {
-      setFormError("Phone must be 10 digits");
-      return;
-    }
-
-    const payload = {
-      ...form,
-      status: "new",
-      dealValue: Number(form.dealValue || 0),
-      notes: form.notes ? String(form.notes) : "",
-    };
-
-    console.log("🚀 FINAL PAYLOAD:", payload);
-
-    const res = await API.post("/leads", payload);
-
-    const newLead = res?.data?.data;
-
-    setLeads((prev) => [newLead, ...prev]);
-    setShowModal(false);
-
-  } catch (err) {
-    console.error("❌ FULL ERROR:", err?.response?.data);
-    console.error("❌ VALIDATION:", err?.response?.data?.errors);
-
-    setFormError(
-      err?.response?.data?.errors?.[0] ||
-      err?.response?.data?.message ||
-      "Create failed"
-    );
-  }
-};
-  /* ================= STATUS ================= */
-  const handleStatusChange = async (id, status) => {
-    const prev = [...leads];
-
-    setLeads((p) =>
-      p.map((l) => (l._id === id ? { ...l, status } : l))
-    );
-
     try {
-      await API.patch(`/leads/${id}/status`, { status });
-    } catch {
-      setLeads(prev);
+      setFormError("");
+
+      if (!form.name.trim()) {
+        return setFormError(
+          "Lead name required"
+        );
+      }
+
+      if (
+        form.phone &&
+        !/^[0-9]{10}$/.test(form.phone)
+      ) {
+        return setFormError(
+          "Phone must be 10 digits"
+        );
+      }
+
+      const payload = {
+        ...form,
+        status: "new",
+        dealValue: Number(
+          form.dealValue || 0
+        ),
+      };
+
+      const res = await API.post(
+        "/leads",
+        payload
+      );
+
+      const newLead =
+        res?.data?.data || payload;
+
+      setLeads((prev) => [
+        newLead,
+        ...prev,
+      ]);
+
+      setShowModal(false);
+
+      setForm({
+        name: "",
+        email: "",
+        phone: "",
+        source: "website",
+        companyName: "",
+        jobTitle: "",
+        dealValue: "",
+        notes: "",
+        tags: [],
+      });
+    } catch (err) {
+      setFormError(
+        err?.response?.data?.message ||
+          "Lead creation failed"
+      );
     }
   };
 
-  /* ================= DELETE ================= */
-  const handleDelete = async (id) => {
-    const prev = [...leads];
+  // =====================================================
+  // DELETE LEAD
+  // =====================================================
 
-    setLeads((p) => p.filter((l) => l._id !== id));
+  const handleDelete = async (id) => {
+    const previous = [...leads];
+
+    setLeads((prev) =>
+      prev.filter((l) => l._id !== id)
+    );
 
     try {
       await API.delete(`/leads/${id}`);
     } catch {
-      setLeads(prev);
+      setLeads(previous);
     }
   };
 
-  /* ================= NOTES FIX ================= */
-  const getNotesText = (notes) => {
-    if (!notes || notes.length === 0) return "-";
+  // =====================================================
+  // STATUS UPDATE
+  // =====================================================
 
-    if (Array.isArray(notes)) {
-      return notes.map((n) => n.text).join(", ");
+  const handleStatusChange = async (
+    id,
+    status
+  ) => {
+    const previous = [...leads];
+
+    setLeads((prev) =>
+      prev.map((l) =>
+        l._id === id
+          ? { ...l, status }
+          : l
+      )
+    );
+
+    try {
+      await API.patch(
+        `/leads/${id}/status`,
+        {
+          status,
+        }
+      );
+    } catch {
+      setLeads(previous);
     }
-
-    return notes;
   };
 
-  /* ================= STATS ================= */
-  const stats = useMemo(() => {
-    return {
-      total: leads.length,
-      new: leads.filter((l) => l.status === "new").length,
-      qualified: leads.filter((l) => l.status === "qualified").length,
-      converted: leads.filter((l) => l.status === "converted").length,
-    };
-  }, [leads]);
+  // =====================================================
+  // CSV IMPORT
+  // =====================================================
 
-  /* ================= CSV UPLOAD ================= */
-  const handleCSVUpload = async (e) => {
-    const file = e.target.files[0];
+  const handleCSVUpload = async () => {
     if (!file) return;
 
     const formData = new FormData();
+
     formData.append("file", file);
 
     try {
-      const res = await API.post("/leads/upload", formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      await API.post(
+        "/leads/upload",
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type":
+              "multipart/form-data",
+          },
+        }
+      );
 
-      console.log("Upload success:", res.data);
+      fetchLeads();
     } catch (err) {
-      console.error("Upload failed:", err);
+      console.error(err);
     }
   };
 
+  // =====================================================
+  // FILTERED LEADS
+  // =====================================================
 
-  /* ================= SCORE TAG ================= */
+  const filteredLeads = useMemo(() => {
+    return leads.filter((lead) => {
+      const searchMatch =
+        lead?.name
+          ?.toLowerCase()
+          ?.includes(
+            search.toLowerCase()
+          ) ||
+        lead?.email
+          ?.toLowerCase()
+          ?.includes(
+            search.toLowerCase()
+          ) ||
+        lead?.companyName
+          ?.toLowerCase()
+          ?.includes(
+            search.toLowerCase()
+          );
+
+      const statusMatch =
+        statusFilter === "all"
+          ? true
+          : lead?.status ===
+            statusFilter;
+
+      return searchMatch && statusMatch;
+    });
+  }, [leads, search, statusFilter]);
+
+  // =====================================================
+  // STATS
+  // =====================================================
+
+  const stats = useMemo(() => {
+    return {
+      total: leads.length,
+
+      new: leads.filter(
+        (l) => l.status === "new"
+      ).length,
+
+      qualified: leads.filter(
+        (l) => l.status === "qualified"
+      ).length,
+
+      converted: leads.filter(
+        (l) => l.status === "converted"
+      ).length,
+
+      revenue: leads.reduce(
+        (sum, l) =>
+          sum +
+          Number(l?.dealValue || 0),
+        0
+      ),
+    };
+  }, [leads]);
+
+  // =====================================================
+  // SCORE TAG
+  // =====================================================
+
   const getScoreTag = (score) => {
-    if (score >= 80) return <span className="text-red-500">🔥 Hot</span>;
-    if (score >= 50) return <span className="text-yellow-500">⚡ Warm</span>;
-    return <span className="text-blue-400">❄️ Cold</span>;
+    if (score >= 80) {
+      return (
+        <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-red-400 rounded-full bg-red-500/10">
+          <Flame size={13} />
+          Hot
+        </span>
+      );
+    }
+
+    if (score >= 50) {
+      return (
+        <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-yellow-400 rounded-full bg-yellow-500/10">
+          ⚡ Warm
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full bg-cyan-500/10 text-cyan-400">
+        ❄ Cold
+      </span>
+    );
   };
 
+  // =====================================================
+  // BADGE
+  // =====================================================
 
-  /* ================= BADGE ================= */
   const badge = (status) => {
     switch (status) {
       case "new":
-        return "bg-blue-500 text-white px-2 py-1 rounded";
+        return "bg-cyan-500/10 text-cyan-400";
+
       case "qualified":
-        return "bg-yellow-500 text-black px-2 py-1 rounded";
+        return "bg-yellow-500/10 text-yellow-400";
+
       case "converted":
-        return "bg-green-600 text-white px-2 py-1 rounded";
+        return "bg-emerald-500/10 text-emerald-400";
+
       case "contacted":
-        return "bg-purple-500 text-white px-2 py-1 rounded";
+        return "bg-violet-500/10 text-violet-400";
+
       default:
-        return "bg-gray-400 text-white px-2 py-1 rounded";
+        return "bg-slate-500/10 text-slate-300";
     }
   };
 
-  /* ================= UI ================= */
+  // =====================================================
+  // UI
+  // =====================================================
+
   return (
-    <div className="min-h-screen text-white bg-black">
+    <div className="min-h-screen overflow-hidden bg-[#030712] text-white">
 
-      {/* ================= TOP BAR (PREMIUM SAAS STYLE) ================= */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 bg-black/60 backdrop-blur">
-        <div>
-          <h1 className="text-lg font-bold tracking-wide">
-            🚀 CRM Studio
-          </h1>
-          <p className="text-xs text-gray-400">Leads • Pipeline • Growth</p>
-        </div>
+      {/* ================================================= */}
+      {/* BACKGROUND EFFECTS */}
+      {/* ================================================= */}
 
-        <div className="flex items-center gap-2">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search..."
-            className="px-3 py-1 text-sm bg-gray-900 border rounded-lg border-white/10"
-          />
+      <div className="fixed inset-0 -z-10">
 
-          <button
-            onClick={() => setShowModal(true)}
-            className="px-3 py-1 text-sm bg-blue-600 rounded-lg hover:bg-blue-500"
-          >
-            + Lead
-          </button>
+        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-cyan-500/10 blur-[140px]" />
 
-          <button
-            onClick={logout}
-            className="px-3 py-1 text-sm bg-red-600 rounded-lg"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-
-      {/* ================= PREMIUM STATS ================= */}
-      <div className="grid grid-cols-2 gap-4 p-4 md:grid-cols-4">
-
-        {/* TOTAL */}
-        <div className="relative p-4 overflow-hidden border rounded-xl bg-gradient-to-br from-blue-600/20 to-blue-900/10 border-blue-500/20">
-          <div className="absolute inset-0 bg-white/5 blur-2xl"></div>
-
-          <div className="relative flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-400">Total Leads</p>
-              <h2 className="text-2xl font-bold">{stats.total}</h2>
-            </div>
-            <span className="text-2xl">📊</span>
-          </div>
-
-          <div className="w-full h-1 mt-3 rounded-full bg-white/10">
-            <div className="w-2/3 h-full bg-blue-400 rounded-full"></div>
-          </div>
-        </div>
-
-        {/* NEW */}
-        <div className="relative p-4 overflow-hidden border rounded-xl bg-gradient-to-br from-cyan-600/20 to-cyan-900/10 border-cyan-500/20">
-          <div className="absolute inset-0 bg-white/5 blur-2xl"></div>
-
-          <div className="relative flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-400">New Leads</p>
-              <h2 className="text-2xl font-bold">{stats.new}</h2>
-            </div>
-            <span className="text-2xl">🆕</span>
-          </div>
-
-          <div className="w-full h-1 mt-3 rounded-full bg-white/10">
-            <div className="w-1/2 h-full rounded-full bg-cyan-400"></div>
-          </div>
-        </div>
-
-        {/* QUALIFIED */}
-        <div className="relative p-4 overflow-hidden border rounded-xl bg-gradient-to-br from-yellow-600/20 to-yellow-900/10 border-yellow-500/20">
-          <div className="absolute inset-0 bg-white/5 blur-2xl"></div>
-
-          <div className="relative flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-400">Qualified</p>
-              <h2 className="text-2xl font-bold">{stats.qualified}</h2>
-            </div>
-            <span className="text-2xl">⚡</span>
-          </div>
-
-          <div className="w-full h-1 mt-3 rounded-full bg-white/10">
-            <div className="w-1/3 h-full bg-yellow-400 rounded-full"></div>
-          </div>
-        </div>
-
-        {/* CONVERTED */}
-        <div className="relative p-4 overflow-hidden border rounded-xl bg-gradient-to-br from-green-600/20 to-green-900/10 border-green-500/20">
-          <div className="absolute inset-0 bg-white/5 blur-2xl"></div>
-
-          <div className="relative flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-400">Converted</p>
-              <h2 className="text-2xl font-bold">{stats.converted}</h2>
-            </div>
-            <span className="text-2xl">🎯</span>
-          </div>
-
-          <div className="w-full h-1 mt-3 rounded-full bg-white/10">
-            <div className="w-1/4 h-full bg-green-400 rounded-full"></div>
-          </div>
-        </div>
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-violet-500/10 blur-[140px]" />
 
       </div>
 
-      {/* ================= PREMIUM FILTER BAR ================= */}
-      <div className="flex flex-wrap items-center gap-3 p-4 mx-4 mb-4 border bg-black/40 backdrop-blur border-white/10 rounded-xl">
+      <div className="p-4 md:p-6">
 
-        {/* SEARCH */}
-        <div className="relative flex-1 min-w-[200px]">
-          <span className="absolute text-gray-500 -translate-y-1/2 left-3 top-1/2">
-            🔎
-          </span>
+        {/* ================================================= */}
+        {/* HERO */}
+        {/* ================================================= */}
 
-          <input
-            className="w-full py-2 pr-3 text-sm text-white bg-gray-900 border rounded-lg pl-9 border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Search leads, email, company..."
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        <div className="relative overflow-hidden border shadow-2xl mb-8 rounded-[34px] border-white/10 bg-white/[0.05] backdrop-blur-2xl">
 
-        {/* STATUS FILTER */}
-        <select
-          className="px-3 py-2 text-sm text-white bg-gray-900 border rounded-lg border-white/10 focus:ring-2 focus:ring-blue-500"
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="all">All Status</option>
-          <option value="new">🆕 New</option>
-          <option value="contacted">📞 Contacted</option>
-          <option value="qualified">⚡ Qualified</option>
-          <option value="converted">🎯 Converted</option>
-        </select>
+          <div className="absolute top-0 right-0 w-[350px] h-[350px] bg-cyan-500/10 blur-[120px]" />
 
-        {/* FILE UPLOAD */}
-        <div className="relative">
-          <input
-            type="file"
-            onChange={(e) => setFile(e.target.files[0])}
-            className="text-xs text-gray-400 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-gray-800 file:text-white hover:file:bg-gray-700"
-          />
-        </div>
+          <div className="absolute bottom-0 left-0 w-[350px] h-[350px] bg-violet-500/10 blur-[120px]" />
 
-        {/* IMPORT BUTTON */}
-        <button
-          onClick={handleCSVUpload}
-          className="px-4 py-2 text-sm font-medium text-white transition bg-green-600 rounded-lg hover:bg-green-500 active:scale-95"
-        >
-          ⬆ Import Leads
-        </button>
+          <div className="relative z-10 p-7 md:p-10">
 
-      </div>
+            <div className="flex flex-col gap-10 xl:flex-row xl:items-center xl:justify-between">
 
-      {/* Table */}
+              {/* LEFT */}
 
+              <div className="max-w-3xl">
 
-      <div className="p-4 overflow-auto">
+                <div className="inline-flex items-center gap-2 px-4 py-2 mb-5 text-sm border rounded-full border-cyan-500/20 bg-cyan-500/10 text-cyan-300">
 
-        {loading ? (
-          <div className="py-10 text-center text-gray-400">
-            Loading leads...
-          </div>
-        ) : (
-          <div className="overflow-hidden border border-white/10 rounded-xl bg-black/30 backdrop-blur">
+                  <Crown size={16} />
 
-            <table className="w-full text-sm">
+                  ReadyTech Solutions Premium Lead Engine
 
-              {/* HEADER */}
-              <thead className="sticky top-0 text-xs text-gray-400 uppercase bg-black/60 backdrop-blur">
-                <tr>
-                  <th className="p-3 text-left">Name</th>
-                  <th className="p-3 text-left">Email</th>
-                  <th className="p-3 text-left">Score</th>
-                  <th className="p-3 text-left">Status</th>
-                  <th className="p-3 text-left">Tags</th>
-                  <th className="p-3 text-left">Notes</th>
-                  <th className="p-3 text-left">Actions</th>
-                </tr>
-              </thead>
+                </div>
 
-              {/* BODY */}
-              <tbody>
+                <h1 className="text-4xl font-black leading-tight md:text-4xl">
 
-                {leads.map((l) => (
-                  <tr
-                    key={l._id}
-                    className="transition border-t border-white/5 hover:bg-white/5"
+                  Intelligent Lead
+                  <span className="block mt-2 text-transparent bg-gradient-to-r from-cyan-400 via-blue-400 to-violet-400 bg-clip-text">
+
+                    Management Platform
+
+                  </span>
+
+                </h1>
+
+                <p className="max-w-2xl mt-6 text-base leading-8 text-slate-300">
+
+                  Accelerate customer acquisition,
+                  automate lead operations,
+                  monitor sales performance
+                  and convert opportunities faster
+                  with ReadyTech Solutions'
+                  enterprise SaaS lead system.
+
+                </p>
+
+                <div className="flex flex-wrap gap-3 mt-8">
+
+                  <div className="flex items-center gap-2 px-4 py-3 border rounded-2xl border-white/10 bg-white/[0.05]">
+
+                    <Sparkles
+                      size={18}
+                      className="text-cyan-400"
+                    />
+
+                    <span className="text-sm">
+                      AI Lead Intelligence
+                    </span>
+
+                  </div>
+
+                  <div className="flex items-center gap-2 px-4 py-3 border rounded-2xl border-white/10 bg-white/[0.05]">
+
+                    <Target
+                      size={18}
+                      className="text-violet-400"
+                    />
+
+                    <span className="text-sm">
+                      Smart Conversion Tracking
+                    </span>
+
+                  </div>
+
+                  <div className="flex items-center gap-2 px-4 py-3 border rounded-2xl border-white/10 bg-white/[0.05]">
+
+                    <ShieldCheck
+                      size={18}
+                      className="text-emerald-400"
+                    />
+
+                    <span className="text-sm">
+                      Enterprise Security
+                    </span>
+
+                  </div>
+
+                </div>
+              </div>
+
+              {/* RIGHT */}
+
+              <div className="grid grid-cols-2 gap-4 min-w-[320px]">
+
+                {[
+                  {
+                    title: "Total Leads",
+                    value: stats.total,
+                    icon: Users,
+                    color:
+                      "from-cyan-500/20 to-blue-500/20 border-cyan-500/20",
+                  },
+
+                  {
+                    title: "Qualified",
+                    value: stats.qualified,
+                    icon: CheckCircle2,
+                    color:
+                      "from-yellow-500/20 to-orange-500/20 border-yellow-500/20",
+                  },
+
+                  {
+                    title: "Converted",
+                    value: stats.converted,
+                    icon: TrendingUp,
+                    color:
+                      "from-emerald-500/20 to-teal-500/20 border-emerald-500/20",
+                  },
+
+                  {
+                    title: "Revenue",
+                    value: `₹${stats.revenue.toLocaleString()}`,
+                    icon: BarChart3,
+                    color:
+                      "from-violet-500/20 to-fuchsia-500/20 border-violet-500/20",
+                  },
+                ].map((item, index) => (
+                  <motion.div
+                    key={item.title}
+                    initial={{
+                      opacity: 0,
+                      y: 20,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                    }}
+                    transition={{
+                      delay: index * 0.1,
+                    }}
+                    className={`rounded-3xl border bg-gradient-to-br ${item.color} p-5 backdrop-blur-xl`}
                   >
 
-                    {/* NAME */}
-                    <td className="p-3 font-medium text-white">
-                      {l.name}
-                    </td>
+                    <div className="flex items-center justify-between">
 
-                    {/* EMAIL */}
-                    <td className="p-3 text-gray-400">
-                      {l.email}
-                    </td>
+                      <div className="p-3 rounded-2xl bg-black/30">
 
-                    {/* SCORE */}
-                    <td className="p-3">
-                      <span className="px-2 py-1 text-xs font-semibold text-blue-300 rounded-lg bg-blue-500/10">
-                        {getScoreTag(l.score)}
-                      </span>
-                    </td>
-
-                    {/* STATUS */}
-                    <td className="p-3">
-                      <span className={`px-2 py-1 rounded-lg text-xs font-medium ${badge(l.status)}`}>
-                        {l.status}
-                      </span>
-                    </td>
-
-                    {/* TAGS */}
-                    <td className="p-3">
-                      <div className="flex flex-wrap gap-1">
-                        {(l.tags || []).map((t, i) => (
-                          <span
-                            key={i}
-                            className="px-2 py-1 text-xs text-gray-300 bg-gray-800 border rounded-md border-white/10"
-                          >
-                            #{t}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-
-                    {/* NOTES */}
-                    <td className="p-3 text-xs text-gray-400 max-w-[200px] truncate">
-                      {getNotesText(l.notes)}
-                    </td>
-
-                    {/* ACTIONS */}
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
-
-                        <select
-                          value={l.status}
-                          onChange={(e) =>
-                            handleStatusChange(l._id, e.target.value)
-                          }
-                          className="px-2 py-1 text-xs text-white bg-gray-900 border rounded-lg border-white/10"
-                        >
-                          <option value="new">New</option>
-                          <option value="contacted">Contacted</option>
-                          <option value="qualified">Qualified</option>
-                          <option value="converted">Converted</option>
-                          <option value="lost">Lost</option>
-                        </select>
-
-                        <button
-                          onClick={() => handleDelete(l._id)}
-                          className="px-2 py-1 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-500"
-                        >
-                          Delete
-                        </button>
+                        <item.icon size={22} />
 
                       </div>
-                    </td>
 
-                  </tr>
+                      <Activity
+                        size={18}
+                        className="text-emerald-400"
+                      />
+
+                    </div>
+
+                    <h2 className="mt-5 text-3xl font-black">
+
+                      {item.value}
+
+                    </h2>
+
+                    <p className="mt-1 text-sm text-slate-300">
+
+                      {item.title}
+
+                    </p>
+
+                  </motion.div>
                 ))}
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        {/* ================================================= */}
+        {/* FILTER BAR */}
+        {/* ================================================= */}
+
+        <div className="grid gap-4 p-5 mb-8 border shadow-2xl xl:grid-cols-5 rounded-[30px] border-white/10 bg-white/[0.04] backdrop-blur-2xl">
+
+          {/* SEARCH */}
+
+          <div className="relative xl:col-span-2">
+
+            <Search
+              size={18}
+              className="absolute text-slate-500 left-4 top-4"
+            />
+
+            <input
+              value={search}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+              placeholder="Search leads, companies, emails..."
+              className="w-full h-14 pl-12 pr-4 text-white transition-all border outline-none rounded-2xl border-white/10 bg-[#0f172a] focus:border-cyan-400"
+            />
+
+          </div>
+
+          {/* STATUS */}
+
+          <select
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(
+                e.target.value
+              )
+            }
+            className="h-14 px-4 text-white border outline-none rounded-2xl border-white/10 bg-[#0f172a]"
+          >
+
+            <option value="all">
+              All Status
+            </option>
+
+            <option value="new">
+              New
+            </option>
+
+            <option value="contacted">
+              Contacted
+            </option>
+
+            <option value="qualified">
+              Qualified
+            </option>
+
+            <option value="converted">
+              Converted
+            </option>
+
+          </select>
+
+          {/* FILE */}
+
+          <label className="flex items-center gap-3 px-4 border cursor-pointer rounded-2xl border-white/10 bg-[#0f172a]">
+
+            <Upload
+              size={18}
+              className="text-cyan-400"
+            />
+
+            <span className="text-sm text-slate-300">
+
+              {file
+                ? file.name
+                : "Choose CSV File"}
+
+            </span>
+
+            <input
+              type="file"
+              hidden
+              onChange={(e) =>
+                setFile(
+                  e.target.files[0]
+                )
+              }
+            />
+
+          </label>
+
+          {/* ACTIONS */}
+
+          <div className="flex gap-3">
+
+            <button
+              onClick={handleCSVUpload}
+              className="flex items-center justify-center flex-1 gap-2 font-semibold transition-all h-14 rounded-2xl bg-emerald-500 hover:bg-emerald-400"
+            >
+
+              <Upload size={18} />
+
+              Import
+
+            </button>
+
+            <button
+              onClick={() =>
+                setShowModal(true)
+              }
+              className="flex items-center justify-center flex-1 gap-2 h-14 font-semibold transition-all rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-500 to-violet-500 hover:scale-[1.02]"
+            >
+
+              <Plus size={18} />
+
+              Add Lead
+
+            </button>
+
+          </div>
+
+        </div>
+
+        {/* ================================================= */}
+        {/* TABLE */}
+        {/* ================================================= */}
+
+        <div className="overflow-hidden border shadow-2xl rounded-[30px] border-white/10 bg-white/[0.04] backdrop-blur-2xl">
+
+          {/* HEADER */}
+
+          <div className="flex flex-col gap-4 p-6 border-b md:flex-row md:items-center md:justify-between border-white/10">
+
+            <div>
+
+              <h2 className="text-3xl font-black">
+
+                Enterprise Leads
+
+              </h2>
+
+              <p className="mt-1 text-slate-400">
+
+                Premium customer acquisition
+                intelligence and sales tracking.
+
+              </p>
+
+            </div>
+
+            <div className="inline-flex items-center gap-2 px-4 py-3 border rounded-2xl border-white/10 bg-white/[0.05]">
+
+              <Filter
+                size={16}
+                className="text-cyan-400"
+              />
+
+              <span className="text-sm text-slate-300">
+
+                {filteredLeads.length} Leads
+
+              </span>
+
+            </div>
+
+          </div>
+
+          {/* TABLE */}
+
+          <div className="overflow-x-auto">
+
+            <table className="w-full min-w-[1200px]">
+
+              <thead className="border-b border-white/10 bg-black/20">
+
+                <tr className="text-sm text-slate-400">
+
+                  <th className="px-6 py-5 text-left">
+                    Lead
+                  </th>
+
+                  <th className="px-6 py-5 text-left">
+                    Company
+                  </th>
+
+                  <th className="px-6 py-5 text-left">
+                    Score
+                  </th>
+
+                  <th className="px-6 py-5 text-left">
+                    Status
+                  </th>
+
+                  <th className="px-6 py-5 text-left">
+                    Deal Value
+                  </th>
+
+                  <th className="px-6 py-5 text-left">
+                    Tags
+                  </th>
+
+                  <th className="px-6 py-5 text-left">
+                    Actions
+                  </th>
+
+                </tr>
+
+              </thead>
+
+              <tbody>
+
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan="7"
+                      className="py-16 text-center text-slate-400"
+                    >
+                      Loading leads...
+                    </td>
+                  </tr>
+                ) : filteredLeads.length ===
+                  0 ? (
+                  <tr>
+                    <td
+                      colSpan="7"
+                      className="py-16 text-center text-slate-500"
+                    >
+                      No leads found
+                    </td>
+                  </tr>
+                ) : (
+                  filteredLeads.map(
+                    (l, index) => (
+                      <motion.tr
+                        key={l._id}
+                        initial={{
+                          opacity: 0,
+                          y: 10,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                        }}
+                        transition={{
+                          delay:
+                            index * 0.04,
+                        }}
+                        className="border-b border-white/5 hover:bg-white/[0.03]"
+                      >
+
+                        {/* LEAD */}
+
+                        <td className="px-6 py-5">
+
+                          <div className="flex items-center gap-4">
+
+                            <div className="flex items-center justify-center text-lg font-black w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600">
+
+                              {l?.name?.charAt(
+                                0
+                              )}
+
+                            </div>
+
+                            <div>
+
+                              <h3 className="font-bold">
+
+                                {l?.name}
+
+                              </h3>
+
+                              <div className="mt-1 space-y-1 text-sm text-slate-400">
+
+                                <div className="flex items-center gap-2">
+
+                                  <Mail size={14} />
+
+                                  {l?.email ||
+                                    "-"}
+
+                                </div>
+
+                                <div className="flex items-center gap-2">
+
+                                  <Phone size={14} />
+
+                                  {l?.phone ||
+                                    "-"}
+
+                                </div>
+
+                              </div>
+
+                            </div>
+
+                          </div>
+
+                        </td>
+
+                        {/* COMPANY */}
+
+                        <td className="px-6 py-5">
+
+                          <div className="flex items-center gap-2 text-slate-300">
+
+                            <Building2
+                              size={16}
+                              className="text-violet-400"
+                            />
+
+                            {l?.companyName ||
+                              "ReadyTech Solutions"}
+
+                          </div>
+
+                          <div className="mt-2 text-xs text-slate-500">
+
+                            {l?.jobTitle ||
+                              "Business Lead"}
+
+                          </div>
+
+                        </td>
+
+                        {/* SCORE */}
+
+                        <td className="px-6 py-5">
+
+                          {getScoreTag(
+                            l?.score || 0
+                          )}
+
+                        </td>
+
+                        {/* STATUS */}
+
+                        <td className="px-6 py-5">
+
+                          <span
+                            className={`px-3 py-1 text-xs font-semibold rounded-full ${badge(
+                              l?.status
+                            )}`}
+                          >
+
+                            {l?.status}
+
+                          </span>
+
+                        </td>
+
+                        {/* VALUE */}
+
+                        <td className="px-6 py-5 font-bold text-emerald-400">
+
+                          ₹
+                          {Number(
+                            l?.dealValue || 0
+                          ).toLocaleString()}
+
+                        </td>
+
+                        {/* TAGS */}
+
+                        <td className="px-6 py-5">
+
+                          <div className="flex flex-wrap gap-2">
+
+                            {(l?.tags || [])
+                              .slice(0, 3)
+                              .map(
+                                (
+                                  tag,
+                                  index
+                                ) => (
+                                  <span
+                                    key={index}
+                                    className="px-3 py-1 text-xs border rounded-full bg-white/5 border-white/10 text-slate-300"
+                                  >
+
+                                    #{tag}
+
+                                  </span>
+                                )
+                              )}
+
+                          </div>
+
+                        </td>
+
+                        {/* ACTIONS */}
+
+                        <td className="px-6 py-5">
+
+                          <div className="flex items-center gap-3">
+
+                            <select
+                              value={
+                                l?.status
+                              }
+                              onChange={(e) =>
+                                handleStatusChange(
+                                  l._id,
+                                  e.target
+                                    .value
+                                )
+                              }
+                              className="h-10 px-3 text-sm text-white border outline-none rounded-xl border-white/10 bg-[#0f172a]"
+                            >
+
+                              <option value="new">
+                                New
+                              </option>
+
+                              <option value="contacted">
+                                Contacted
+                              </option>
+
+                              <option value="qualified">
+                                Qualified
+                              </option>
+
+                              <option value="converted">
+                                Converted
+                              </option>
+
+                              <option value="lost">
+                                Lost
+                              </option>
+
+                            </select>
+
+                            <button
+                              onClick={() =>
+                                handleDelete(
+                                  l._id
+                                )
+                              }
+                              className="flex items-center justify-center w-10 h-10 transition rounded-xl bg-red-500/10 hover:bg-red-500/20"
+                            >
+
+                              <Trash2
+                                size={16}
+                                className="text-red-400"
+                              />
+
+                            </button>
+
+                          </div>
+
+                        </td>
+
+                      </motion.tr>
+                    )
+                  )
+                )}
 
               </tbody>
             </table>
           </div>
-        )}
+        </div>
+
       </div>
 
+      {/* ================================================= */}
       {/* MODAL */}
+      {/* ================================================= */}
+
       {showModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/70">
-          <div className="w-[560px] p-6 bg-gradient-to-br from-gray-900 to-gray-950 border border-white/10 rounded-2xl shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+
+          <motion.div
+            initial={{
+              opacity: 0,
+              scale: 0.95,
+            }}
+            animate={{
+              opacity: 1,
+              scale: 1,
+            }}
+            className="w-full max-w-3xl overflow-hidden border shadow-2xl rounded-[32px] border-white/10 bg-[#0b1120]"
+          >
 
             {/* HEADER */}
-            <div className="flex items-start justify-between mb-5">
-              <div>
-                <h2 className="text-xl font-bold">✨ Create New Lead</h2>
-                <p className="text-xs text-gray-400">Fill details to add into pipeline</p>
+
+            <div className="p-6 border-b border-white/10">
+
+              <div className="flex items-start justify-between">
+
+                <div>
+
+                  <div className="inline-flex items-center gap-2 px-3 py-1 mb-4 text-xs rounded-full bg-cyan-500/10 text-cyan-300">
+
+                    <Sparkles size={14} />
+
+                    ReadyTech Lead Creation
+
+                  </div>
+
+                  <h2 className="text-3xl font-black">
+
+                    Create New Lead
+
+                  </h2>
+
+                  <p className="mt-2 text-slate-400">
+
+                    Add premium business
+                    opportunities into your
+                    enterprise pipeline.
+
+                  </p>
+
+                </div>
+
+                <button
+                  onClick={() =>
+                    setShowModal(false)
+                  }
+                  className="px-4 py-2 transition rounded-xl bg-white/5 hover:bg-white/10"
+                >
+
+                  Close
+
+                </button>
+
               </div>
 
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-3 py-1 text-sm bg-gray-800 rounded hover:bg-gray-700"
-              >
-                ← Back
-              </button>
             </div>
 
-            {/* ERROR DISPLAY (NO ALERTS) */}
+            {/* ERROR */}
+
             {formError && (
-              <div className="p-2 mb-3 text-sm text-red-300 border rounded-lg bg-red-900/30 border-red-500/30">
+              <div className="p-4 mx-6 mt-6 text-sm text-red-300 border rounded-2xl bg-red-500/10 border-red-500/20">
+
                 {formError}
+
               </div>
             )}
 
-            {/* FORM GRID */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* FORM */}
 
-              {/* NAME */}
+            <div className="grid gap-4 p-6 md:grid-cols-2">
+
               <input
-                placeholder="Full Name *"
-                className="col-span-2 p-3 bg-gray-800 border border-gray-700 rounded-lg"
+                placeholder="Full Name"
                 value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    name:
+                      e.target.value,
+                  })
+                }
+                className="h-14 px-4 text-white border outline-none rounded-2xl border-white/10 bg-[#111827]"
               />
 
-              {/* EMAIL */}
               <input
-                placeholder="Email"
-                className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
+                placeholder="Email Address"
                 value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    email:
+                      e.target.value,
+                  })
+                }
+                className="h-14 px-4 text-white border outline-none rounded-2xl border-white/10 bg-[#111827]"
               />
 
-              {/* PHONE */}
               <input
-                placeholder="Phone"
-                className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
+                placeholder="Phone Number"
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    phone:
+                      e.target.value,
+                  })
+                }
+                className="h-14 px-4 text-white border outline-none rounded-2xl border-white/10 bg-[#111827]"
               />
 
-              {/* COMPANY */}
               <input
                 placeholder="Company Name"
-                className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
                 value={form.companyName}
-                onChange={(e) => setForm({ ...form, companyName: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    companyName:
+                      e.target.value,
+                  })
+                }
+                className="h-14 px-4 text-white border outline-none rounded-2xl border-white/10 bg-[#111827]"
               />
 
-              {/* JOB TITLE DROPDOWN */}
               <select
-                className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
                 value={form.jobTitle}
-                onChange={(e) => setForm({ ...form, jobTitle: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    jobTitle:
+                      e.target.value,
+                  })
+                }
+                className="h-14 px-4 text-white border outline-none rounded-2xl border-white/10 bg-[#111827]"
               >
-                <option value="">🎯 Select Job Title</option>
-                <option value="Founder">Founder</option>
-                <option value="CEO">CEO</option>
-                <option value="Manager">Manager</option>
-                <option value="Marketing">Marketing</option>
-                <option value="Developer">Developer</option>
-                <option value="Sales">Sales</option>
-                <option value="HR">HR</option>
+
+                <option value="">
+                  Select Job Title
+                </option>
+
+                <option value="CEO">
+                  CEO
+                </option>
+
+                <option value="Founder">
+                  Founder
+                </option>
+
+                <option value="Manager">
+                  Manager
+                </option>
+
+                <option value="Developer">
+                  Developer
+                </option>
+
+                <option value="Marketing">
+                  Marketing
+                </option>
+
               </select>
 
-              {/* DEAL VALUE */}
               <input
                 type="number"
-                placeholder="Deal Value (₹)"
-                className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
-                value={form.dealValue || ""}
+                placeholder="Deal Value"
+                value={form.dealValue}
                 onChange={(e) =>
-                  setForm({ ...form, dealValue: e.target.value })
+                  setForm({
+                    ...form,
+                    dealValue:
+                      e.target.value,
+                  })
                 }
+                className="h-14 px-4 text-white border outline-none rounded-2xl border-white/10 bg-[#111827]"
               />
-              {/* SOURCE */}
+
               <select
-                className="p-3 bg-gray-800 border border-gray-700 rounded-lg"
                 value={form.source}
-                onChange={(e) => setForm({ ...form, source: e.target.value })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    source:
+                      e.target.value,
+                  })
+                }
+                className="h-14 px-4 text-white border outline-none rounded-2xl border-white/10 bg-[#111827]"
               >
-                <option value="website">🌐 Website</option>
-                <option value="facebook">📘 Facebook</option>
-                <option value="linkedin">💼 LinkedIn</option>
-                <option value="google">🔎 Google</option>
-                <option value="referral">🤝 Referral</option>
+
+                <option value="website">
+                  Website
+                </option>
+
+                <option value="linkedin">
+                  LinkedIn
+                </option>
+
+                <option value="facebook">
+                  Facebook
+                </option>
+
+                <option value="google">
+                  Google
+                </option>
+
+                <option value="referral">
+                  Referral
+                </option>
+
               </select>
 
-              {/* NOTES */}
               <textarea
-                placeholder="Notes"
-                className="col-span-2 p-3 bg-gray-800 border border-gray-700 rounded-lg"
-                value={form.notes || ""}
+                rows={4}
+                placeholder="Lead Notes"
+                value={form.notes}
                 onChange={(e) =>
-                  setForm({ ...form, notes: e.target.value })
+                  setForm({
+                    ...form,
+                    notes:
+                      e.target.value,
+                  })
                 }
+                className="px-4 py-4 text-white border outline-none md:col-span-2 rounded-2xl border-white/10 bg-[#111827]"
               />
 
-              {/* TAGS MULTI SELECT STYLE */}
-              <div className="col-span-2">
-                <label className="text-xs text-gray-400">Tags</label>
-
-                <div className="grid grid-cols-4 gap-2 mt-2">
-                  {["hot", "warm", "cold", "priority", "vip", "new"].map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => {
-                        const exists = form.tags.includes(tag);
-
-                        setForm({
-                          ...form,
-                          tags: exists
-                            ? form.tags.filter((t) => t !== tag)
-                            : [...form.tags, tag],
-                        });
-                      }}
-                      className={`p-2 text-xs rounded-lg border ${form.tags.includes(tag)
-                          ? "bg-blue-600 border-blue-500"
-                          : "bg-gray-800 border-gray-700"
-                        }`}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
-            {/* ACTIONS */}
-            <div className="flex justify-end gap-3 mt-6">
+            {/* FOOTER */}
+
+            <div className="flex justify-end gap-4 p-6 border-t border-white/10">
 
               <button
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-gray-300 bg-gray-800 rounded-lg hover:bg-gray-700"
+                onClick={() =>
+                  setShowModal(false)
+                }
+                className="px-6 py-3 transition rounded-2xl bg-white/5 hover:bg-white/10"
               >
+
                 Cancel
+
               </button>
 
               <button
-                onClick={handleCreateLead}
-                className="px-5 py-2 font-semibold text-white rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 hover:opacity-90"
+                onClick={
+                  handleCreateLead
+                }
+                className="flex items-center gap-2 px-6 py-3 font-semibold transition-all rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-500 to-violet-500 hover:scale-[1.02]"
               >
-                🚀 Create Lead
+
+                <Plus size={18} />
+
+                Create Lead
+
               </button>
+
             </div>
-          </div>
+
+          </motion.div>
         </div>
       )}
     </div>

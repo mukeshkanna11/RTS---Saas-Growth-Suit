@@ -1,7 +1,7 @@
 // =======================================================
 // src/pages/Analytics.jsx
-// ULTRA ENTERPRISE ANALYTICS DASHBOARD
-// REAL API + FALLBACK + FULL UI/UX OPTIMIZED
+// READYTECH SOLUTIONS - PREMIUM ENTERPRISE ANALYTICS
+// ULTRA SAAS LEVEL UI/UX DASHBOARD
 // =======================================================
 
 import {
@@ -29,6 +29,12 @@ import {
   ArrowDownRight,
   LayoutDashboard,
   Database,
+  Sparkles,
+  Globe,
+  ShieldCheck,
+  Building2,
+  Eye,
+  PieChart as PieChartIcon,
 } from "lucide-react";
 
 import {
@@ -79,7 +85,7 @@ export default function Analytics() {
     useState("all");
 
   // =====================================================
-  // FETCH ANALYTICS
+  // FETCH
   // =====================================================
 
   const fetchAnalytics = useCallback(
@@ -93,10 +99,6 @@ export default function Analytics() {
 
         setErrorMsg("");
 
-        // =================================================
-        // API CALLS
-        // =================================================
-
         const [
           summaryRes,
           revenueTrendRes,
@@ -107,10 +109,6 @@ export default function Analytics() {
             `/analytics/revenue-trend?period=${period}`
           ),
         ]);
-
-        // =================================================
-        // SUMMARY PARSER
-        // =================================================
 
         let summaryData = [];
 
@@ -129,10 +127,7 @@ export default function Analytics() {
 
           if (Array.isArray(raw)) {
             summaryData = raw;
-          }
-
-          // AUTO CONVERT OBJECT → ARRAY
-          else if (
+          } else if (
             raw &&
             typeof raw === "object"
           ) {
@@ -140,6 +135,7 @@ export default function Analytics() {
               raw
             ).map(([key, value]) => ({
               category: key,
+
               total:
                 Number(
                   value?.total ||
@@ -158,16 +154,7 @@ export default function Analytics() {
                 ) || 0,
             }));
           }
-
-          console.log(
-            "✅ SUMMARY DATA:",
-            summaryData
-          );
         }
-
-        // =================================================
-        // REVENUE TREND PARSER
-        // =================================================
 
         let revenueData = [];
 
@@ -187,15 +174,10 @@ export default function Analytics() {
           revenueData = Array.isArray(raw)
             ? raw
             : [];
-
-          console.log(
-            "✅ REVENUE TREND:",
-            revenueData
-          );
         }
 
         // =================================================
-        // FALLBACK SUMMARY
+        // FALLBACKS
         // =================================================
 
         if (!summaryData.length) {
@@ -231,16 +213,11 @@ export default function Analytics() {
           ];
         }
 
-        // =================================================
-        // FALLBACK REVENUE TREND
-        // =================================================
-
         if (!revenueData.length) {
           revenueData = [
             {
               _id: {
                 month: "Jan",
-                year: 2026,
               },
               totalRevenue: 18000,
             },
@@ -248,7 +225,6 @@ export default function Analytics() {
             {
               _id: {
                 month: "Feb",
-                year: 2026,
               },
               totalRevenue: 24000,
             },
@@ -256,7 +232,6 @@ export default function Analytics() {
             {
               _id: {
                 month: "Mar",
-                year: 2026,
               },
               totalRevenue: 31000,
             },
@@ -264,7 +239,6 @@ export default function Analytics() {
             {
               _id: {
                 month: "Apr",
-                year: 2026,
               },
               totalRevenue: 28000,
             },
@@ -272,25 +246,24 @@ export default function Analytics() {
             {
               _id: {
                 month: "May",
-                year: 2026,
               },
               totalRevenue: 45000,
             },
+
+            {
+              _id: {
+                month: "Jun",
+              },
+              totalRevenue: 62000,
+            },
           ];
         }
-
-        // =================================================
-        // FINAL SET
-        // =================================================
 
         setSummary(summaryData);
 
         setRevenueTrend(revenueData);
       } catch (err) {
-        console.error(
-          "🔥 ANALYTICS ERROR:",
-          err
-        );
+        console.error(err);
 
         setErrorMsg(
           err?.message ||
@@ -313,70 +286,71 @@ export default function Analytics() {
   }, [fetchAnalytics]);
 
   // =====================================================
-  // SAFE METRIC
+  // METRICS
   // =====================================================
 
+  const getMetric = (category) => {
+    const item = summary.find(
+      (s) => s.category === category
+    );
+
+    if (!item) return 0;
+
+    return Number(
+      item.totalValue ||
+        item.total ||
+        item.value ||
+        0
+    );
+  };
+
   // =====================================================
-// SAFE METRIC
-// =====================================================
+  // KPI CARDS
+  // =====================================================
 
-const getMetric = (category) => {
-  const item = summary.find(
-    (s) => s.category === category
-  );
+  const cards = [
+    {
+      title: "Revenue",
+      value: getMetric("revenue"),
+      icon: DollarSign,
+      growth: "+38%",
+      trend: "up",
+      color:
+        "from-emerald-500 to-cyan-500",
+    },
 
-  if (!item) return 0;
+    {
+      title: "Leads",
+      value: getMetric(
+        "lead_generation"
+      ),
+      icon: Users,
+      growth: "+24%",
+      trend: "up",
+      color:
+        "from-blue-500 to-indigo-500",
+    },
 
-  // SUPPORT BOTH API STRUCTURES
-  return Number(
-    item.totalValue ||
-    item.total ||
-    item.value ||
-    0
-  );
-};
+    {
+      title: "Conversions",
+      value: getMetric("conversion"),
+      icon: TrendingUp,
+      growth: "+18%",
+      trend: "up",
+      color:
+        "from-violet-500 to-fuchsia-500",
+    },
 
-// =====================================================
-// KPI CARDS
-// =====================================================
-
-const cards = [
-  {
-    title: "Revenue",
-    value: getMetric("revenue"),
-    icon: DollarSign,
-    growth: "+38%",
-    trend: "up",
-    color: "from-emerald-500 to-cyan-500",
-  },
-
-  {
-    title: "Leads",
-    value: getMetric("lead_generation"),
-    icon: Users,
-    growth: "+24%",
-    trend: "up",
-    color: "from-blue-500 to-cyan-500",
-  },
-
-  {
-    title: "Conversions",
-    value: getMetric("conversion"),
-    icon: TrendingUp,
-    growth: "+18%",
-    trend: "up",
-    color: "from-violet-500 to-fuchsia-500",
-  },
-
-  {
-    title: "Traffic",
-    value: getMetric("traffic"),
-    icon: Activity,
-    growth: "+12%",
-    trend: "up",
-    color: "from-orange-500 to-amber-500",
-  },
-];
+    {
+      title: "Traffic",
+      value: getMetric("traffic"),
+      icon: Activity,
+      growth: "+12%",
+      trend: "up",
+      color:
+        "from-orange-500 to-amber-500",
+    },
+  ];
 
   // =====================================================
   // CHART DATA
@@ -384,14 +358,7 @@ const cards = [
 
   const chartData = useMemo(() => {
     return revenueTrend.map((item) => ({
-      name:
-        period === "daily"
-          ? `${item?._id?.day || ""}/${
-              item?._id?.month || ""
-            }`
-          : `${
-              item?._id?.month || ""
-            }`,
+      name: `${item?._id?.month || ""}`,
 
       revenue: Number(
         item?.totalRevenue ||
@@ -400,34 +367,30 @@ const cards = [
           0
       ),
     }));
-  }, [revenueTrend, period]);
+  }, [revenueTrend]);
 
   // =====================================================
   // PIE DATA
   // =====================================================
 
-  // =====================================================
-// PIE DATA
-// =====================================================
+  const pieData = useMemo(() => {
+    return summary.map((item) => ({
+      name:
+        item?.category?.replaceAll(
+          "_",
+          " "
+        ) || "Unknown",
 
-const pieData = useMemo(() => {
-  return summary.map((item) => ({
-    name:
-      item?.category?.replaceAll(
-        "_",
-        " "
-      ) || "Unknown",
-
-    value: Number(
-      item?.totalValue ||
-      item?.total ||
-      0
-    ),
-  }));
-}, [summary]);
+      value: Number(
+        item?.totalValue ||
+          item?.total ||
+          0
+      ),
+    }));
+  }, [summary]);
 
   // =====================================================
-  // FILTERED SUMMARY
+  // FILTER
   // =====================================================
 
   const filteredSummary = useMemo(() => {
@@ -474,14 +437,22 @@ const pieData = useMemo(() => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#020617] text-white">
+      <div className="flex items-center justify-center min-h-screen bg-[#020617]">
+
         <div className="text-center">
-          <div className="mx-auto mb-5 border-4 rounded-full w-14 h-14 border-cyan-400 border-t-transparent animate-spin" />
+
+          <div className="w-16 h-16 mx-auto mb-5 border-4 rounded-full border-cyan-400 border-t-transparent animate-spin" />
+
+          <h2 className="mb-2 text-xl font-semibold text-white">
+            ReadyTech Analytics
+          </h2>
 
           <p className="text-slate-400">
-            Loading analytics dashboard...
+            Loading enterprise dashboard...
           </p>
+
         </div>
+
       </div>
     );
   }
@@ -490,564 +461,736 @@ const pieData = useMemo(() => {
   // MAIN UI
   // =====================================================
 
-return (
-  <div className="min-h-screen p-4 text-white md:p-6 bg-[#020617]">
+  return (
+    <div className="relative min-h-screen overflow-hidden text-white bg-[#020617]">
 
-    {/* ================================================= */}
-    {/* TOP BACKGROUND */}
-    {/* ================================================= */}
+      {/* ================================================= */}
+      {/* BACKGROUND */}
+      {/* ================================================= */}
 
-    <div className="fixed top-0 left-0 w-full h-full pointer-events-none -z-10">
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
 
-      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-cyan-500/10 blur-[120px]" />
+        <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-cyan-500/10 blur-[120px]" />
 
-      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-500/10 blur-[120px]" />
-    </div>
+        <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-blue-600/10 blur-[120px]" />
 
-    {/* ================================================= */}
-    {/* HEADER */}
-    {/* ================================================= */}
+        <div className="absolute top-1/2 left-1/2 w-[500px] h-[500px] bg-violet-500/10 blur-[120px] -translate-x-1/2 -translate-y-1/2" />
 
-    <div className="flex flex-col gap-5 mb-8 2xl:flex-row 2xl:items-center 2xl:justify-between">
-
-      {/* LEFT */}
-
-      <div className="flex items-center gap-4">
-
-        <div className="p-4 border shadow-lg rounded-3xl bg-cyan-500/10 border-cyan-500/20">
-
-          <LayoutDashboard
-            size={30}
-            className="text-cyan-400"
-          />
-        </div>
-
-        <div>
-
-          <h1 className="text-2xl font-bold tracking-tight md:text-2xl">
-
-            Analytics Dashboard
-          </h1>
-
-          <p className="mt-1 text-slate-400">
-
-            Enterprise SaaS Intelligence Platform
-          </p>
-        </div>
       </div>
 
-      {/* RIGHT */}
+      <div className="relative z-10 p-4 md:p-8">
 
-      <div className="flex flex-wrap items-center gap-3">
+        {/* ================================================= */}
+        {/* HERO HEADER */}
+        {/* ================================================= */}
 
-        {/* SEARCH */}
+        <div className="relative p-8 mb-8 overflow-hidden border shadow-2xl rounded-[32px] border-white/10 bg-white/[0.04] backdrop-blur-2xl">
 
-        <div className="relative">
+          <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-cyan-500/10 blur-3xl" />
 
-          <Search
-            size={17}
-            className="absolute -translate-y-1/2 left-3 top-1/2 text-slate-500"
-          />
+          <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full bg-blue-500/10 blur-3xl" />
 
-          <input
-            type="text"
-            placeholder="Search analytics..."
-            value={search}
-            onChange={(e) =>
-              setSearch(e.target.value)
-            }
-            className="w-[260px] rounded-2xl border border-white/10 bg-white/5 py-3 pl-10 pr-4 text-sm outline-none backdrop-blur-xl transition focus:border-cyan-400"
-          />
-        </div>
+          <div className="relative flex flex-col gap-8 2xl:flex-row 2xl:items-center 2xl:justify-between">
 
-        {/* PERIOD */}
+            {/* LEFT */}
 
-        <select
-          value={period}
-          onChange={(e) =>
-            setPeriod(e.target.value)
-          }
-          className="px-4 py-3 text-sm border outline-none rounded-2xl border-white/10 bg-white/5 backdrop-blur-xl"
-        >
-          <option value="monthly">
-            Monthly
-          </option>
+            <div className="flex items-start gap-5">
 
-          <option value="daily">
-            Daily
-          </option>
-        </select>
+              <div className="p-5 border rounded-3xl bg-cyan-500/10 border-cyan-400/20">
 
-        {/* REFRESH */}
+                <LayoutDashboard
+                  size={38}
+                  className="text-cyan-400"
+                />
 
-        <button
-          onClick={() =>
-            fetchAnalytics(true)
-          }
-          className="flex items-center gap-2 px-5 py-3 text-sm font-semibold text-black transition rounded-2xl bg-cyan-400 hover:scale-105 hover:bg-cyan-300"
-        >
-          <RefreshCcw
-            size={16}
-            className={
-              refreshing
-                ? "animate-spin"
-                : ""
-            }
-          />
-
-          Refresh
-        </button>
-      </div>
-    </div>
-
-    {/* ================================================= */}
-    {/* ERROR */}
-    {/* ================================================= */}
-
-    {errorMsg && (
-      <div className="flex items-center gap-3 p-4 mb-6 text-red-300 border rounded-2xl border-red-500/20 bg-red-500/10">
-
-        <AlertCircle size={18} />
-
-        <span>{errorMsg}</span>
-      </div>
-    )}
-
-    {/* ================================================= */}
-    {/* KPI CARDS */}
-    {/* ================================================= */}
-
-    <div className="grid grid-cols-1 gap-5 mb-8 md:grid-cols-2 2xl:grid-cols-4">
-
-      {cards.map((card, index) => (
-        <motion.div
-          key={card.title}
-          initial={{
-            opacity: 0,
-            y: 20,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          transition={{
-            delay: index * 0.08,
-          }}
-          className="group relative overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.05] backdrop-blur-xl"
-        >
-          {/* GLOW */}
-
-          <div
-            className={`absolute inset-0 bg-gradient-to-br ${card.color} opacity-[0.08]`}
-          />
-
-          <div className="absolute w-40 h-40 rounded-full -top-10 -right-10 bg-cyan-400/10 blur-3xl" />
-
-          <div className="relative p-6">
-
-            {/* TOP */}
-
-            <div className="flex items-start justify-between">
+              </div>
 
               <div>
 
-                <p className="text-sm text-slate-400">
-                  {card.title}
+                <div className="inline-flex items-center gap-2 px-4 py-2 mb-5 text-sm border rounded-full bg-cyan-500/10 border-cyan-400/20 text-cyan-300">
+
+                  <Sparkles size={15} />
+
+                  ReadyTech Solutions Intelligence Platform
+
+                </div>
+
+                <h1 className="text-4xl font-black leading-tight md:text-4xl">
+
+                  Enterprise Analytics
+                  <span className="block mt-1 text-transparent bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text">
+                    Dashboard Suite
+                  </span>
+
+                </h1>
+
+                <p className="max-w-2xl mt-5 text-base leading-relaxed text-slate-400">
+
+                  Monitor revenue growth, lead conversions,
+                  customer acquisition, campaign performance
+                  and operational intelligence across your
+                  SaaS ecosystem with ReadyTech Solutions.
+
                 </p>
 
-                <h2 className="mt-4 text-2xl font-bold tracking-tight">
-
-                  {card.title ===
-                  "Revenue"
-                    ? `₹${card.value.toLocaleString()}`
-                    : card.value.toLocaleString()}
-                </h2>
               </div>
 
-              <div className="p-4 transition rounded-2xl bg-white/10 group-hover:scale-110">
-
-                <card.icon className="text-cyan-400" />
-              </div>
             </div>
 
-            {/* BOTTOM */}
+            {/* RIGHT */}
 
-            <div className="flex items-center gap-2 mt-6">
+            <div className="grid grid-cols-2 gap-4">
 
-              {card.trend === "up" ? (
-                <ArrowUpRight
-                  size={18}
-                  className="text-emerald-400"
-                />
-              ) : (
-                <ArrowDownRight
-                  size={18}
-                  className="text-red-400"
-                />
-              )}
+              <InfoCard
+                icon={ShieldCheck}
+                title="Security"
+                value="99.9%"
+              />
 
-              <span
-                className={`text-sm font-semibold ${
-                  card.trend === "up"
-                    ? "text-emerald-400"
-                    : "text-red-400"
-                }`}
-              >
-                {card.growth}
-              </span>
+              <InfoCard
+                icon={Globe}
+                title="Active Users"
+                value="12.4K"
+              />
 
-              <span className="text-sm text-slate-500">
-                vs previous period
-              </span>
+              <InfoCard
+                icon={Building2}
+                title="Clients"
+                value="350+"
+              />
+
+              <InfoCard
+                icon={Eye}
+                title="Insights"
+                value="Realtime"
+              />
+
             </div>
-          </div>
-        </motion.div>
-      ))}
-    </div>
 
-    {/* ================================================= */}
-    {/* CHARTS */}
-    {/* ================================================= */}
-
-    <div className="grid gap-6 mb-8 2xl:grid-cols-2">
-
-      {/* AREA CHART */}
-
-      <div className="rounded-[28px] border border-white/10 bg-white/[0.05] p-6 backdrop-blur-xl">
-
-        <div className="flex items-center justify-between mb-6">
-
-          <div>
-
-            <h2 className="text-2xl font-bold">
-              Revenue Trend
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-400">
-
-              Revenue growth analytics
-            </p>
           </div>
 
-          <TrendingUp className="text-cyan-400" />
         </div>
 
-        <ResponsiveContainer
-          width="100%"
-          height={340}
-        >
-          <AreaChart data={chartData}>
+        {/* ================================================= */}
+        {/* FILTER BAR */}
+        {/* ================================================= */}
 
-            <defs>
+        <div className="flex flex-col gap-4 p-5 mb-8 border lg:flex-row lg:items-center lg:justify-between rounded-3xl border-white/10 bg-white/[0.04] backdrop-blur-xl">
 
-              <linearGradient
-                id="revenueGradient"
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="1"
-              >
-                <stop
-                  offset="5%"
-                  stopColor="#06b6d4"
-                  stopOpacity={0.7}
-                />
+          <div className="flex flex-wrap gap-4">
 
-                <stop
-                  offset="95%"
-                  stopColor="#06b6d4"
-                  stopOpacity={0}
-                />
-              </linearGradient>
-            </defs>
+            {/* SEARCH */}
 
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#1e293b"
-            />
+            <div className="relative">
 
-            <XAxis dataKey="name" />
+              <Search
+                size={18}
+                className="absolute -translate-y-1/2 text-slate-500 left-4 top-1/2"
+              />
 
-            <YAxis />
+              <input
+                type="text"
+                placeholder="Search analytics..."
+                value={search}
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
+                className="w-[280px] rounded-2xl border border-white/10 bg-[#0f172a] py-3 pl-11 pr-4 text-sm outline-none transition-all focus:border-cyan-400"
+              />
 
-            <Tooltip />
+            </div>
 
-            <Area
-              type="monotone"
-              dataKey="revenue"
-              stroke="#06b6d4"
-              strokeWidth={3}
-              fillOpacity={1}
-              fill="url(#revenueGradient)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+            {/* PERIOD */}
 
-      {/* BAR CHART */}
-
-      <div className="rounded-[28px] border border-white/10 bg-white/[0.05] p-6 backdrop-blur-xl">
-
-        <div className="flex items-center justify-between mb-6">
-
-          <div>
-
-            <h2 className="text-2xl font-bold">
-              Revenue Comparison
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-400">
-
-              Performance metrics overview
-            </p>
-          </div>
-
-          <BarChart3 className="text-cyan-400" />
-        </div>
-
-        <ResponsiveContainer
-          width="100%"
-          height={340}
-        >
-          <BarChart data={chartData}>
-
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#1e293b"
-            />
-
-            <XAxis dataKey="name" />
-
-            <YAxis />
-
-            <Tooltip />
-
-            <Bar
-              dataKey="revenue"
-              fill="#06b6d4"
-              radius={[10, 10, 0, 0]}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-
-    {/* ================================================= */}
-    {/* BOTTOM SECTION */}
-    {/* ================================================= */}
-
-    <div className="grid gap-6 2xl:grid-cols-3">
-
-      {/* PIE CHART */}
-
-      <div className="rounded-[28px] border border-white/10 bg-white/[0.05] p-6 backdrop-blur-xl">
-
-        <div className="flex items-center gap-3 mb-6">
-
-          <Database className="text-cyan-400" />
-
-          <h2 className="text-2xl font-bold">
-            Distribution
-          </h2>
-        </div>
-
-        <ResponsiveContainer
-          width="100%"
-          height={340}
-        >
-          <PieChart>
-
-            <Pie
-              data={pieData}
-              dataKey="value"
-              outerRadius={110}
-              label
+            <select
+              value={period}
+              onChange={(e) =>
+                setPeriod(e.target.value)
+              }
+              className="px-5 py-3 text-white border outline-none rounded-2xl border-white/10 bg-[#0f172a]"
             >
-              {pieData.map(
-                (entry, index) => (
-                  <Cell
-                    key={index}
-                    fill={
-                      COLORS[
-                        index %
-                          COLORS.length
-                      ]
-                    }
-                  />
-                )
-              )}
-            </Pie>
 
-            <Tooltip />
+              <option
+                value="monthly"
+                className="bg-[#0f172a]"
+              >
+                Monthly
+              </option>
 
-            <Legend />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
+              <option
+                value="daily"
+                className="bg-[#0f172a]"
+              >
+                Daily
+              </option>
 
-      {/* SUMMARY */}
+            </select>
 
-      <div className="rounded-[28px] border border-white/10 bg-white/[0.05] p-6 backdrop-blur-xl 2xl:col-span-2">
-
-        <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
-
-          <div>
-
-            <h2 className="text-2xl font-black">
-              Analytics Summary
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-400">
-
-              Business intelligence insights
-            </p>
           </div>
 
-          <div className="inline-flex items-center gap-2 px-4 py-2 text-sm border w-fit rounded-2xl border-white/10 bg-white/5 text-slate-300">
+          {/* ACTIONS */}
 
-            <Filter size={15} />
+          <div className="flex gap-3">
 
-            {filteredSummary.length} Results
+            <button className="flex items-center gap-2 px-5 py-3 text-sm border rounded-2xl border-white/10 bg-white/[0.04]">
+
+              <Filter size={16} />
+
+              Filters
+
+            </button>
+
+            <button
+              onClick={() =>
+                fetchAnalytics(true)
+              }
+              className="flex items-center gap-2 px-5 py-3 text-sm font-semibold text-black transition-all rounded-2xl bg-cyan-400 hover:scale-105"
+            >
+
+              <RefreshCcw
+                size={16}
+                className={
+                  refreshing
+                    ? "animate-spin"
+                    : ""
+                }
+              />
+
+              Refresh Data
+
+            </button>
+
           </div>
+
         </div>
 
-        {/* TABLE */}
+        {/* ================================================= */}
+        {/* ERROR */}
+        {/* ================================================= */}
 
-        <div className="overflow-x-auto">
+        {errorMsg && (
+          <div className="flex items-center gap-3 p-4 mb-8 text-red-300 border rounded-2xl bg-red-500/10 border-red-500/20">
 
-          <table className="w-full">
+            <AlertCircle size={18} />
 
-            <thead>
+            {errorMsg}
 
-              <tr className="text-sm border-b border-white/10 text-slate-400">
+          </div>
+        )}
 
-                <th className="px-4 py-4 text-left">
-                  Category
-                </th>
+        {/* ================================================= */}
+        {/* KPI CARDS */}
+        {/* ================================================= */}
 
-                <th className="px-4 py-4 text-left">
-                  Total
-                </th>
+        <div className="grid grid-cols-1 gap-6 mb-8 md:grid-cols-2 2xl:grid-cols-4">
 
-                <th className="px-4 py-4 text-left">
-                  Average
-                </th>
+          {cards.map((card, index) => (
+            <motion.div
+              key={card.title}
+              initial={{
+                opacity: 0,
+                y: 20,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
+              transition={{
+                delay: index * 0.08,
+              }}
+              className="relative overflow-hidden border shadow-xl rounded-[30px] border-white/10 bg-white/[0.05] backdrop-blur-xl"
+            >
 
-                <th className="px-4 py-4 text-left">
-                  Records
-                </th>
+              <div
+                className={`absolute inset-0 bg-gradient-to-br ${card.color} opacity-[0.12]`}
+              />
 
-                <th className="px-4 py-4 text-left">
-                  Status
-                </th>
-              </tr>
-            </thead>
+              <div className="relative p-6">
 
-            <tbody>
+                <div className="flex items-start justify-between">
 
-              {filteredSummary.map(
-                (item, index) => {
-                  const positive =
-                    Number(
-                      item.totalValue ||
-                        item.total ||
-                        0
-                    ) > 0;
+                  <div>
 
-                  return (
-                    <motion.tr
-                      key={index}
-                      initial={{
-                        opacity: 0,
-                        y: 10,
-                      }}
-                      animate={{
-                        opacity: 1,
-                        y: 0,
-                      }}
-                      transition={{
-                        delay:
-                          index * 0.05,
-                      }}
-                      className="border-b border-white/5 transition hover:bg-white/[0.03]"
-                    >
-                      <td className="px-4 py-5">
+                    <p className="text-sm text-slate-400">
+                      {card.title}
+                    </p>
 
-                        <div className="flex items-center gap-3">
+                    <h2 className="mt-4 text-4xl font-black tracking-tight">
 
-                          <div className="w-3 h-3 rounded-full bg-cyan-400" />
+                      {card.title ===
+                      "Revenue"
+                        ? `₹${card.value.toLocaleString()}`
+                        : card.value.toLocaleString()}
 
-                          <span className="capitalize text-slate-200">
+                    </h2>
+
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-white/10">
+
+                    <card.icon className="text-cyan-400" />
+
+                  </div>
+
+                </div>
+
+                <div className="flex items-center gap-2 mt-6">
+
+                  <ArrowUpRight
+                    size={18}
+                    className="text-emerald-400"
+                  />
+
+                  <span className="font-semibold text-emerald-400">
+
+                    {card.growth}
+
+                  </span>
+
+                  <span className="text-sm text-slate-500">
+
+                    growth this month
+
+                  </span>
+
+                </div>
+
+              </div>
+
+            </motion.div>
+          ))}
+
+        </div>
+
+        {/* ================================================= */}
+        {/* CHARTS */}
+        {/* ================================================= */}
+
+        <div className="grid gap-6 mb-8 2xl:grid-cols-2">
+
+          {/* AREA */}
+
+          <div className="p-6 border shadow-xl rounded-[30px] border-white/10 bg-white/[0.05] backdrop-blur-xl">
+
+            <div className="flex items-center justify-between mb-6">
+
+              <div>
+
+                <h2 className="text-2xl font-bold">
+
+                  Revenue Growth
+
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-400">
+
+                  Monthly SaaS revenue intelligence
+
+                </p>
+
+              </div>
+
+              <TrendingUp className="text-cyan-400" />
+
+            </div>
+
+            <ResponsiveContainer
+              width="100%"
+              height={350}
+            >
+
+              <AreaChart data={chartData}>
+
+                <defs>
+
+                  <linearGradient
+                    id="colorRevenue"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+
+                    <stop
+                      offset="5%"
+                      stopColor="#06b6d4"
+                      stopOpacity={0.7}
+                    />
+
+                    <stop
+                      offset="95%"
+                      stopColor="#06b6d4"
+                      stopOpacity={0}
+                    />
+
+                  </linearGradient>
+
+                </defs>
+
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#1e293b"
+                />
+
+                <XAxis
+                  dataKey="name"
+                  stroke="#94a3b8"
+                />
+
+                <YAxis stroke="#94a3b8" />
+
+                <Tooltip />
+
+                <Area
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="#06b6d4"
+                  strokeWidth={3}
+                  fillOpacity={1}
+                  fill="url(#colorRevenue)"
+                />
+
+              </AreaChart>
+
+            </ResponsiveContainer>
+
+          </div>
+
+          {/* BAR */}
+
+          <div className="p-6 border shadow-xl rounded-[30px] border-white/10 bg-white/[0.05] backdrop-blur-xl">
+
+            <div className="flex items-center justify-between mb-6">
+
+              <div>
+
+                <h2 className="text-2xl font-bold">
+
+                  Performance Metrics
+
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-400">
+
+                  Revenue comparison overview
+
+                </p>
+
+              </div>
+
+              <BarChart3 className="text-cyan-400" />
+
+            </div>
+
+            <ResponsiveContainer
+              width="100%"
+              height={350}
+            >
+
+              <BarChart data={chartData}>
+
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#1e293b"
+                />
+
+                <XAxis
+                  dataKey="name"
+                  stroke="#94a3b8"
+                />
+
+                <YAxis stroke="#94a3b8" />
+
+                <Tooltip />
+
+                <Bar
+                  dataKey="revenue"
+                  fill="#06b6d4"
+                  radius={[12, 12, 0, 0]}
+                />
+
+              </BarChart>
+
+            </ResponsiveContainer>
+
+          </div>
+
+        </div>
+
+        {/* ================================================= */}
+        {/* BOTTOM */}
+        {/* ================================================= */}
+
+        <div className="grid gap-6 2xl:grid-cols-3">
+
+          {/* PIE */}
+
+          <div className="p-6 border shadow-xl rounded-[30px] border-white/10 bg-white/[0.05] backdrop-blur-xl">
+
+            <div className="flex items-center gap-3 mb-6">
+
+              <PieChartIcon className="text-cyan-400" />
+
+              <h2 className="text-2xl font-bold">
+                Business Distribution
+              </h2>
+
+            </div>
+
+            <ResponsiveContainer
+              width="100%"
+              height={320}
+            >
+
+              <PieChart>
+
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  outerRadius={110}
+                  label
+                >
+
+                  {pieData.map(
+                    (entry, index) => (
+                      <Cell
+                        key={index}
+                        fill={
+                          COLORS[
+                            index %
+                              COLORS.length
+                          ]
+                        }
+                      />
+                    )
+                  )}
+
+                </Pie>
+
+                <Tooltip />
+
+                <Legend />
+
+              </PieChart>
+
+            </ResponsiveContainer>
+
+          </div>
+
+          {/* TABLE */}
+
+          <div className="p-6 border shadow-xl rounded-[30px] border-white/10 bg-white/[0.05] backdrop-blur-xl 2xl:col-span-2">
+
+            <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
+
+              <div>
+
+                <h2 className="text-3xl font-black">
+
+                  Analytics Summary
+
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-400">
+
+                  Enterprise intelligence overview
+
+                </p>
+
+              </div>
+
+              <div className="inline-flex items-center gap-2 px-4 py-2 text-sm border rounded-2xl border-white/10 bg-white/[0.04] text-slate-300">
+
+                <Database size={15} />
+
+                {filteredSummary.length} Results
+
+              </div>
+
+            </div>
+
+            <div className="overflow-x-auto">
+
+              <table className="w-full">
+
+                <thead>
+
+                  <tr className="border-b border-white/10 text-slate-400">
+
+                    <th className="px-4 py-4 text-left">
+                      Category
+                    </th>
+
+                    <th className="px-4 py-4 text-left">
+                      Total
+                    </th>
+
+                    <th className="px-4 py-4 text-left">
+                      Average
+                    </th>
+
+                    <th className="px-4 py-4 text-left">
+                      Records
+                    </th>
+
+                    <th className="px-4 py-4 text-left">
+                      Status
+                    </th>
+
+                  </tr>
+
+                </thead>
+
+                <tbody>
+
+                  {filteredSummary.map(
+                    (item, index) => {
+                      const positive =
+                        Number(
+                          item.totalValue ||
+                            item.total ||
+                            0
+                        ) > 0;
+
+                      return (
+                        <motion.tr
+                          key={index}
+                          initial={{
+                            opacity: 0,
+                            y: 10,
+                          }}
+                          animate={{
+                            opacity: 1,
+                            y: 0,
+                          }}
+                          transition={{
+                            delay:
+                              index * 0.05,
+                          }}
+                          className="border-b border-white/5 hover:bg-white/[0.03]"
+                        >
+
+                          <td className="px-4 py-5 capitalize">
 
                             {item.category.replaceAll(
                               "_",
                               " "
                             )}
-                          </span>
-                        </div>
-                      </td>
 
-                      <td className="px-4 py-5 font-bold text-white">
+                          </td>
 
-                        ₹
-                        {Number(
-                          item.totalValue ||
-                            item.total ||
-                            0
-                        ).toLocaleString()}
-                      </td>
+                          <td className="px-4 py-5 font-bold">
 
-                      <td className="px-4 py-5 text-slate-300">
+                            ₹
+                            {Number(
+                              item.totalValue ||
+                                item.total ||
+                                0
+                            ).toLocaleString()}
 
-                        ₹
-                        {Number(
-                          item.avgValue ||
-                            item.avg ||
-                            0
-                        ).toLocaleString()}
-                      </td>
+                          </td>
 
-                      <td className="px-4 py-5">
+                          <td className="px-4 py-5">
 
-                        <div className="inline-flex items-center gap-2 px-3 py-1 text-sm border rounded-xl border-white/10 bg-white/5 text-slate-300">
+                            ₹
+                            {Number(
+                              item.avgValue ||
+                                item.avg ||
+                                0
+                            ).toLocaleString()}
 
-                          <Activity size={14} />
+                          </td>
 
-                          {item.count || 0}
-                        </div>
-                      </td>
+                          <td className="px-4 py-5">
 
-                      <td className="px-4 py-5">
+                            {item.count || 0}
 
-                        <div
-                          className={`inline-flex items-center gap-2 rounded-xl px-3 py-1 text-sm font-medium ${
-                            positive
-                              ? "bg-emerald-500/10 text-emerald-400"
-                              : "bg-red-500/10 text-red-400"
-                          }`}
-                        >
-                          {positive ? (
-                            <>
-                              <ArrowUpRight size={14} />
-                              Active
-                            </>
-                          ) : (
-                            <>
-                              <ArrowDownRight size={14} />
-                              Low
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </motion.tr>
-                  );
-                }
-              )}
-            </tbody>
-          </table>
+                          </td>
+
+                          <td className="px-4 py-5">
+
+                            <div
+                              className={`inline-flex items-center gap-2 rounded-xl px-3 py-1 text-sm font-medium ${
+                                positive
+                                  ? "bg-emerald-500/10 text-emerald-400"
+                                  : "bg-red-500/10 text-red-400"
+                              }`}
+                            >
+
+                              {positive ? (
+                                <>
+                                  <ArrowUpRight size={14} />
+                                  Active
+                                </>
+                              ) : (
+                                <>
+                                  <ArrowDownRight size={14} />
+                                  Low
+                                </>
+                              )}
+
+                            </div>
+
+                          </td>
+
+                        </motion.tr>
+                      );
+                    }
+                  )}
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+          </div>
+
         </div>
+
       </div>
+
     </div>
-  </div>
-);
+  );
+}
+
+// =======================================================
+// MINI INFO CARD
+// =======================================================
+
+function InfoCard({
+  icon: Icon,
+  title,
+  value,
+}) {
+  return (
+    <div className="p-4 border rounded-2xl border-white/10 bg-white/[0.04] min-w-[140px]">
+
+      <div className="flex items-center justify-between">
+
+        <Icon
+          size={18}
+          className="text-cyan-400"
+        />
+
+        <span className="text-xs text-emerald-400">
+          Live
+        </span>
+
+      </div>
+
+      <h3 className="mt-4 text-2xl font-black">
+
+        {value}
+
+      </h3>
+
+      <p className="mt-1 text-sm text-slate-400">
+
+        {title}
+
+      </p>
+
+    </div>
+  );
 }
