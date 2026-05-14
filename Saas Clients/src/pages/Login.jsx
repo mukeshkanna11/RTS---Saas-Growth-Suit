@@ -1,14 +1,13 @@
 // =======================================================
 // src/pages/Login.jsx
-// PRODUCTION READY ENTERPRISE LOGIN
-// RESPONSIVE + NO OVERFLOW + CLEAN ALIGNMENT
+// READYTECH SOLUTIONS
+// COMPACT PREMIUM ENTERPRISE LOGIN
+// CLEAN • MODERN • SAAS LEVEL UI
 // =======================================================
 
 import { useRef, useState } from "react";
 
-import {
-  useNavigate,
-} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { motion } from "framer-motion";
 
@@ -20,7 +19,12 @@ import {
   Loader2,
   Eye,
   EyeOff,
-  Building2,
+  Cpu,
+  BarChart3,
+  Database,
+  Globe,
+  Sparkles,
+  CheckCircle2,
 } from "lucide-react";
 
 import { loginUser } from "../api/auth";
@@ -28,6 +32,7 @@ import { loginUser } from "../api/auth";
 import { useAuthStore } from "../store/authStore";
 
 export default function Login() {
+
   // =====================================================
   // STATE
   // =====================================================
@@ -57,6 +62,29 @@ export default function Login() {
   );
 
   const navigate = useNavigate();
+
+  // =====================================================
+  // FEATURES
+  // =====================================================
+
+  const features = [
+    {
+      icon: Cpu,
+      title: "AI Automation",
+    },
+    {
+      icon: BarChart3,
+      title: "Analytics",
+    },
+    {
+      icon: Database,
+      title: "CRM System",
+    },
+    {
+      icon: Globe,
+      title: "Cloud Platform",
+    },
+  ];
 
   // =====================================================
   // HANDLE CHANGE
@@ -93,9 +121,6 @@ export default function Login() {
     setError("");
 
     try {
-      // ===============================================
-      // LOGIN API
-      // ===============================================
 
       const response =
         await loginUser({
@@ -105,10 +130,6 @@ export default function Login() {
 
           password: form.password,
         });
-
-      // ===============================================
-      // SAFE RESPONSE
-      // ===============================================
 
       const data =
         response?.data?.data ||
@@ -120,10 +141,6 @@ export default function Login() {
       const accessToken =
         data?.accessToken ||
         data?.token;
-
-      // ===============================================
-      // VALIDATION
-      // ===============================================
 
       if (!user) {
         throw new Error(
@@ -137,36 +154,25 @@ export default function Login() {
         );
       }
 
-      if (!user?.role) {
-        throw new Error(
-          "User role missing"
-        );
-      }
-
-      // ===============================================
-      // UPDATE AUTH STORE
-      // ===============================================
-
       setAuth({
         user,
         token: accessToken,
       });
 
-      // ===============================================
-      // ROLE REDIRECT
-      // ===============================================
+      let roleRoute =
+        "/employee";
 
-      let roleRoute = "/employee";
-
-      if (user.role === "admin") {
+      if (
+        user.role === "admin"
+      ) {
         roleRoute = "/admin";
       }
 
-      if (user.role === "manager") {
+      if (
+        user.role === "manager"
+      ) {
         roleRoute = "/manager";
       }
-
-      // SMALL DELAY FOR STATE UPDATE
 
       setTimeout(() => {
         navigate(roleRoute, {
@@ -175,28 +181,28 @@ export default function Login() {
       }, 120);
 
     } catch (err) {
+
       console.error(
         "❌ LOGIN ERROR:",
         err
       );
 
       const apiMessage =
-        err?.response?.data?.message;
-
-      // ===============================================
-      // ERROR HANDLING
-      // ===============================================
+        err?.response?.data
+          ?.message;
 
       if (
-        err?.response?.status === 429
+        err?.response?.status ===
+        429
       ) {
         setError(
-          "Too many attempts. Please wait and try again."
+          "Too many attempts. Please wait."
         );
       }
 
       else if (
-        err?.response?.status === 401
+        err?.response?.status ===
+        401
       ) {
         setError(
           apiMessage ||
@@ -205,19 +211,11 @@ export default function Login() {
       }
 
       else if (
-        err?.response?.status === 403
+        err?.response?.status >=
+        500
       ) {
         setError(
-          apiMessage ||
-            "Access denied"
-        );
-      }
-
-      else if (
-        err?.response?.status >= 500
-      ) {
-        setError(
-          "Server error. Please try again later."
+          "Server error. Try again later."
         );
       }
 
@@ -236,11 +234,13 @@ export default function Login() {
       }
 
     } finally {
+
       setLoading(false);
 
       setTimeout(() => {
-        isSubmitting.current = false;
-      }, 800);
+        isSubmitting.current =
+          false;
+      }, 700);
     }
   };
 
@@ -249,7 +249,7 @@ export default function Login() {
   // =====================================================
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#020617]">
+    <div className="relative min-h-screen overflow-hidden bg-[#030712]">
 
       {/* =================================================
           BACKGROUND
@@ -257,60 +257,173 @@ export default function Login() {
 
       <div className="absolute inset-0 overflow-hidden">
 
-        <div className="absolute top-0 left-0 w-[450px] h-[450px] bg-cyan-500/10 blur-[120px]" />
+        <div className="absolute top-[-120px] left-[-120px] h-[300px] w-[300px] rounded-full bg-cyan-500/15 blur-[100px]" />
 
-        <div className="absolute bottom-0 right-0 w-[450px] h-[450px] bg-blue-600/10 blur-[120px]" />
+        <div className="absolute bottom-[-100px] right-[-100px] h-[280px] w-[280px] rounded-full bg-indigo-600/15 blur-[100px]" />
 
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:38px_38px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:34px_34px]" />
 
       </div>
 
       {/* =================================================
-          CONTAINER
+          MAIN
       ================================================= */}
 
-      <div className="relative z-10 flex items-center justify-center min-h-screen px-4 py-10">
-
-        {/* =================================================
-            CARD
-        ================================================= */}
+      <div className="relative z-10 flex items-center justify-center min-h-screen px-4 py-6">
 
         <motion.div
           initial={{
             opacity: 0,
-            y: 20,
-            scale: 0.98,
+            y: 18,
           }}
           animate={{
             opacity: 1,
             y: 0,
-            scale: 1,
           }}
           transition={{
-            duration: 0.4,
+            duration: 0.45,
           }}
-          className="w-full max-w-md overflow-hidden border shadow-2xl bg-white/[0.05] backdrop-blur-2xl border-white/10 rounded-3xl"
+          className="grid w-full max-w-5xl overflow-hidden border shadow-2xl lg:grid-cols-2 rounded-3xl border-white/10 bg-white/[0.04] backdrop-blur-2xl"
         >
 
-          {/* TOP BAR */}
+          {/* =================================================
+              LEFT SIDE
+          ================================================= */}
 
-          <div className="h-1 bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600" />
+          <div className="relative hidden lg:flex">
 
-          {/* CONTENT */}
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-blue-600/10 to-indigo-700/10" />
 
-          <div className="p-6 sm:p-8">
+            <div className="relative z-10 flex flex-col justify-between w-full p-8">
 
-            {/* =============================================
-                LOGO
-            ============================================= */}
+              {/* TOP */}
 
-            <div className="flex justify-center">
+              <div>
 
-              <div className="relative">
+                <div className="inline-flex items-center gap-3">
 
-                <div className="absolute inset-0 rounded-2xl bg-cyan-500/30 blur-xl" />
+                  <div className="flex items-center justify-center w-12 h-12 text-sm font-black text-white shadow-lg rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 shadow-cyan-500/20">
 
-                <div className="relative flex items-center justify-center w-20 h-20 text-2xl font-black text-white shadow-2xl rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700">
+                    RTS
+
+                  </div>
+
+                  <div>
+
+                    <h2 className="text-base font-bold text-white">
+
+                      ReadyTech Solutions
+
+                    </h2>
+
+                    <p className="text-xs text-slate-400">
+
+                      Enterprise SaaS Platform
+
+                    </p>
+
+                  </div>
+
+                </div>
+
+                <div className="mt-10">
+
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-[11px] font-medium">
+
+                    <Sparkles size={12} />
+
+                    Smart Business Infrastructure
+
+                  </div>
+
+                  <h1 className="max-w-sm mt-5 text-3xl font-black leading-tight tracking-tight text-white">
+
+                    Secure Enterprise
+                    Workspace Platform
+
+                  </h1>
+
+                  <p className="max-w-md mt-4 text-sm leading-7 text-slate-400">
+
+                    Manage CRM, analytics,
+                    automation, employee
+                    systems, and operations
+                    through one secure
+                    intelligent platform.
+
+                  </p>
+
+                </div>
+
+              </div>
+
+              {/* FEATURES */}
+
+              <div className="grid grid-cols-2 gap-3 mt-8">
+
+                {features.map(
+                  (
+                    item,
+                    index
+                  ) => {
+                    const Icon =
+                      item.icon;
+
+                    return (
+                      <div
+                        key={index}
+                        className="flex items-center gap-3 p-3 border rounded-2xl bg-white/[0.03] border-white/10"
+                      >
+
+                        <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-cyan-500/10">
+
+                          <Icon
+                            size={18}
+                            className="text-cyan-300"
+                          />
+
+                        </div>
+
+                        <div>
+
+                          <p className="text-sm font-semibold text-white">
+
+                            {item.title}
+
+                          </p>
+
+                          <p className="text-[11px] mt-0.5 text-slate-500">
+
+                            Enterprise Ready
+
+                          </p>
+
+                        </div>
+
+                      </div>
+                    );
+                  }
+                )}
+
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* =================================================
+              RIGHT SIDE
+          ================================================= */}
+
+          <div className="relative flex items-center justify-center p-6 sm:p-8">
+
+            <div className="w-full max-w-sm">
+
+              {/* MOBILE LOGO */}
+
+              <div className="flex justify-center lg:hidden">
+
+                <div className="flex items-center justify-center w-16 h-16 text-lg font-black text-white shadow-xl rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 shadow-cyan-500/20">
 
                   RTS
 
@@ -318,247 +431,245 @@ export default function Login() {
 
               </div>
 
-            </div>
+              {/* HEADER */}
 
-            {/* =============================================
-                HEADER
-            ============================================= */}
+              <div className="mt-6 text-center lg:mt-0">
 
-            <div className="mt-6 text-center">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04] text-cyan-300 text-[11px] font-medium">
 
-              <div className="inline-flex items-center gap-2 px-3 py-1 mb-4 text-xs font-medium border rounded-full text-cyan-300 bg-cyan-500/10 border-cyan-500/20">
+                  <ShieldCheck size={12} />
 
-                <Building2 size={14} />
+                  Secure Access
 
-                Enterprise CRM Platform
+                </div>
+
+                <h2 className="mt-4 text-3xl font-black tracking-tight text-white">
+
+                  Welcome Back
+
+                </h2>
+
+                <p className="mt-3 text-sm leading-6 text-slate-400">
+
+                  Login to your
+                  ReadyTech enterprise
+                  dashboard.
+
+                </p>
 
               </div>
 
-              <h1 className="text-3xl font-black tracking-tight text-white">
+              {/* ERROR */}
 
-                Welcome Back
+              {error && (
+                <motion.div
+                  initial={{
+                    opacity: 0,
+                    y: 8,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                  }}
+                  className="flex gap-3 px-4 py-3 mt-5 text-sm text-red-300 border bg-red-500/10 border-red-500/20 rounded-2xl"
+                >
 
-              </h1>
-
-              <p className="mt-3 text-sm leading-relaxed text-slate-400">
-
-                Securely access your
-                CRM, analytics, leads,
-                automation, and business
-                management dashboard.
-
-              </p>
-
-            </div>
-
-            {/* =============================================
-                ERROR
-            ============================================= */}
-
-            {error && (
-              <motion.div
-                initial={{
-                  opacity: 0,
-                }}
-                animate={{
-                  opacity: 1,
-                }}
-                className="flex gap-3 px-4 py-3 mt-6 text-sm text-red-300 border bg-red-500/10 border-red-500/20 rounded-2xl"
-              >
-
-                <AlertCircle
-                  size={18}
-                  className="mt-0.5 shrink-0"
-                />
-
-                <span>{error}</span>
-
-              </motion.div>
-            )}
-
-            {/* =============================================
-                FORM
-            ============================================= */}
-
-            <form
-              onSubmit={handleLogin}
-              className="mt-6 space-y-5"
-            >
-
-              {/* EMAIL */}
-
-              <div>
-
-                <label className="block mb-2 text-sm font-medium text-slate-300">
-
-                  Email Address
-
-                </label>
-
-                <div className="flex items-center gap-3 px-4 transition border h-14 rounded-2xl bg-slate-900/70 border-slate-700 focus-within:border-cyan-500">
-
-                  <Mail
-                    size={18}
-                    className="text-cyan-400"
+                  <AlertCircle
+                    size={16}
+                    className="mt-0.5 shrink-0"
                   />
 
-                  <input
-                    type="email"
-                    name="email"
-                    required
-                    autoComplete="email"
-                    value={form.email}
-                    placeholder="you@company.com"
-                    onChange={handleChange}
-                    className="w-full text-sm text-white bg-transparent outline-none placeholder:text-slate-500"
+                  <span>{error}</span>
+
+                </motion.div>
+              )}
+
+              {/* FORM */}
+
+{/* FORM */}
+
+<form
+  onSubmit={handleLogin}
+  className="mt-6 space-y-4"
+>
+
+  {/* EMAIL */}
+
+  <div className="space-y-2">
+
+    <label className="text-[13px] font-medium text-slate-300">
+
+      Email Address
+
+    </label>
+
+    <div className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] transition-all duration-300 focus-within:border-cyan-400/60 hover:border-white/20">
+
+      <div className="flex items-center gap-3 px-4 h-14">
+
+        <div className="flex items-center justify-center rounded-lg w-9 h-9 bg-cyan-500/10">
+
+          <Mail
+            size={16}
+            className="text-cyan-300"
+          />
+
+        </div>
+
+        <input
+          type="email"
+          name="email"
+          required
+          autoComplete="email"
+          value={form.email}
+          placeholder="you@readytech.com"
+          onChange={handleChange}
+          className="w-full text-sm font-medium text-white bg-transparent outline-none placeholder:text-slate-500"
+        />
+
+      </div>
+
+    </div>
+
+  </div>
+
+  {/* PASSWORD */}
+
+  <div className="space-y-2">
+
+    <label className="text-[13px] font-medium text-slate-300">
+
+      Password
+
+    </label>
+
+    <div className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] transition-all duration-300 focus-within:border-cyan-400/60 hover:border-white/20">
+
+      <div className="flex items-center gap-3 px-4 h-14">
+
+        <div className="flex items-center justify-center rounded-lg w-9 h-9 bg-indigo-500/10">
+
+          <Lock
+            size={16}
+            className="text-indigo-300"
+          />
+
+        </div>
+
+        <input
+          type={
+            showPassword
+              ? "text"
+              : "password"
+          }
+          name="password"
+          required
+          autoComplete="current-password"
+          value={form.password}
+          placeholder="Enter password"
+          onChange={handleChange}
+          className="w-full text-sm font-medium text-white bg-transparent outline-none placeholder:text-slate-500"
+        />
+
+        <button
+          type="button"
+          onClick={() =>
+            setShowPassword(
+              !showPassword
+            )
+          }
+          className="flex items-center justify-center w-8 h-8 transition rounded-lg text-slate-400 hover:text-white hover:bg-white/5"
+        >
+
+          {showPassword ? (
+            <EyeOff size={16} />
+          ) : (
+            <Eye size={16} />
+          )}
+
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  {/* OPTIONS */}
+
+  <div className="flex items-center justify-between px-1 text-[12px]">
+
+    <label className="flex items-center gap-2 cursor-pointer text-slate-400">
+
+      <input
+        type="checkbox"
+        className="w-3.5 h-3.5 accent-cyan-500"
+      />
+
+      Remember me
+
+    </label>
+
+    <button
+      type="button"
+      className="font-medium transition text-cyan-400 hover:text-cyan-300"
+    >
+
+      Forgot Password?
+
+    </button>
+
+  </div>
+
+  {/* BUTTON */}
+
+  <button
+    type="submit"
+    disabled={loading}
+    className="relative flex items-center justify-center w-full h-14 gap-2 overflow-hidden text-sm font-semibold tracking-wide text-white transition-all duration-300 shadow-xl rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 shadow-cyan-500/20"
+  >
+
+    <div className="absolute inset-0 transition-opacity duration-300 opacity-0 bg-white/10 hover:opacity-100" />
+
+    {loading ? (
+      <>
+        <Loader2
+          size={17}
+          className="animate-spin"
+        />
+
+        Authenticating...
+
+      </>
+    ) : (
+      <>
+        <ShieldCheck size={17} />
+
+        Secure Login
+
+      </>
+    )}
+
+  </button>
+
+</form>
+
+              {/* FOOTER */}
+
+              <div className="pt-5 mt-6 border-t border-white/10">
+
+                <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
+
+                  <CheckCircle2
+                    size={14}
+                    className="text-green-400"
                   />
+
+                  Enterprise-grade protected authentication
 
                 </div>
 
               </div>
-
-              {/* PASSWORD */}
-
-              <div>
-
-                <label className="block mb-2 text-sm font-medium text-slate-300">
-
-                  Password
-
-                </label>
-
-                <div className="flex items-center gap-3 px-4 transition border h-14 rounded-2xl bg-slate-900/70 border-slate-700 focus-within:border-cyan-500">
-
-                  <Lock
-                    size={18}
-                    className="text-indigo-400"
-                  />
-
-                  <input
-                    type={
-                      showPassword
-                        ? "text"
-                        : "password"
-                    }
-                    name="password"
-                    required
-                    autoComplete="current-password"
-                    value={form.password}
-                    placeholder="Enter password"
-                    onChange={handleChange}
-                    className="w-full text-sm text-white bg-transparent outline-none placeholder:text-slate-500"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowPassword(
-                        !showPassword
-                      )
-                    }
-                    className="transition text-slate-400 hover:text-white"
-                  >
-
-                    {showPassword ? (
-                      <EyeOff size={18} />
-                    ) : (
-                      <Eye size={18} />
-                    )}
-
-                  </button>
-
-                </div>
-
-              </div>
-
-              {/* OPTIONS */}
-
-              <div className="flex items-center justify-between text-sm">
-
-                <label className="flex items-center gap-2 cursor-pointer text-slate-400">
-
-                  <input
-                    type="checkbox"
-                    className="accent-cyan-500"
-                  />
-
-                  Remember me
-
-                </label>
-
-                <button
-                  type="button"
-                  className="font-medium transition text-cyan-400 hover:text-cyan-300"
-                >
-
-                  Forgot Password?
-
-                </button>
-
-              </div>
-
-              {/* BUTTON */}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex items-center justify-center w-full gap-2 h-14 font-semibold text-white transition-all duration-300 shadow-xl rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50"
-              >
-
-                {loading ? (
-                  <>
-                    <Loader2
-                      size={18}
-                      className="animate-spin"
-                    />
-
-                    Authenticating...
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck size={18} />
-
-                    Secure Login
-                  </>
-                )}
-
-              </button>
-
-            </form>
-
-            {/* =============================================
-                FOOTER
-            ============================================= */}
-
-            <div className="pt-6 mt-8 border-t border-white/10">
-
-              <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
-
-                <ShieldCheck
-                  size={14}
-                  className="text-green-400"
-                />
-
-                Enterprise-grade encrypted authentication
-
-              </div>
-
-              <p className="mt-5 text-sm text-center text-slate-400">
-
-                Don’t have an account?{" "}
-
-                <button
-                  onClick={() =>
-                    navigate("/register")
-                  }
-                  className="font-semibold transition text-cyan-400 hover:text-cyan-300"
-                >
-
-                  Create Account
-
-                </button>
-
-              </p>
 
             </div>
 
