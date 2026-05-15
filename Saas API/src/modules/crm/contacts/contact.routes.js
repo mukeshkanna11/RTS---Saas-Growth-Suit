@@ -23,6 +23,8 @@ router.get("/team", ctrl.getTeamContacts);
 
 router.put("/:id", ctrl.update);
 
+router.get("/my", ctrl.getMyContacts);
+
 router.delete("/:id", ctrl.remove);
 
 module.exports = router;
