@@ -45,22 +45,26 @@ exports.create = async (req, res) => {
       });
     }
 
-    // ==================================================
-    // BUILD PAYLOAD
-    // ==================================================
-    const payload = {
-      ...req.body,
+   if (!req.body.assignedTo) {
+  return res.status(400).json({
+    success: false,
+    message: "Please select employee",
+  });
+}
 
-      tenantId: req.user.tenantId,
+const payload = {
+  ...req.body,
 
-      createdBy: userId,
+  tenantId: req.user.tenantId,
 
-      owner: userId,
+  createdBy: userId,
 
-      assignedTo: req.body.assignedTo || userId,
+  owner: userId,
 
-      updatedBy: userId,
-    };
+  assignedTo: req.body.assignedTo,
+
+  updatedBy: userId,
+};
 
     // ==================================================
     // CREATE CONTACT
@@ -191,14 +195,15 @@ exports.getTeamContacts = async (req, res) => {
 // ======================================================
 // ✏️ UPDATE CONTACT
 // ======================================================
+
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
 
     // ==================================================
-    // VALIDATION
+    // VALIDATE CONTACT ID
     // ==================================================
-    if (!id || !isValidObjectId(id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
         message: "Invalid contact id",
@@ -206,10 +211,41 @@ exports.update = async (req, res) => {
     }
 
     // ==================================================
-    // UPDATE
+    // OPTIONAL VALIDATION
     // ==================================================
-    const data = await service.update(id, req.body, req.user);
+    if (
+      req.body.assignedTo &&
+      !mongoose.Types.ObjectId.isValid(req.body.assignedTo)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid assigned employee id",
+      });
+    }
 
+    // ==================================================
+    // BUILD UPDATE PAYLOAD
+    // ==================================================
+    const payload = {
+      ...req.body,
+
+      updatedBy: req.user.id,
+
+      updatedAt: new Date(),
+    };
+
+    // ==================================================
+    // UPDATE CONTACT
+    // ==================================================
+    const data = await service.update(
+      id,
+      payload,
+      req.user
+    );
+
+    // ==================================================
+    // NOT FOUND
+    // ==================================================
     if (!data) {
       return res.status(404).json({
         success: false,
@@ -217,6 +253,9 @@ exports.update = async (req, res) => {
       });
     }
 
+    // ==================================================
+    // SUCCESS
+    // ==================================================
     return res.status(200).json({
       success: true,
       message: "Contact updated successfully 🚀",
@@ -227,7 +266,9 @@ exports.update = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: err.message || "Failed to update contact",
+      message:
+        err.message ||
+        "Failed to update contact",
     });
   }
 };
