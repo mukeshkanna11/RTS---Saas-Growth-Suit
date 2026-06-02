@@ -1,8 +1,8 @@
 const { z } = require("zod");
 
-// --------------------------------------
-// 🔥 COMMON FIELDS
-// --------------------------------------
+/* =========================================
+   COMMON FIELDS
+========================================= */
 
 const email = z
   .string()
@@ -13,8 +13,14 @@ const password = z
   .string()
   .min(6, "Password must be at least 6 characters")
   .max(50, "Password too long")
-  .regex(/[A-Z]/, "Must include at least one uppercase letter")
-  .regex(/[0-9]/, "Must include at least one number");
+  .regex(
+    /[A-Z]/,
+    "Must include at least one uppercase letter"
+  )
+  .regex(
+    /[0-9]/,
+    "Must include at least one number"
+  );
 
 const name = z
   .string()
@@ -28,60 +34,81 @@ const companyName = z
   .max(100, "Company name too long")
   .trim();
 
-const role = z.enum(["admin", "manager", "employee"]);
+/* =========================================
+   ROLE ENUM
+========================================= */
+const role = z.enum([
+  "admin",
+  "manager",
+  "employee",
+  "client",
+]);
 
+/* =========================================
+   REGISTER
+   First Tenant Admin Creation
+========================================= */
+exports.signupSchema = z
+  .object({
+    name,
+    email,
+    password,
+    companyName,
+  })
+  .strict();
 
-// --------------------------------------
-// 📝 REGISTER (FIRST USER → ADMIN)
-// --------------------------------------
+/* =========================================
+   LOGIN
+========================================= */
+exports.loginSchema = z
+  .object({
+    email,
+    password,
+  })
+  .strict();
 
-exports.signupSchema = z.object({
-  name,
-  email,
-  password,
-  companyName, // ✅ instead of tenantId
-})
-.strict();
+/* =========================================
+   CREATE USER
+   ADMIN ONLY
+========================================= */
+exports.createUserSchema = z
+  .object({
+    name,
+    email,
+    password,
+    role,
 
+    // optional manager assignment
+    managerId: z.string().optional(),
+  })
+  .strict()
+  .refine((data) => data.role !== "admin", {
+    message: "Cannot create admin user",
+    path: ["role"],
+  });
 
-// --------------------------------------
-// 🔐 LOGIN
-// --------------------------------------
+/* =========================================
+   UPDATE USER
+========================================= */
+exports.updateUserSchema = z
+  .object({
+    name: name.optional(),
 
-exports.loginSchema = z.object({
-  email,
-  password,
-}).strict();
+    email: email.optional(),
 
+    role: role.optional(),
 
-// --------------------------------------
-// 👤 CREATE USER (ADMIN ONLY)
-// --------------------------------------
+    password: password.optional(),
 
-exports.createUserSchema = z.object({
-  name,
-  email,
-  password,
-  role,
-})
-.strict()
-.refine((data) => data.role !== "admin", {
-  message: "Cannot create admin user",
-  path: ["role"],
-});
+    isActive: z.boolean().optional(),
 
-
-// --------------------------------------
-// 🔄 UPDATE USER
-// --------------------------------------
-
-exports.updateUserSchema = z.object({
-  name: name.optional(),
-  email: email.optional(),
-  role: role.optional(),
-  isActive: z.boolean().optional(),
-})
-.strict()
-.refine((data) => Object.keys(data).length > 0, {
-  message: "At least one field must be provided",
-});
+    managerId: z.string().nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (data) => Object.keys(data).length > 0,
+    {
+      message:
+        "At least one field must be provided",
+    }
+  );

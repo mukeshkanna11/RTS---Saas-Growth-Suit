@@ -1,8 +1,3 @@
-// =======================================================
-// src/App.jsx
-// FAST + PRODUCTION SAAS ROUTER (NO LOADER BLOCK)
-// =======================================================
-
 import {
   BrowserRouter,
   Routes,
@@ -12,8 +7,6 @@ import {
 
 import { useEffect } from "react";
 import { useAuthStore } from "./store/authStore";
-
-/* ================= PAGES ================= */
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -27,12 +20,10 @@ import Analytics from "./pages/Analytics";
 import Subscription from "./pages/Subscription";
 import Users from "./pages/Users";
 
-/* ================= LAYOUT ================= */
+import ClientDashboard from "./pages/ClientDashboard";
 
 import MainLayout from "./layouts/MainLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
-
-/* ================= ROLE REDIRECT ================= */
 
 function RoleRedirect() {
   const user = useAuthStore((s) => s.user);
@@ -48,33 +39,34 @@ function RoleRedirect() {
     admin: "/admin",
     manager: "/manager",
     employee: "/employee",
+    client: "/client",
   };
 
-  return <Navigate to={roleMap[role] || "/login"} replace />;
+  return (
+    <Navigate
+      to={roleMap[role] || "/login"}
+      replace
+    />
+  );
 }
-
-/* ================= MAIN APP ================= */
 
 export default function App() {
   const init = useAuthStore((s) => s.init);
 
-  // ⚡ BACKGROUND INIT (NO UI BLOCK)
   useEffect(() => {
-    init(); // runs silently
+    init();
   }, [init]);
 
   return (
     <BrowserRouter>
       <Routes>
 
-        {/* ================= PUBLIC ================= */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* ================= ROOT ================= */}
         <Route path="/" element={<RoleRedirect />} />
 
-        {/* ================= ADMIN ================= */}
+        {/* ADMIN */}
         <Route
           path="/admin"
           element={
@@ -90,10 +82,13 @@ export default function App() {
           <Route path="automation" element={<Automation />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="users" element={<Users />} />
-          <Route path="subscription" element={<Subscription />} />
+          <Route
+            path="subscription"
+            element={<Subscription />}
+          />
         </Route>
 
-        {/* ================= MANAGER ================= */}
+        {/* MANAGER */}
         <Route
           path="/manager"
           element={
@@ -110,7 +105,7 @@ export default function App() {
           <Route path="analytics" element={<Analytics />} />
         </Route>
 
-        {/* ================= EMPLOYEE ================= */}
+        {/* EMPLOYEE */}
         <Route
           path="/employee"
           element={
@@ -124,8 +119,33 @@ export default function App() {
           <Route path="crm" element={<CRM />} />
         </Route>
 
-        {/* ================= 404 ================= */}
-        <Route path="*" element={<div>404 Not Found</div>} />
+        {/* CLIENT */}
+        <Route
+          path="/client"
+          element={
+            <ProtectedRoute allowedRoles={["client"]}>
+              <MainLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route
+            index
+            element={<ClientDashboard />}
+          />
+          <Route
+            path="campaigns"
+            element={<Campaigns />}
+          />
+          <Route
+            path="analytics"
+            element={<Analytics />}
+          />
+        </Route>
+
+        <Route
+          path="*"
+          element={<div>404 Not Found</div>}
+        />
 
       </Routes>
     </BrowserRouter>
