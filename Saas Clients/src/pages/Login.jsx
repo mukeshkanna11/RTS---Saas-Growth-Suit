@@ -159,20 +159,25 @@ export default function Login() {
         token: accessToken,
       });
 
-      let roleRoute =
-        "/employee";
+     let roleRoute = "/employee";
 
-      if (
-        user.role === "admin"
-      ) {
-        roleRoute = "/admin";
-      }
+switch (user.role) {
+  case "admin":
+    roleRoute = "/admin";
+    break;
 
-      if (
-        user.role === "manager"
-      ) {
-        roleRoute = "/manager";
-      }
+  case "manager":
+    roleRoute = "/manager";
+    break;
+
+  case "client":
+    roleRoute = "/client";
+    break;
+
+  case "employee":
+  default:
+    roleRoute = "/employee";
+}
 
       setTimeout(() => {
         navigate(roleRoute, {

@@ -1,7 +1,7 @@
 const userService = require("./user.service");
 
 /* =========================================
-   👥 GET USERS (ADMIN / MANAGER / EMPLOYEE)
+   👥 GET USERS
 ========================================= */
 exports.getUsersController = async (req, res) => {
   try {
@@ -18,7 +18,7 @@ exports.getUsersController = async (req, res) => {
       req.query
     );
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       data: result.data,
       pagination: result.pagination,
@@ -28,13 +28,13 @@ exports.getUsersController = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: err.message,
+      message: err.message || "Failed to fetch users",
     });
   }
 };
 
 /* =========================================
-   👤 GET SINGLE USER (BY ID)
+   👤 GET SINGLE USER
 ========================================= */
 exports.getUserById = async (req, res) => {
   try {
@@ -44,12 +44,12 @@ exports.getUserById = async (req, res) => {
       req.user
     );
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       data: user,
     });
   } catch (err) {
-    return res.status(404).json({
+    return res.status(403).json({
       success: false,
       message: err.message,
     });
@@ -57,7 +57,7 @@ exports.getUserById = async (req, res) => {
 };
 
 /* =========================================
-   👤 PROFILE (SELF)
+   👤 GET PROFILE (SELF)
 ========================================= */
 exports.getProfile = async (req, res) => {
   try {
@@ -67,7 +67,7 @@ exports.getProfile = async (req, res) => {
       req.user
     );
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       data: user,
     });
@@ -80,7 +80,8 @@ exports.getProfile = async (req, res) => {
 };
 
 /* =========================================
-   ➕ CREATE USER (ADMIN ONLY)
+   ➕ CREATE USER
+   ADMIN → manager / employee / client
 ========================================= */
 exports.createUser = async (req, res) => {
   try {
@@ -92,7 +93,7 @@ exports.createUser = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "User created successfully",
+      message: `${user.role} created successfully`,
       data: user,
     });
   } catch (err) {
@@ -104,7 +105,7 @@ exports.createUser = async (req, res) => {
 };
 
 /* =========================================
-   ✏️ UPDATE USER / ROLE
+   ✏️ UPDATE USER
 ========================================= */
 exports.updateUser = async (req, res) => {
   try {
@@ -115,7 +116,7 @@ exports.updateUser = async (req, res) => {
       req.user
     );
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       message: "User updated successfully",
       data: user,
@@ -129,18 +130,29 @@ exports.updateUser = async (req, res) => {
 };
 
 /* =========================================
-   🧨 UPDATE ROLE (STRICT ADMIN ONLY)
+   🧨 UPDATE USER ROLE
+   STRICT ADMIN ONLY
 ========================================= */
 exports.updateUserRole = async (req, res) => {
   try {
+    // 🔥 only admin can update role
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only admin can update roles",
+      });
+    }
+
     const user = await userService.updateUser(
       req.params.id,
       req.user.tenantId,
-      { role: req.body.role },
+      {
+        role: req.body.role,
+      },
       req.user
     );
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       message: "Role updated successfully",
       data: user,
@@ -154,7 +166,7 @@ exports.updateUserRole = async (req, res) => {
 };
 
 /* =========================================
-   ❌ DELETE USER (SOFT DELETE)
+   ❌ DELETE USER
 ========================================= */
 exports.deleteUser = async (req, res) => {
   try {
@@ -164,7 +176,7 @@ exports.deleteUser = async (req, res) => {
       req.user
     );
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       message: result.message,
     });

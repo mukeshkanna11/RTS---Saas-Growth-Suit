@@ -1,17 +1,30 @@
 const express = require("express");
+
 const router = express.Router();
 
-const { protect, authorize } = require("../../middleware/auth.middleware");
+const {
+  protect,
+  authorize,
+} = require("../../middleware/auth.middleware");
+
 const userController = require("./user.controller");
 
 /* =========================================
-   🏢 USER MANAGEMENT ROUTES (SAAS RBAC)
+   👤 PROFILE ROUTE
+   ALL LOGGED USERS
 ========================================= */
+router.get(
+  "/profile",
+  protect,
+  userController.getProfile
+);
 
+/* =========================================
+   👥 GET USERS
+========================================= */
 /**
- * 👥 GET USERS
- * Admin → all users
- * Manager → team users
+ * 👑 Admin → all users
+ * 👨‍💼 Manager → team users
  */
 router.get(
   "/",
@@ -20,18 +33,36 @@ router.get(
   userController.getUsersController
 );
 
+/* =========================================
+   👤 GET SINGLE USER
+========================================= */
 /**
- * 👤 GET SINGLE USER
+ * 👑 Admin → any user
+ * 👨‍💼 Manager → team users
+ * 👨‍💻 Employee → self
+ * 👤 Client → self
  */
 router.get(
   "/:id",
   protect,
-  authorize("admin", "manager", "employee"),
+  authorize(
+    "admin",
+    "manager",
+    "employee",
+    "client"
+  ),
   userController.getUserById
 );
 
+/* =========================================
+   ➕ CREATE USER
+========================================= */
 /**
- * ➕ CREATE USER (ADMIN ONLY)
+ * 👑 Admin Only
+ * Can create:
+ * - manager
+ * - employee
+ * - client
  */
 router.post(
   "/",
@@ -40,18 +71,32 @@ router.post(
   userController.createUser
 );
 
+/* =========================================
+   ✏️ UPDATE USER
+========================================= */
 /**
- * ✏️ UPDATE USER (ADMIN + MANAGER)
+ * 👑 Admin → any user
+ * 👨‍💼 Manager → team employees
+ * 👨‍💻 Employee → self
+ * 👤 Client → self
  */
 router.put(
   "/:id",
   protect,
-  authorize("admin", "manager"),
+  authorize(
+    "admin",
+    "manager",
+    "employee",
+    "client"
+  ),
   userController.updateUser
 );
 
+/* =========================================
+   🧨 UPDATE ROLE
+========================================= */
 /**
- * 🧨 UPDATE ROLE (ADMIN ONLY)
+ * 👑 Admin Only
  */
 router.put(
   "/:id/role",
@@ -60,23 +105,17 @@ router.put(
   userController.updateUserRole
 );
 
+/* =========================================
+   ❌ DELETE USER
+========================================= */
 /**
- * ❌ DELETE USER (ADMIN ONLY)
+ * 👑 Admin Only
  */
 router.delete(
   "/:id",
   protect,
   authorize("admin"),
   userController.deleteUser
-);
-
-/* =========================================
-   👤 PROFILE ROUTE
-========================================= */
-router.get(
-  "/profile",
-  protect,
-  userController.getProfile
 );
 
 module.exports = router;
