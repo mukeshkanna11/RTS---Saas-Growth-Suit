@@ -1,83 +1,192 @@
-const ClientAlert = require("./client-alert.model");
+const alertService = require(
+  "./alert.service"
+);
 
-// CREATE ALERT
-exports.createAlert = async (req, res) => {
+/* ==========================================
+   CREATE ALERT
+========================================== */
+
+exports.createAlert = async (
+  req,
+  res
+) => {
   try {
-    const alert = await ClientAlert.create({
-      ...req.body,
-      tenantId: req.user.tenantId,
-      createdBy: req.user.id,
-    });
+    const alert =
+      await alertService.createAlert({
+        ...req.body,
+        tenantId:
+          req.user.tenantId,
+        createdBy:
+          req.user.id,
+      });
 
     return res.status(201).json({
       success: true,
-      message: "Alert created successfully",
+      message:
+        "Alert created successfully",
       data: alert,
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message:
+        error.message,
     });
   }
 };
 
+/* ==========================================
+   GET ALERTS
+========================================== */
 
-
-// GET ALERTS
-exports.getAlerts = async (req, res) => {
+exports.getAlerts = async (
+  req,
+  res
+) => {
   try {
-    const alerts = await ClientAlert.find({
-      tenantId: req.user.tenantId,
-    }).sort({ createdAt: -1 });
+    const result =
+      await alertService.getAlerts(
+        req.user.tenantId,
+        req.query
+      );
 
     return res.status(200).json({
       success: true,
-      count: alerts.length,
-      data: alerts,
+      ...result,
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message:
+        error.message,
     });
   }
 };
 
-// MARK READ
-exports.markAsRead = async (req, res) => {
-  try {
-    const alert = await ClientAlert.findByIdAndUpdate(
-      req.params.id,
-      { isRead: true },
-      { new: true }
-    );
+/* ==========================================
+   UNREAD COUNT
+========================================== */
 
-    return res.status(200).json({
-      success: true,
-      data: alert,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+exports.getUnreadCount =
+  async (req, res) => {
+    try {
+      const count =
+        await alertService.getUnreadCount(
+          req.user.tenantId
+        );
 
-// DELETE
-exports.deleteAlert = async (req, res) => {
-  try {
-    await ClientAlert.findByIdAndDelete(req.params.id);
+      return res.status(200).json({
+        success: true,
+        unreadCount:
+          count,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message,
+      });
+    }
+  };
 
-    return res.status(200).json({
-      success: true,
-      message: "Alert deleted successfully",
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+/* ==========================================
+   MARK AS READ
+========================================== */
+
+exports.markAsRead =
+  async (req, res) => {
+    try {
+      const alert =
+        await alertService.markAsRead(
+          req.user.tenantId,
+          req.params.id
+        );
+
+      return res.status(200).json({
+        success: true,
+        data: alert,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message,
+      });
+    }
+  };
+
+/* ==========================================
+   MARK ALL READ
+========================================== */
+
+exports.markAllRead =
+  async (req, res) => {
+    try {
+      await alertService.markAllRead(
+        req.user.tenantId
+      );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "All alerts marked as read",
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message,
+      });
+    }
+  };
+
+/* ==========================================
+   GENERATE SYSTEM ALERTS
+========================================== */
+
+exports.generateAlerts =
+  async (req, res) => {
+    try {
+      await alertService.generateSystemAlerts(
+        req.user.tenantId
+      );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "System alerts generated",
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message,
+      });
+    }
+  };
+
+/* ==========================================
+   DELETE ALERT
+========================================== */
+
+exports.deleteAlert =
+  async (req, res) => {
+    try {
+      await alertService.deleteAlert(
+        req.user.tenantId,
+        req.params.id
+      );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Alert deleted successfully",
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message,
+      });
+    }
+  };

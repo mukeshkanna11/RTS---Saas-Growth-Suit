@@ -155,9 +155,12 @@ export default function Login() {
       }
 
       setAuth({
-        user,
-        token: accessToken,
-      });
+  user,
+  token: accessToken,
+});
+
+localStorage.setItem("token", accessToken);
+localStorage.setItem("user", JSON.stringify(user));
 
      let roleRoute = "/employee";
 
