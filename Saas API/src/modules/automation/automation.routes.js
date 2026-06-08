@@ -1,4 +1,7 @@
 const express = require("express");
+
+const router = express.Router();
+
 const {
   createAutomation,
   getAutomations,
@@ -9,19 +12,74 @@ const {
   testAutomation,
 } = require("./automation.controller");
 
-const { protect } = require("../../middleware/auth.middleware");
+const {
+  protect,
+  authorize,
+} = require("../../middleware/auth.middleware");
 
-const router = express.Router();
+/* =========================================
+   CRUD
+========================================= */
 
-// CRUD
-router.post("/", protect, createAutomation);
-router.get("/", protect, getAutomations);
-router.get("/:id", protect, getAutomationById);
-router.put("/:id", protect, updateAutomation);
-router.delete("/:id", protect, deleteAutomation);
+router.post(
+  "/",
+  protect,
+  authorize("admin", "manager"),
+  createAutomation
+);
 
-// SaaS Features
-router.patch("/:id/toggle", protect, toggleAutomation);
-router.post("/test", protect, testAutomation);
+router.get(
+  "/",
+  protect,
+  authorize(
+    "admin",
+    "manager",
+    "client"
+  ),
+  getAutomations
+);
+
+router.get(
+  "/:id",
+  protect,
+  authorize(
+    "admin",
+    "manager",
+    "client"
+  ),
+  getAutomationById
+);
+
+router.put(
+  "/:id",
+  protect,
+  authorize("admin", "manager"),
+  updateAutomation
+);
+
+router.delete(
+  "/:id",
+  protect,
+  authorize("admin", "manager"),
+  deleteAutomation
+);
+
+/* =========================================
+   SaaS Actions
+========================================= */
+
+router.patch(
+  "/:id/toggle",
+  protect,
+  authorize("admin", "manager"),
+  toggleAutomation
+);
+
+router.post(
+  "/test",
+  protect,
+  authorize("admin", "manager"),
+  testAutomation
+);
 
 module.exports = router;
