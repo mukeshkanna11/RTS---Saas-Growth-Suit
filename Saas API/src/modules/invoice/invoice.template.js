@@ -56,7 +56,8 @@ class InvoiceTemplate {
     });
   }
 
- toHTML(inv) {
+toHTML(inv) {
+
   const statusColor =
     inv.paymentStatus === "PAID"
       ? "#16a34a"
@@ -64,66 +65,58 @@ class InvoiceTemplate {
       ? "#f59e0b"
       : "#ef4444";
 
-  const watermark = inv.paymentStatus || "INVOICE";
+  const invoiceId = inv.invoiceId || "N/A";
+  const orderDate = inv.orderDate
+    ? new Date(inv.orderDate).toLocaleDateString("en-IN")
+    : "-";
+
+  const dueDate = inv.dueDate
+    ? new Date(inv.dueDate).toLocaleDateString("en-IN")
+    : "-";
+
+  const items = Array.isArray(inv.items) ? inv.items : [];
+  const totals = inv.totals || {};
 
   return `
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<title>${inv.invoice.invoiceId}</title>
+<title>${invoiceId}</title>
 
 <style>
 
+@page {
+  size: A4;
+  margin: 15mm;
+}
+
 body{
   font-family: Arial, sans-serif;
-  background:#eef2ff;
-  padding:30px;
+  background:#f6f7fb;
+  margin:0;
+  padding:0;
+  color:#0f172a;
 }
 
-/* WATERMARK */
-.watermark{
-  position:fixed;
-  top:50%;
-  left:50%;
-  transform:translate(-50%,-50%) rotate(-30deg);
-  font-size:120px;
-  font-weight:900;
-  color:rgba(99,102,241,0.07);
-  z-index:0;
-}
-
-/* CONTAINER */
+/* MAIN CARD */
 .invoice{
   background:#fff;
-  padding:25px;
-  border-radius:16px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.08);
-  position:relative;
-  z-index:2;
+  padding:24px;
+  border-radius:12px;
+  border:1px solid #e5e7eb;
 }
 
 /* HEADER */
 .header{
   width:100%;
   border-collapse:collapse;
-  background:#0f172a;
-  color:white;
-  border-radius:12px;
-  overflow:hidden;
-}
-
-/* LOGO */
-.logo{
-  width:90px;
-  height:90px;
-  background:white;
+  background:#f8fafc;
   border-radius:10px;
-  padding:6px;
-  object-fit:contain;
+  overflow:hidden;
+  border:1px solid #e5e7eb;
 }
 
-/* COMPANY */
 .company h2{
   margin:0;
   font-size:18px;
@@ -131,13 +124,13 @@ body{
 
 .small{
   font-size:12px;
-  opacity:0.85;
+  color:#64748b;
 }
 
-/* STATUS */
+/* STATUS BADGE */
 .status{
   display:inline-block;
-  padding:6px 14px;
+  padding:5px 12px;
   border-radius:999px;
   background:${statusColor};
   color:white;
@@ -147,7 +140,7 @@ body{
 
 /* SECTION */
 .section{
-  margin-top:18px;
+  margin-top:14px;
   padding:14px;
   border:1px solid #e5e7eb;
   border-radius:10px;
@@ -162,46 +155,49 @@ table{
 }
 
 th{
-  background:#4f46e5;
-  color:white;
+  background:#eef2ff;
   padding:10px;
-  font-size:13px;
+  font-size:12px;
+  text-align:left;
+  color:#1e293b;
 }
 
 td{
   padding:10px;
-  border-bottom:1px solid #eee;
-  font-size:13px;
+  font-size:12px;
+  border-bottom:1px solid #f1f5f9;
+  color:#334155;
 }
 
-/* SUMMARY */
+/* SUMMARY BOX */
 .summary{
-  width:350px;
+  width:320px;
   margin-left:auto;
-  margin-top:20px;
+  margin-top:18px;
+  padding:12px;
   border:1px solid #e5e7eb;
   border-radius:10px;
-  padding:10px;
-  background:#f9fafb;
+  background:#f8fafc;
 }
 
 .total{
   font-weight:700;
   color:#4f46e5;
-  font-size:16px;
-}
-
-/* BANK */
-.bank{
-  background:#f1f5f9;
+  font-size:14px;
 }
 
 /* FOOTER */
 .footer{
   text-align:center;
-  margin-top:30px;
+  margin-top:20px;
   font-size:11px;
   color:#64748b;
+}
+
+/* PDF SAFE */
+*{
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 </style>
@@ -209,108 +205,84 @@ td{
 
 <body>
 
-<div class="watermark">${watermark}</div>
-
 <div class="invoice">
 
-<!-- HEADER -->
-<table class="header">
-<tr>
+  <!-- HEADER -->
+  <table class="header">
+    <tr>
 
-  <!-- LOGO -->
-  <td style="width:120px; padding:15px;">
-    ${
-      inv.company.logo
-        ? `<img class="logo" src="${inv.company.logo}" />`
-        : `<div style="color:black;">LOGO</div>`
-    }
-  </td>
+      <td style="padding:14px;">
+        <div class="company">
+          <h2>${inv.company?.name || "-"}</h2>
+          <div class="small">${inv.company?.address || ""}</div>
+          <div class="small">${inv.company?.email || ""} | ${inv.company?.phone || ""}</div>
+        </div>
+      </td>
 
-  <!-- COMPANY -->
-  <td>
-    <h2>${inv.company.name}</h2>
-    <div class="small">${inv.company.address}</div>
-    <div class="small">${inv.company.email}</div>
-    <div class="small">${inv.company.phone}</div>
-  </td>
+      <td style="text-align:right; padding:14px;">
+        <div style="font-weight:700;">TAX INVOICE</div>
 
-  <!-- INVOICE INFO -->
-  <td style="text-align:right; padding:15px;">
-    <h3>TAX INVOICE</h3>
+        <div class="small">Invoice: ${invoiceId}</div>
+        <div class="small">Order: ${orderDate}</div>
+        <div class="small">Due: ${dueDate}</div>
 
-    <div class="small">Invoice: ${inv.invoice.invoiceId}</div>
-    <div class="small">Order: ${new Date(inv.invoice.orderDate).toLocaleDateString("en-IN")}</div>
-    <div class="small">Purchase: ${new Date(inv.invoice.purchaseDate).toLocaleDateString("en-IN")}</div>
-    <div class="small">Due: ${new Date(inv.invoice.dueDate).toLocaleDateString("en-IN")}</div>
+        <div class="status">${inv.paymentStatus || "-"}</div>
+      </td>
 
-    <div class="status">${inv.paymentStatus}</div>
-  </td>
+    </tr>
+  </table>
 
-</tr>
-</table>
+  <!-- CUSTOMER -->
+  <div class="section">
+    <h3 style="margin:0 0 6px 0;">Bill To</h3>
+    <b>${inv.customer?.name || "-"}</b><br>
+    <div class="small">${inv.customer?.email || ""}</div>
+    <div class="small">${inv.customer?.phone || ""}</div>
+    <div class="small">${inv.customer?.address || ""}</div>
+    <div class="small">GSTIN: ${inv.customer?.gstin || "-"}</div>
+  </div>
 
-<!-- CUSTOMER -->
-<div class="section">
-<h3>Bill To</h3>
-<b>${inv.customer.name}</b><br>
-${inv.customer.email}<br>
-${inv.customer.phone}<br>
-${inv.customer.address}<br>
-GSTIN: ${inv.customer.gstin || "-"}
-</div>
+  <!-- ITEMS -->
+  <div class="section">
+    <table>
+      <tr>
+        <th>#</th>
+        <th>Item</th>
+        <th>HSN</th>
+        <th>Qty</th>
+        <th>Price</th>
+        <th>Total</th>
+      </tr>
 
-<!-- ITEMS -->
-<div class="section">
-<table>
-<tr>
-<th>#</th><th>Item</th><th>HSN</th><th>Qty</th><th>Price</th><th>Total</th>
-</tr>
+      ${items.map((i, idx) => `
+        <tr>
+          <td>${idx + 1}</td>
+          <td>${i.name || "-"}</td>
+          <td>${i.hsn || "998314"}</td>
+          <td>${i.qty || 0}</td>
+          <td>₹${i.price || 0}</td>
+          <td>₹${(i.qty || 0) * (i.price || 0)}</td>
+        </tr>
+      `).join("")}
 
-${inv.items.map((i, idx)=>`
-<tr>
-<td>${idx+1}</td>
-<td>${i.name}</td>
-<td>${i.hsn || "998314"}</td>
-<td>${i.qty}</td>
-<td>₹${i.price}</td>
-<td>₹${i.qty * i.price}</td>
-</tr>
-`).join("")}
+    </table>
+  </div>
 
-</table>
-</div>
+  <!-- SUMMARY -->
+  <div class="summary">
+    <table>
+      <tr><td>Subtotal</td><td>₹${totals.subtotal || 0}</td></tr>
+      <tr><td>Discount</td><td>₹${totals.discountAmount || 0}</td></tr>
+      <tr><td>CGST</td><td>₹${totals.cgst || 0}</td></tr>
+      <tr><td>SGST</td><td>₹${totals.sgst || 0}</td></tr>
+      <tr class="total"><td>Total</td><td>₹${totals.total || 0}</td></tr>
+    </table>
+  </div>
 
-<!-- SUMMARY -->
-<div class="summary">
-<table>
-<tr><td>Subtotal</td><td>₹${inv.totals.subtotal}</td></tr>
-<tr><td>Discount</td><td>₹${inv.totals.discountAmount}</td></tr>
-<tr><td>CGST</td><td>₹${inv.totals.cgst}</td></tr>
-<tr><td>SGST</td><td>₹${inv.totals.sgst}</td></tr>
-<tr><td>IGST</td><td>₹${inv.totals.igst}</td></tr>
-<tr class="total"><td>Total</td><td>₹${inv.totals.total}</td></tr>
-</table>
-</div>
-
-<!-- BANK -->
-<div class="section bank">
-<h3>Bank Details</h3>
-Account: ${inv.bank.accountName}<br>
-Bank: ${inv.bank.bankName}<br>
-A/C: ${inv.bank.accountNumber}<br>
-IFSC: ${inv.bank.ifsc}
-</div>
-
-<!-- NOTES -->
-<div class="section">
-<h3>Notes</h3>
-${inv.notes}
-</div>
-
-<!-- FOOTER -->
-<div class="footer">
-Generated by SaaS Billing Engine • ReadyTechSolutions
-</div>
+  <!-- FOOTER -->
+  <div class="footer">
+    Generated by ReadyTechSolutions • SaaS Billing Engine
+  </div>
 
 </div>
 

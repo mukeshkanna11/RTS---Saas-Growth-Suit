@@ -48,50 +48,36 @@ exports.downloadInvoice = async (req, res) => {
 };
 
 
-// =========================
-// GENERATE INVOICE CONTROLLER
-// =========================
 exports.generateInvoice = async (req, res) => {
   try {
     const invoiceData = req.body;
 
-    // =========================
-    // VALIDATION
-    // =========================
     const error = validateInvoiceRequest(invoiceData);
     if (error) {
       return fail(res, error, 400);
     }
 
-    // =========================
-    // SAFE INVOICE ID (fallback only)
-    // =========================
     invoiceData.invoiceId =
       invoiceData.invoiceId ||
       `INV-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    // =========================
-    // CALL SERVICE
-    // =========================
     const result = await InvoiceService.generateInvoice(invoiceData);
 
-    // =========================
-    // SERVICE FAILURE HANDLING
-    // =========================
-    if (!result?.success) {
-      return fail(res, result?.message || "Invoice generation failed", 500);
-    }
-
-    // =========================
-    // SUCCESS RESPONSE (CLEAN)
-    // =========================
-    return success(res, "Invoice generated successfully", result);
-  } catch (err) {
-    console.error("INVOICE CONTROLLER ERROR:", err);
-
-    return fail(
-      res,
-      err.message || "Internal server error while generating invoice"
+    // SEND PDF DIRECTLY (BEST PRACTICE)
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=${invoiceData.invoiceId}.pdf`
     );
+
+    return res.send(result.pdf);
+
+  } catch (err) {
+    console.error("🔥 CONTROLLER ERROR:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };

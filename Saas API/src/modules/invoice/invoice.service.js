@@ -3,6 +3,8 @@ const path = require("path");
 const InvoiceTemplate = require("./invoice.template");
 const PDFGenerator = require("./pdf.generator");
 const Invoice = require("./invoice.model");
+
+
 // ======================================================
 // HELPERS
 // ======================================================
@@ -109,58 +111,54 @@ const calculateTotals = (
 
 
 // ======================================================
-// GENERATE INVOICE (PRODUCTION SAFE)
+// GENERATE INVOICE (PRODUCTION SAFE FIXED)
 // ======================================================
+
 
 const generateInvoice = async (invoiceData = {}) => {
   try {
     // =========================
     // VALIDATION
     // =========================
-    if (!invoiceData.company) {
-      return {
-        success: false,
-        message: "Company details required",
-      };
+    if (!invoiceData?.company) {
+      throw new Error("Company details required");
     }
 
-    if (!invoiceData.customer) {
-      return {
-        success: false,
-        message: "Customer details required",
-      };
+    if (!invoiceData?.customer) {
+      throw new Error("Customer details required");
+    }
+
+    if (!Array.isArray(invoiceData.items)) {
+      invoiceData.items = [];
     }
 
     // =========================
-    // SAFE INVOICE ID GENERATION
+    // INVOICE ID
     // =========================
     const invoiceId =
       invoiceData.invoiceId ||
       `INV-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     // =========================
-    // CHECK DUPLICATE (SAFE)
+    // DUPLICATE CHECK
     // =========================
     const existing = await Invoice.findOne({ invoiceId });
 
     if (existing) {
-      return {
-        success: false,
-        message: "Invoice ID already exists. Try again.",
-      };
+      throw new Error("Invoice ID already exists. Try again.");
     }
 
     // =========================
     // CALCULATIONS
     // =========================
     const totals = calculateTotals(
-      invoiceData.items || [],
+      invoiceData.items,
       invoiceData.discount,
       invoiceData.tax
     );
 
     // =========================
-    // BUILD DATA FOR TEMPLATE
+    // BUILD TEMPLATE DATA
     // =========================
     const data = {
       ...invoiceData,
@@ -169,40 +167,58 @@ const generateInvoice = async (invoiceData = {}) => {
       createdAt: new Date(),
     };
 
-    // =========================
-    // HTML GENERATION
-    // =========================
-    const html = InvoiceTemplate.build(data);
+    const logoPath = path.join(process.cwd(), "public", "logo.png");
+
+let logoBase64 = "";
+
+if (fs.existsSync(logoPath)) {
+  const file = fs.readFileSync(logoPath);
+  logoBase64 = file.toString("base64");
+}
 
     // =========================
-    // ENSURE DIRECTORY EXISTS
+    // GENERATE HTML
     // =========================
-    const fs = require("fs");
-    const path = require("path");
+    const html = InvoiceTemplate.toHTML(data, logoBase64);
 
+    if (!html) {
+      throw new Error("HTML generation failed from template");
+    }
+
+    console.log("HTML GENERATED LENGTH:", html.length);
+
+    // =========================
+    // CREATE UPLOAD DIR
+    // =========================
     const uploadDir = path.join(process.cwd(), "uploads", "invoices");
     fs.mkdirSync(uploadDir, { recursive: true });
 
     // =========================
-    // PDF GENERATION
+    // PDF GENERATION (IMPORTANT FIX AREA)
     // =========================
-    const fileResult = await PDFGenerator.generate(html, invoiceId);
+    let fileResult;
 
-    if (!fileResult || !fileResult.filePath) {
-      return {
-        success: false,
-        message: "PDF generation failed",
-      };
+    try {
+      fileResult = await PDFGenerator.generate(html, invoiceId);
+    } catch (pdfErr) {
+      console.error("🔥 PDF GENERATION REAL ERROR:");
+      console.error(pdfErr);
+
+      throw new Error(`PDF generation failed: ${pdfErr.message}`);
+    }
+
+    if (!fileResult?.filePath) {
+      throw new Error("PDF generation returned empty filePath");
     }
 
     // =========================
-    // SAVE IN DATABASE
+    // SAVE IN DB
     // =========================
     const savedInvoice = await Invoice.create({
       invoiceId,
       company: invoiceData.company,
       customer: invoiceData.customer,
-      items: invoiceData.items || [],
+      items: invoiceData.items,
       discount: invoiceData.discount || {},
       tax: invoiceData.tax || {},
       totals,
@@ -227,7 +243,7 @@ const generateInvoice = async (invoiceData = {}) => {
     });
 
     // =========================
-    // FINAL RESPONSE (CLEAN)
+    // FINAL RESPONSE
     // =========================
     return {
       success: true,
@@ -235,8 +251,10 @@ const generateInvoice = async (invoiceData = {}) => {
       invoice: savedInvoice,
       totals,
     };
+
   } catch (error) {
-    console.error("INVOICE ERROR:", error);
+    console.error("🔥 INVOICE SERVICE ERROR:");
+    console.error(error);
 
     return {
       success: false,
@@ -244,6 +262,9 @@ const generateInvoice = async (invoiceData = {}) => {
     };
   }
 };
+
+module.exports = { generateInvoice };
+
 
 // ======================================================
 // DOWNLOAD INVOICE (SAAS GRADE SAFE VERSION)
