@@ -39,6 +39,15 @@ const validateInvoiceRequest = (body) => {
   return null;
 };
 
+exports.downloadInvoice = async (req, res) => {
+  try {
+    const result = await InvoiceService.download(req.params.invoiceId, res);
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
 // =========================
 // GENERATE INVOICE CONTROLLER
 // =========================

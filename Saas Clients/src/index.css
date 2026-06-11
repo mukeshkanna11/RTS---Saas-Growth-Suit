@@ -24,3 +24,61 @@ body {
   background: #374151;
   border-radius: 10px;
 }
+
+.card {
+  background: #0f172a;
+  border: 1px solid #1f2937;
+  padding: 16px;
+  border-radius: 16px;
+}
+
+.section-title {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #020617;
+  border: 1px solid #1f2937;
+  color: #ffffff;
+  outline: none;
+  transition: 0.2s;
+}
+
+.input::placeholder {
+  color: #64748b;
+}
+
+.input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+}
+
+.tax-box {
+  padding: 12px;
+  border-radius: 12px;
+  background: #020617;
+  border: 1px solid #1f2937;
+}
+
+.tax-box p {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.tax-box span {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+}
+
+.tax-box.highlight {
+  background: rgba(99,102,241,0.15);
+  border-color: #6366f1;
+}
