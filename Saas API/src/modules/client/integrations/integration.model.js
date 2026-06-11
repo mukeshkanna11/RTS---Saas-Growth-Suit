@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const integrationSchema = new mongoose.Schema(
+const IntegrationSchema = new mongoose.Schema(
   {
     tenantId: {
       type: String,
@@ -10,31 +10,18 @@ const integrationSchema = new mongoose.Schema(
 
     provider: {
       type: String,
-      enum: [
-        "email",
-        "whatsapp",
-        "googleAds",
-        "metaAds",
-        "instagram",
-        "linkedin",
-      ],
+      enum: ["whatsapp", "email", "instagram"],
       required: true,
     },
 
     displayName: {
       type: String,
-      required: true,
+      default: "",
     },
 
-    isConnected: {
+    connected: {
       type: Boolean,
       default: false,
-    },
-
-    status: {
-      type: String,
-      enum: ["active", "inactive", "error"],
-      default: "inactive",
     },
 
     credentials: {
@@ -42,43 +29,39 @@ const integrationSchema = new mongoose.Schema(
       default: {},
     },
 
-    settings: {
-      autoSync: {
-        type: Boolean,
-        default: true,
-      },
-
-      syncInterval: {
-        type: Number,
-        default: 60,
-      },
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
     },
 
-    lastSyncedAt: Date,
-
-    connectedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+    status: {
+      type: String,
+      enum: ["healthy", "warning", "error"],
+      default: "healthy",
     },
 
-    isDeleted: {
-      type: Boolean,
-      default: false,
+    usageCount: {
+      type: Number,
+      default: 0,
     },
+
+    lastSync: Date,
+
+    connectedAt: Date,
+
+    disconnectedAt: Date,
   },
   {
     timestamps: true,
   }
 );
 
-integrationSchema.index({
+IntegrationSchema.index({
   tenantId: 1,
   provider: 1,
 });
 
-module.exports =
-  mongoose.models.Integration ||
-  mongoose.model(
-    "Integration",
-    integrationSchema
-  );
+module.exports = mongoose.model(
+  "Integration",
+  IntegrationSchema
+);

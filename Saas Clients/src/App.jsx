@@ -18,6 +18,7 @@ import Campaigns from "./pages/Campaigns";
 import Automation from "./pages/Automation";
 import Analytics from "./pages/Analytics";
 import Subscription from "./pages/Subscription";
+import Invoice from "./pages/Invoice";
 import Users from "./pages/Users";
 
 import ClientDashboard from "./pages/ClientDashboard";
@@ -66,27 +67,28 @@ export default function App() {
 
         <Route path="/" element={<RoleRedirect />} />
 
-        {/* ADMIN */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <MainLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Dashboard />} />
-          <Route path="leads" element={<Leads />} />
-          <Route path="crm" element={<CRM />} />
-          <Route path="campaigns" element={<Campaigns />} />
-          <Route path="automation" element={<Automation />} />
-          <Route path="analytics" element={<Analytics />} />
-          <Route path="users" element={<Users />} />
-          <Route
-            path="subscription"
-            element={<Subscription />}
-          />
-        </Route>
+       {/* ADMIN */}
+<Route
+  path="/admin"
+  element={
+    <ProtectedRoute allowedRoles={["admin"]}>
+      <MainLayout />
+    </ProtectedRoute>
+  }
+>
+  <Route index element={<Dashboard />} />
+  <Route path="leads" element={<Leads />} />
+  <Route path="crm" element={<CRM />} />
+  <Route path="campaigns" element={<Campaigns />} />
+  <Route path="automation" element={<Automation />} />
+  <Route path="analytics" element={<Analytics />} />
+  <Route path="users" element={<Users />} />
+  <Route path="subscription" element={<Subscription />} />
+
+  {/* NEW */}
+  <Route path="invoice" element={<Invoice />} />
+</Route>
+        
 
         {/* MANAGER */}
         <Route

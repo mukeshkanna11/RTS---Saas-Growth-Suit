@@ -18,6 +18,154 @@ const throwError = (msg, code = 400) => {
   throw new ServiceError(msg, code);
 };
 
+const safe = (v) => (isNaN(Number(v)) ? 0 : Number(v));
+
+invoiceData.discount = invoiceData.discount || { type: "percent", value: 0 };
+invoiceData.tax = invoiceData.tax || {
+  type: "intra",
+  cgst: 9,
+  sgst: 9,
+  igst: 0,
+};
+
+const items = invoiceData.items || [];
+
+const subtotal = items.reduce((sum, item) => {
+  return sum + safe(item.qty) * safe(item.price);
+}, 0);
+
+// DISCOUNT
+let discountAmount = 0;
+
+if (invoiceData.discount.type === "percent") {
+  discountAmount = (subtotal * safe(invoiceData.discount.value)) / 100;
+} else {
+  discountAmount = safe(invoiceData.discount.value);
+}
+
+const taxable = subtotal - discountAmount;
+
+// TAX
+const cgst = (taxable * safe(invoiceData.tax.cgst)) / 100;
+const sgst = (taxable * safe(invoiceData.tax.sgst)) / 100;
+const igst = (taxable * safe(invoiceData.tax.igst)) / 100;
+
+const total = taxable + cgst + sgst + igst;
+
+const generateInvoice = async ({ subscriptionId, tax = {}, discount = {} }) => {
+  if (!isValidId(subscriptionId)) {
+    throwError("Invalid subscription ID");
+  }
+
+  const subscription = await Subscription.findById(subscriptionId).populate("userId");
+
+  if (!subscription) {
+    throwError("Subscription not found", 404);
+  }
+
+  // ======================================================
+  // PAYMENT STATUS LOGIC
+  // ======================================================
+  const paymentStatus =
+    subscription.paymentStatus === "paid" ? "PAID" : "PENDING";
+
+  // ======================================================
+  // INVOICE DATA (SAAS MANUAL CONTROLLED)
+  // ======================================================
+  const invoiceData = {
+    invoiceId: "INV-" + Date.now(),
+
+    company: {
+      name: "ReadyTechSolutions Pvt Ltd",
+      address: "Coimbatore, Tamil Nadu, India",
+      gstin: "33ABCDE1234F1Z5",
+    },
+
+    customer: {
+      name: subscription.userId?.name || subscription.clientName,
+      email: subscription.userId?.email || subscription.clientEmail,
+      address: "India",
+    },
+
+    items: [
+      {
+        name: `${subscription.plan} Plan Subscription`,
+        qty: 1,
+        price: Number(subscription.amount || 0),
+      },
+    ],
+
+    orderDate: subscription.createdAt,
+    purchaseDate: new Date(),
+
+    discount: discount || { type: "percent", value: 0 },
+
+    tax: tax || {
+      type: "intra",
+      cgst: 9,
+      sgst: 9,
+      igst: 0,
+    },
+
+    paymentStatus,
+  };
+
+  // ======================================================
+  // GENERATE INVOICE PDF + TOTALS
+  // ======================================================
+  const invoice = await InvoiceService.generateInvoice(invoiceData, {
+    saveToDisk: true,
+  });
+
+  // ======================================================
+  // SAVE TO SUBSCRIPTION (IMPORTANT FOR DOWNLOAD)
+  // ======================================================
+  subscription.invoice = {
+    invoiceId: invoice.invoice.invoiceId,
+    fileName: invoice.invoice.fileName,
+    filePath: invoice.invoice.filePath,
+    generatedAt: new Date(),
+  };
+
+  await subscription.save();
+
+  return invoice;
+};
+
+const downloadInvoice = async ({ subscriptionId, res }) => {
+  if (!isValidId(subscriptionId)) {
+    throwError("Invalid subscription ID");
+  }
+
+  const subscription = await Subscription.findById(subscriptionId);
+
+  if (!subscription) {
+    throwError("Subscription not found", 404);
+  }
+
+  if (!subscription.invoice?.filePath) {
+    throwError("Invoice not generated yet", 404);
+  }
+
+  // ======================================================
+  // STREAM PDF FILE
+  // ======================================================
+  const fs = require("fs");
+
+  if (!fs.existsSync(subscription.invoice.filePath)) {
+    throwError("Invoice file missing on server", 404);
+  }
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename=${subscription.invoice.fileName}`
+  );
+
+  const fileStream = fs.createReadStream(subscription.invoice.filePath);
+  fileStream.pipe(res);
+};
+
 // ======================================================
 // CREATE SUBSCRIPTION INTENT
 // ======================================================
@@ -289,5 +437,7 @@ module.exports = {
   cancelSubscription,
   reactivateSubscription,
   getAnalytics,
+   generateInvoice,
+  downloadInvoice,
   ServiceError,
 };
