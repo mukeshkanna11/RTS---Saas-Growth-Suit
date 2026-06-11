@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const puppeteer = require("puppeteer");
+const pdf = require("html-pdf-node");
 
 const INVOICE_DIR = path.join(process.cwd(), "uploads", "invoices");
 
@@ -11,8 +11,6 @@ const ensureDirectory = async () => {
 };
 
 const generate = async (html, invoiceId) => {
-  let browser;
-
   try {
     if (!html) throw new Error("HTML required");
     if (!invoiceId) throw new Error("Invoice ID required");
@@ -21,28 +19,22 @@ const generate = async (html, invoiceId) => {
 
     const filePath = path.join(INVOICE_DIR, `${invoiceId}.pdf`);
 
-    browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
+    const file = { content: html };
 
-    const page = await browser.newPage();
-
-    await page.setContent(html, {
-      waitUntil: "networkidle0",
-    });
-
-    await page.pdf({
-      path: filePath,
+    const options = {
       format: "A4",
       printBackground: true,
       margin: {
         top: "20px",
-        right: "20px",
         bottom: "20px",
         left: "20px",
+        right: "20px",
       },
-    });
+    };
+
+    const pdfBuffer = await pdf.generatePdf(file, options);
+
+    await fs.promises.writeFile(filePath, pdfBuffer);
 
     const stats = await fs.promises.stat(filePath);
 
@@ -56,8 +48,6 @@ const generate = async (html, invoiceId) => {
   } catch (err) {
     console.error("PDF ERROR:", err);
     throw new Error(err.message || "PDF generation failed");
-  } finally {
-    if (browser) await browser.close();
   }
 };
 
