@@ -1,6 +1,5 @@
 const fs = require("fs");
 const path = require("path");
-
 const InvoiceTemplate = require("./invoice.template");
 const PDFGenerator = require("./pdf.generator");
 const Invoice = require("./invoice.model");
@@ -110,49 +109,59 @@ const calculateTotals = (
 
 
 // ======================================================
-// GENERATE INVOICE
+// GENERATE INVOICE (PRODUCTION SAFE)
 // ======================================================
 
-const generateInvoice = async (
-  invoiceData = {}
-) => {
+const generateInvoice = async (invoiceData = {}) => {
   try {
+    // =========================
+    // VALIDATION
+    // =========================
     if (!invoiceData.company) {
-      throw new Error(
-        "Company details required"
-      );
+      return {
+        success: false,
+        message: "Company details required",
+      };
     }
 
     if (!invoiceData.customer) {
-      throw new Error(
-        "Customer details required"
-      );
+      return {
+        success: false,
+        message: "Customer details required",
+      };
     }
 
+    // =========================
+    // SAFE INVOICE ID GENERATION
+    // =========================
     const invoiceId =
       invoiceData.invoiceId ||
-      `INV-${Date.now()}-${Math.floor(
-        1000 + Math.random() * 9000
-      )}`;
+      `INV-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-      const existing =
-  await Invoice.findOne({
-    invoiceId,
-  });
+    // =========================
+    // CHECK DUPLICATE (SAFE)
+    // =========================
+    const existing = await Invoice.findOne({ invoiceId });
 
-if (existing) {
-  throw new Error(
-    "Invoice ID already exists"
-  );
-}
+    if (existing) {
+      return {
+        success: false,
+        message: "Invoice ID already exists. Try again.",
+      };
+    }
 
-    const totals =
-      calculateTotals(
-        invoiceData.items || [],
-        invoiceData.discount,
-        invoiceData.tax
-      );
+    // =========================
+    // CALCULATIONS
+    // =========================
+    const totals = calculateTotals(
+      invoiceData.items || [],
+      invoiceData.discount,
+      invoiceData.tax
+    );
 
+    // =========================
+    // BUILD DATA FOR TEMPLATE
+    // =========================
     const data = {
       ...invoiceData,
       invoiceId,
@@ -160,138 +169,105 @@ if (existing) {
       createdAt: new Date(),
     };
 
-    // HTML
-    const html =
-      InvoiceTemplate.build(data);
+    // =========================
+    // HTML GENERATION
+    // =========================
+    const html = InvoiceTemplate.build(data);
 
-    // FILE GENERATION
-    const fileResult =
-      await PDFGenerator.generate(
-        html,
-        invoiceId
-      );
+    // =========================
+    // ENSURE DIRECTORY EXISTS
+    // =========================
+    const fs = require("fs");
+    const path = require("path");
 
-const savedInvoice =
-  await Invoice.create({
-    invoiceId,
+    const uploadDir = path.join(process.cwd(), "uploads", "invoices");
+    fs.mkdirSync(uploadDir, { recursive: true });
 
-    company:
-      invoiceData.company,
+    // =========================
+    // PDF GENERATION
+    // =========================
+    const fileResult = await PDFGenerator.generate(html, invoiceId);
 
-    customer:
-      invoiceData.customer,
+    if (!fileResult || !fileResult.filePath) {
+      return {
+        success: false,
+        message: "PDF generation failed",
+      };
+    }
 
-    items:
-      invoiceData.items || [],
+    // =========================
+    // SAVE IN DATABASE
+    // =========================
+    const savedInvoice = await Invoice.create({
+      invoiceId,
+      company: invoiceData.company,
+      customer: invoiceData.customer,
+      items: invoiceData.items || [],
+      discount: invoiceData.discount || {},
+      tax: invoiceData.tax || {},
+      totals,
+      notes: invoiceData.notes || "",
 
-    discount:
-      invoiceData.discount || {},
+      terms: Array.isArray(invoiceData.terms)
+        ? invoiceData.terms
+        : invoiceData.terms
+        ? [invoiceData.terms]
+        : [],
 
-    tax:
-      invoiceData.tax || {},
+      fileName: fileResult.fileName,
+      filePath: fileResult.filePath,
 
-    totals,
+      status: "generated",
+      paymentStatus: "pending",
 
-    notes:
-      invoiceData.notes || "",
+      orderDate: invoiceData.orderDate,
+      purchaseDate: invoiceData.purchaseDate,
+      paymentDate: invoiceData.paymentDate,
+      dueDate: invoiceData.dueDate,
+    });
 
-    terms: Array.isArray(
-  invoiceData.terms
-)
-  ? invoiceData.terms
-  : invoiceData.terms
-  ? [invoiceData.terms]
-  : [],
-
-    fileName:
-      fileResult.fileName,
-
-    filePath:
-      fileResult.filePath,
-
-    status: "generated",
-
-    paymentStatus:
-      "pending",
-
-    orderDate:
-      invoiceData.orderDate,
-
-    purchaseDate:
-      invoiceData.purchaseDate,
-
-    paymentDate:
-      invoiceData.paymentDate,
-
-    dueDate:
-      invoiceData.dueDate,
-  });
-
+    // =========================
+    // FINAL RESPONSE (CLEAN)
+    // =========================
     return {
-  success: true,
-
-  invoice: savedInvoice,
-
-  company:
-    invoiceData.company,
-
-  customer:
-    invoiceData.customer,
-
-  totals,
-
-  message:
-    "Invoice generated successfully",
-};
-   
+      success: true,
+      message: "Invoice generated successfully",
+      invoice: savedInvoice,
+      totals,
+    };
   } catch (error) {
-    console.error(
-      "INVOICE ERROR:",
-      error
-    );
+    console.error("INVOICE ERROR:", error);
 
     return {
       success: false,
-      message:
-        error.message ||
-        "Invoice generation failed",
+      message: error.message || "Invoice generation failed",
     };
   }
 };
 
-
 // ======================================================
-// DOWNLOAD INVOICE
+// DOWNLOAD INVOICE (SAAS GRADE SAFE VERSION)
 // ======================================================
 
-const downloadInvoice = async (
-  filePath,
-  res
-) => {
-  if (!filePath) {
-    throw new Error(
-      "Invoice file path missing"
-    );
+// adjust if needed
+
+const downloadInvoice = async (invoiceId) => {
+  const invoice = await Invoice.findOne({ invoiceId });
+
+  if (!invoice) {
+    throw new Error("Invoice not found");
   }
 
-  if (
-    !fs.existsSync(filePath)
-  ) {
-    throw new Error(
-      "Invoice file not found"
-    );
+  const filePath = path.resolve(invoice.filePath);
+
+  if (!fs.existsSync(filePath)) {
+    throw new Error("Invoice file not found");
   }
 
-  const fileName =
-    path.basename(filePath);
-
-  return res.download(
-    filePath,
-    fileName
-  );
+  return filePath;
 };
 
-
+module.exports = { downloadInvoice };
 
 // ======================================================
 // GET ALL INVOICES

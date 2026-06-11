@@ -1,10 +1,11 @@
 const router = require("express").Router();
 const path = require("path");
 const fs = require("fs");
-
+const PDFGenerator = require("./pdf.generator");
+const InvoiceTemplate = require("./invoice.template");
 const InvoiceService = require("./invoice.service");
 const { protect } = require("../../middleware/auth.middleware");
-
+const Invoice = require("./invoice.model"); // OR correct path
 // ======================================================
 // GET ALL INVOICES
 // ======================================================
@@ -32,6 +33,54 @@ router.get(
     }
   }
 );
+
+// ======================================================
+// DOWNLOAD PDF  (MOVE THIS UP)
+// ======================================================
+
+router.get("/download/:invoiceId", protect, async (req, res) => {
+  try {
+    const invoice = await Invoice.findOne({
+      invoiceId: req.params.invoiceId,
+    });
+
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: "Invoice not found",
+      });
+    }
+
+    // rebuild HTML
+    const html = InvoiceTemplate.build(invoice);
+
+    // generate buffer
+    const pdfBuffer = await PDFGenerator.generate(html);
+
+    if (!Buffer.isBuffer(pdfBuffer)) {
+      return res.status(500).json({
+        success: false,
+        message: "Invalid PDF buffer",
+      });
+    }
+
+    // VERY IMPORTANT HEADERS
+    res.writeHead(200, {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename=${invoice.invoiceId}.pdf`,
+      "Content-Length": pdfBuffer.length,
+    });
+
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("DOWNLOAD ERROR:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
 
 // ======================================================
 // GET SINGLE INVOICE (PREVIEW DATA)
@@ -100,49 +149,7 @@ router.post(
   }
 );
 
-// ======================================================
-// DOWNLOAD PDF
-// ======================================================
 
-router.get(
-  "/download/:invoiceId",
-  protect,
-  async (req, res) => {
-    try {
-      const { invoiceId } =
-        req.params;
-
-      const filePath = path.join(
-        process.cwd(),
-        "uploads",
-        "invoices",
-        `${invoiceId}.pdf`
-      );
-
-      if (
-        !fs.existsSync(filePath)
-      ) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Invoice file not found",
-        });
-      }
-
-      return res.download(
-        filePath,
-        `${invoiceId}.pdf`
-      );
-    } catch (err) {
-      console.error(err);
-
-      return res.status(500).json({
-        success: false,
-        message: err.message,
-      });
-    }
-  }
-);
 
 // ======================================================
 // UPDATE INVOICE STATUS
