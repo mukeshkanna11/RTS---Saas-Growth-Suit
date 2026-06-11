@@ -25,6 +25,14 @@ const success = (res, message, data = null) =>
 const fail = (res, message, code = 500) =>
   res.status(code).json({ success: false, message });
 
+
+const generateInvoiceId = () => {
+  const year = new Date().getFullYear();
+  const random = Math.floor(1000 + Math.random() * 9000);
+  return `INV-${year}-${random}`;
+};
+
+
 // ======================================================
 // CREATE INTENT
 // ======================================================
@@ -296,95 +304,154 @@ exports.reactivateSubscription = async (req, res) => {
 // ✅ Stream support
 // ======================================================
 
-exports.generateInvoice = async function generateInvoice(
-  data,
-  options = {}
-) {
+exports.generateInvoice = async (req, res) => {
   try {
-    // ==================================================
-    // OPTIONS
-    // ==================================================
+    const subscriptionId = req.params.id;
 
-    const {
-      filePath = null,
-      res = null,
-      autoDownload = false,
-      saveToDisk = true,
-    } = options;
+    // ======================================================
+    // 1. FETCH SUBSCRIPTION
+    // ======================================================
+    const subscription = await Subscription.findById(subscriptionId).populate("userId");
 
-    // ==================================================
-    // VALIDATION
-    // ==================================================
-
-    if (!data) {
-      throw new Error("Invoice data is required");
+    if (!subscription) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription not found",
+      });
     }
 
-    if (!data.customer) {
-      throw new Error("Customer details missing");
+    // ======================================================
+    // 2. SECURITY CHECK
+    // ======================================================
+    const isAdmin = ["admin", "superadmin"].includes(req.user?.role);
+
+    const isOwner =
+      subscription.userId?._id?.toString() === req.user?.id?.toString();
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized invoice access",
+      });
     }
 
-    if (
-      !Array.isArray(data.items) ||
-      !data.items.length
-    ) {
-      throw new Error("Invoice items missing");
-    }
+    // ======================================================
+    // 3. PAYMENT STATUS LOGIC
+    // ======================================================
+    const paymentStatus =
+      subscription.paymentStatus === "paid"
+        ? "PAID"
+        : "PENDING";
 
-    // ==================================================
-    // CREATE PDF
-    // ==================================================
+    // ======================================================
+    // 4. MANUAL INVOICE DATA (YOU CONTROL EVERYTHING)
+    // ======================================================
+    const invoiceData = {
+      invoiceId: generateInvoiceId(),
 
-    const result = await this.createPDF(
-      data,
-      saveToDisk ? filePath : null
-    );
-
-    // ==================================================
-    // DIRECT DOWNLOAD MODE
-    // ==================================================
-
-    if (res && autoDownload) {
-      return this.streamInvoice(
-        result.filePath,
-        res,
-        result.fileName
-      );
-    }
-
-    // ==================================================
-    // RETURN RESPONSE
-    // ==================================================
-
-    return {
-      success: true,
-      message:
-        "Invoice generated successfully",
-
-      invoice: {
-        invoiceId:
-          result.invoiceId,
-
-        fileName:
-          result.fileName,
-
-        filePath:
-          result.filePath,
-
-        totals:
-          result.totals,
+      // ======================================================
+      // COMPANY (MANUAL FIXED DETAILS)
+      // ======================================================
+      company: {
+        name: "ReadyTechSolutions Pvt Ltd",
+        address: "Coimbatore, Tamil Nadu, India",
+        email: "support@readytechsolutions.in",
+        phone: "+91-9876543210",
+        gstin: "33ABCDE1234F1Z5",
+        logo: process.env.COMPANY_LOGO || null,
       },
-    };
-  } catch (err) {
-    console.error(
-      "Generate invoice failed:",
-      err
-    );
 
-    throw new Error(
-      err.message ||
-        "Invoice generation failed"
-    );
+      // ======================================================
+      // CUSTOMER
+      // ======================================================
+      customer: {
+        name: subscription.userId?.name || subscription.clientName || "Unknown",
+        email: subscription.userId?.email || subscription.clientEmail || "N/A",
+        phone: subscription.userId?.phone || null,
+        address: subscription.userId?.address || "India",
+        gstin: subscription.userId?.gstin || null,
+      },
+
+      // ======================================================
+      // ITEMS (MANUAL CONTROLLED)
+      // ======================================================
+      items: [
+        {
+          name: `${subscription.plan} Plan Subscription`,
+          description: `Billing Cycle: ${subscription.billingCycle}`,
+          qty: 1,
+          price: Number(subscription.amount || 0),
+        },
+      ],
+
+      // ======================================================
+      // ORDER + PURCHASE DATES
+      // ======================================================
+      orderDate: subscription.createdAt,
+      purchaseDate: new Date(),
+
+      // ======================================================
+      // DISCOUNT (MANUAL)
+      // ======================================================
+      discount: {
+        type: req.body.discountType || "percent",
+        value: req.body.discountValue || 0,
+      },
+
+      // ======================================================
+      // GST CONFIG (MANUAL CONTROL)
+      // ======================================================
+      tax: {
+        type: req.body.taxType || "intra", // intra | inter
+        cgst: 9,
+        sgst: 9,
+        igst: 18,
+      },
+
+      // ======================================================
+      // PAYMENT STATUS
+      // ======================================================
+      paymentStatus,
+
+      status: paymentStatus,
+
+      createdAt: new Date(),
+    };
+
+    // ======================================================
+    // 5. GENERATE INVOICE USING SERVICE
+    // ======================================================
+    const invoice = await InvoiceService.generateInvoice(invoiceData, {
+      res,
+      autoDownload: false,
+      saveToDisk: true,
+    });
+
+    // ======================================================
+    // 6. SAVE IN SUBSCRIPTION (AUDIT TRAIL)
+    // ======================================================
+    subscription.invoice = {
+      invoiceId: invoiceData.invoiceId,
+      generatedAt: new Date(),
+      amount: subscription.amount,
+      status: paymentStatus,
+      gst: invoiceData.tax,
+    };
+
+    await subscription.save();
+
+    return res.json({
+      success: true,
+      message: "Invoice generated successfully",
+      data: invoice,
+    });
+  } catch (err) {
+    console.error("Generate invoice error:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Invoice generation failed",
+    });
   }
 };
 
@@ -404,128 +471,100 @@ exports.generateInvoice = async function generateInvoice(
 
 exports.downloadInvoice = async (req, res) => {
   try {
-    // ==================================================
-    // GET SUBSCRIPTION
-    // ==================================================
-
-    const subscription =
-      await Subscription.findById(
-        req.params.id
-      )
-        .populate("userId")
-        .lean();
+    const subscription = await Subscription.findById(req.params.id)
+      .populate("userId")
+      .lean();
 
     if (!subscription) {
       return res.status(404).json({
         success: false,
-        message:
-          "Subscription not found",
+        message: "Subscription not found",
       });
     }
 
-    // ==================================================
+    // ======================================================
     // SECURITY CHECK
-    // ==================================================
-
-    const isAdmin = [
-      "admin",
-      "superadmin",
-    ].includes(req.user?.role);
+    // ======================================================
+    const isAdmin = ["admin", "superadmin"].includes(req.user?.role);
 
     const isOwner =
-      subscription.userId?._id?.toString() ===
-      req.user?.id?.toString();
+      subscription.userId?._id?.toString() === req.user?.id?.toString();
 
     if (!isAdmin && !isOwner) {
       return res.status(403).json({
         success: false,
-        message:
-          "Unauthorized invoice access",
+        message: "Unauthorized invoice access",
       });
     }
 
-    // ==================================================
-    // INVOICE DATA
-    // ==================================================
+    // ======================================================
+    // PAYMENT STATUS
+    // ======================================================
+    const paymentStatus =
+      subscription.paymentStatus === "paid"
+        ? "PAID"
+        : "PENDING";
 
+    // ======================================================
+    // INVOICE DATA (MANUAL STRUCTURE)
+    // ======================================================
     const invoiceData = {
       invoiceId:
         subscription.invoice?.invoiceId ||
-        `INV-${subscription._id}`,
+        generateInvoiceId(),
 
       company: {
-        name:
-          process.env.COMPANY_NAME ||
-          "ReadyTech Solutions",
-
-        address:
-          process.env.COMPANY_ADDRESS ||
-          "Tamil Nadu, India",
-
-        gstin:
-          process.env.COMPANY_GST ||
-          "33ABCDE1234F1Z5",
+        name: "ReadyTechSolutions Pvt Ltd",
+        address: "Coimbatore, Tamil Nadu, India",
+        gstin: "33ABCDE1234F1Z5",
       },
 
       customer: {
-        name:
-          subscription.userId?.name ||
-          subscription.clientName ||
-          "Customer",
-
-        email:
-          subscription.userId?.email ||
-          subscription.clientEmail ||
-          "N/A",
-
+        name: subscription.userId?.name || "Customer",
+        email: subscription.userId?.email || "N/A",
         address: "India",
       },
 
       items: [
         {
-          name: `${subscription.plan} Plan`,
+          name: `${subscription.plan} Plan Subscription`,
           qty: 1,
-          price:
-            Number(
-              subscription.amount || 0
-            ),
+          price: Number(subscription.amount || 0),
         },
       ],
 
-      discount: 0,
+      orderDate: subscription.createdAt,
+      purchaseDate: subscription.updatedAt || new Date(),
 
-      cgst: 9,
+      discount: {
+        type: "percent",
+        value: 0,
+      },
 
-      sgst: 9,
+      tax: {
+        type: "intra",
+        cgst: 9,
+        sgst: 9,
+        igst: 0,
+      },
 
-      paymentStatus:
-        subscription.paymentStatus ||
-        "paid",
+      paymentStatus,
     };
 
-    // ==================================================
-    // DIRECT PDF STREAM
-    // ==================================================
-
-    return await InvoiceService.generateInvoice(
-      invoiceData,
-      {
-        res,
-        autoDownload: true,
-        saveToDisk: false,
-      }
-    );
+    // ======================================================
+    // STREAM PDF / HTML DOWNLOAD
+    // ======================================================
+    return await InvoiceService.generateInvoice(invoiceData, {
+      res,
+      autoDownload: true,
+      saveToDisk: false,
+    });
   } catch (err) {
-    console.error(
-      "Invoice download error:",
-      err
-    );
+    console.error("Invoice download error:", err);
 
     return res.status(500).json({
       success: false,
-      message:
-        err.message ||
-        "Invoice download failed",
+      message: err.message || "Invoice download failed",
     });
   }
 };
@@ -699,6 +738,40 @@ exports.upgradeRequest = async (req, res) => {
 
     console.error(err);
 
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+exports.analytics = async (req, res) => {
+  try {
+    const [total, active, cancelled, revenue] = await Promise.all([
+      Subscription.countDocuments({ isDeleted: false }),
+      Subscription.countDocuments({ status: "active" }),
+      Subscription.countDocuments({ status: "cancelled" }),
+      Subscription.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: "$amount" },
+          },
+        },
+      ]),
+    ]);
+
+    return res.json({
+      success: true,
+      message: "Analytics fetched",
+      data: {
+        totalSubscriptions: total,
+        activeSubscriptions: active,
+        cancelledSubscriptions: cancelled,
+        totalRevenue: revenue?.[0]?.totalRevenue || 0,
+      },
+    });
+  } catch (err) {
     return res.status(500).json({
       success: false,
       message: err.message,

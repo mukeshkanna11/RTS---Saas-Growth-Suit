@@ -1,142 +1,311 @@
-const integrationService =
-  require("./integration.service");
+const integrationService = require("./integration.service");
 
-exports.connect =
-  async (req, res) => {
+const SUPPORTED_PROVIDERS = [
+  "whatsapp",
+  "email",
+  "instagram",
+];
+
+/*
+=========================================
+CONNECT INTEGRATION
+=========================================
+*/
+
+exports.connect = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const {
+      provider,
+      credentials = {},
+      displayName,
+    } = req.body;
+
+    if (!provider) {
+      return res.status(400).json({
+        success: false,
+        message: "Provider is required",
+      });
+    }
+
+    if (
+      !SUPPORTED_PROVIDERS.includes(
+        provider.toLowerCase()
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Unsupported integration provider",
+      });
+    }
+
+    const integration =
+      await integrationService.connect(
+        req.user.tenantId,
+        {
+          provider,
+          displayName,
+          credentials,
+        }
+      );
+
+    return res.status(200).json({
+      success: true,
+      message:
+        `${provider} connected successfully`,
+      data: integration,
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+/*
+=========================================
+DISCONNECT
+=========================================
+*/
+
+exports.disconnect = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const { provider } = req.params;
+
+    const integration =
+      await integrationService.disconnect(
+        req.user.tenantId,
+        provider
+      );
+
+    return res.status(200).json({
+      success: true,
+      message:
+        `${provider} disconnected successfully`,
+      data: integration,
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+/*
+=========================================
+GET ALL
+=========================================
+*/
+
+exports.getAll = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const data =
+      await integrationService.getAll(
+        req.user.tenantId
+      );
+
+    return res.status(200).json({
+      success: true,
+      count: data.length,
+      data,
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+/*
+=========================================
+GET SINGLE
+=========================================
+*/
+
+exports.getOne = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const data =
+      await integrationService.getOne(
+        req.user.tenantId,
+        req.params.provider
+      );
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Integration not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data,
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+/*
+=========================================
+TEST CONNECTION
+=========================================
+*/
+
+exports.testConnection = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const result =
+      await integrationService.testConnection(
+        req.user.tenantId,
+        req.params.provider
+      );
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+/*
+=========================================
+WHATSAPP TEST MESSAGE
+=========================================
+*/
+
+exports.sendWhatsAppTest =
+  async (
+    req,
+    res,
+    next
+  ) => {
     try {
-      const data =
-        await integrationService.connectIntegration(
+      const {
+        phone,
+        message,
+      } = req.body;
+
+      if (!phone) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Phone number required",
+        });
+      }
+
+      const result =
+        await integrationService.sendWhatsAppTest(
           req.user.tenantId,
-          req.user.id,
-          req.body
+          {
+            phone,
+            message:
+              message ||
+              "Hello from ReadyTech SaaS 🚀",
+          }
         );
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         message:
-          "Integration connected successfully",
-        data,
+          "WhatsApp message sent",
+        data: result,
       });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message:
-          error.message,
-      });
+
+    } catch (err) {
+      next(err);
     }
   };
 
-exports.getAll =
-  async (req, res) => {
+/*
+=========================================
+EMAIL TEST
+=========================================
+*/
+
+exports.sendEmailTest =
+  async (
+    req,
+    res,
+    next
+  ) => {
     try {
-      const data =
-        await integrationService.getIntegrations(
-          req.user.tenantId
-        );
+      const {
+        email,
+        subject,
+        message,
+      } = req.body;
 
-      res.status(200).json({
-        success: true,
-        count: data.length,
-        data,
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message:
-          error.message,
-      });
-    }
-  };
-
-exports.getOne =
-  async (req, res) => {
-    try {
-      const data =
-        await integrationService.getIntegrationById(
-          req.params.id,
-          req.user.tenantId
-        );
-
-      res.status(200).json({
-        success: true,
-        data,
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message:
-          error.message,
-      });
-    }
-  };
-
-exports.disconnect =
-  async (req, res) => {
-    try {
-      const data =
-        await integrationService.disconnectIntegration(
-          req.params.id,
-          req.user.tenantId
-        );
-
-      res.status(200).json({
-        success: true,
-        message:
-          "Integration disconnected",
-        data,
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message:
-          error.message,
-      });
-    }
-  };
-
-exports.updateSettings =
-  async (req, res) => {
-    try {
-      const data =
-        await integrationService.updateSettings(
-          req.params.id,
+      const result =
+        await integrationService.sendEmailTest(
           req.user.tenantId,
-          req.body
+          {
+            email,
+            subject:
+              subject ||
+              "ReadyTech Test Email",
+            message:
+              message ||
+              "Email integration working successfully",
+          }
         );
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
-        data,
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
         message:
-          error.message,
+          "Email sent successfully",
+        data: result,
       });
+
+    } catch (err) {
+      next(err);
     }
   };
 
-exports.deleteIntegration =
-  async (req, res) => {
-    try {
-      const data =
-        await integrationService.deleteIntegration(
-          req.params.id,
-          req.user.tenantId
-        );
+/*
+=========================================
+INTEGRATION STATS
+=========================================
+*/
 
-      res.status(200).json({
-        success: true,
-        message:
-          "Integration deleted",
-        data,
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message:
-          error.message,
-      });
-    }
-  };
+exports.stats = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const stats =
+      await integrationService.stats(
+        req.user.tenantId
+      );
+
+    return res.status(200).json({
+      success: true,
+      data: stats,
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};

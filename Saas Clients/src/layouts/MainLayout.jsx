@@ -18,6 +18,7 @@ import {
   Users,
   ShieldCheck,
   Bell,
+  Receipt,      // 👈 Add this
 } from "lucide-react";
 
 import { logoutUser } from "../api/auth";
@@ -39,16 +40,16 @@ const [profileOpen, setProfileOpen] = useState(false);
   const menus = useMemo(
     () => ({
       admin: [
-        { label: "Dashboard", path: "/admin", icon: <Home size={18} /> },
-        { label: "Users", path: "/admin/users", icon: <Users size={18} /> },
-        { label: "Leads", path: "/admin/leads", icon: <Target size={18} /> },
-        { label: "Deals", path: "/admin/crm", icon: <Briefcase size={18} /> },
-        { label: "Campaigns", path: "/admin/campaigns", icon: <Activity size={18} /> },
-        { label: "Automation", path: "/admin/automation", icon: <Layers size={18} /> },
-        { label: "Analytics", path: "/admin/analytics", icon: <BarChart3 size={18} /> },
-        { label: "Subscription", path: "/admin/subscription", icon: <CreditCard size={18} /> },
-      ],
-
+  { label: "Dashboard", path: "/admin", icon: <Home size={18} /> },
+  { label: "Users", path: "/admin/users", icon: <Users size={18} /> },
+  { label: "Leads", path: "/admin/leads", icon: <Target size={18} /> },
+  { label: "Deals", path: "/admin/crm", icon: <Briefcase size={18} /> },
+  { label: "Campaigns", path: "/admin/campaigns", icon: <Activity size={18} /> },
+  { label: "Automation", path: "/admin/automation", icon: <Layers size={18} /> },
+  { label: "Analytics", path: "/admin/analytics", icon: <BarChart3 size={18} /> },
+  { label: "Subscription", path: "/admin/subscription", icon: <CreditCard size={18} /> },
+  { label: "Invoice", path: "/admin/invoice", icon: <Receipt size={18} /> },
+],
       manager: [
         { label: "Dashboard", path: "/manager", icon: <Home size={18} /> },
         { label: "Leads", path: "/manager/leads", icon: <Target size={18} /> },

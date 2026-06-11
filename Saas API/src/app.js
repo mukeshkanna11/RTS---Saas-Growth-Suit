@@ -13,6 +13,7 @@ const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
 const { ipKeyGenerator } = require("express-rate-limit");
 
+
 const app = express();
 
 // =======================================================
@@ -177,6 +178,10 @@ const automationRoutes = require("./modules/automation/automation.routes");
 const analyticsRoutes = require("./modules/analytics/analytics.routes");
 const subscriptionRoutes = require("./modules/subscription/subscription.routes");
 const clientRoutes = require("./modules/client");
+const integrationRoutes = require("./modules/client/integrations/integration.routes");
+const webhookRoutes = require("./modules/client/integrations/webhook.routes");
+const invoiceRoutes = require("./modules/invoice/invoice.routes");
+
 // =======================================================
 // ROOT ROUTE
 // =======================================================
@@ -230,6 +235,12 @@ app.use("/api/v1/analytics", analyticsRoutes);
 app.use("/api/v1/subscription", subscriptionRoutes);
 
 app.use("/api/v1/client", clientRoutes);
+
+app.use("/api/v1/integrations", integrationRoutes);
+
+app.use("/api/v1/webhooks", webhookRoutes);
+
+app.use("/api/v1/invoice", invoiceRoutes);
 
 // =======================================================
 // 404 HANDLER

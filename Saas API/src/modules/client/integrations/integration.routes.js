@@ -1,74 +1,99 @@
 const express = require("express");
-
 const router = express.Router();
 
-const controller =
-  require("./integration.controller");
+const { protect } = require("../../../middleware/auth.middleware");
 
-const {
-  protect,
-  authorize,
-} = require(
-  "../../middleware/auth.middleware"
-);
+const controller = require("./integration.controller");
 
-router.post(
-  "/connect",
-  protect,
-  authorize(
-    "admin",
-    "manager"
-  ),
-  controller.connect
-);
+const whatsappWebhook = require("./webhooks/whatsapp.webhook");
+const instagramWebhook = require("./webhooks/instagram.webhook");
+const emailWebhook = require("./webhooks/email.webhook");
 
-router.get(
-  "/",
-  protect,
-  authorize(
-    "admin",
-    "manager",
-    "client"
-  ),
-  controller.getAll
-);
+const rateLimit = require("express-rate-limit");
 
-router.get(
-  "/:id",
-  protect,
-  authorize(
-    "admin",
-    "manager",
-    "client"
-  ),
-  controller.getOne
-);
+/*
+================================
+GLOBAL WEBHOOK RATE LIMITER
+================================
+Protects against spam / abuse
+================================
+*/
+const webhookLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 min
+  max: 60, // limit each IP
+  message: {
+    success: false,
+    message: "Too many webhook requests, please slow down.",
+  },
+});
+
+/*
+================================
+BASE ROUTE
+================================
+*/
+
+router.get("/", protect, controller.getAll);
+
+/*
+================================
+INTEGRATION MANAGEMENT
+================================
+*/
+
+router.post("/connect", protect, controller.connect);
 
 router.patch(
-  "/:id/disconnect",
+  "/disconnect/:provider",
   protect,
-  authorize(
-    "admin",
-    "manager"
-  ),
   controller.disconnect
 );
 
-router.patch(
-  "/:id/settings",
-  protect,
-  authorize(
-    "admin",
-    "manager"
-  ),
-  controller.updateSettings
+/*
+================================
+WHATSAPP WEBHOOK
+================================
+*/
+
+router
+  .route("/webhooks/whatsapp")
+  .get(whatsappWebhook.verifyWebhook)
+  .post(webhookLimiter, whatsappWebhook.receiveWebhook);
+
+/*
+================================
+INSTAGRAM WEBHOOK
+================================
+*/
+
+router
+  .route("/webhooks/instagram")
+  .get(instagramWebhook.verifyWebhook)
+  .post(webhookLimiter, instagramWebhook.receiveWebhook);
+
+/*
+================================
+EMAIL WEBHOOK
+================================
+*/
+
+router.post(
+  "/webhooks/email",
+  webhookLimiter,
+  emailWebhook.receiveWebhook
 );
 
-router.delete(
-  "/:id",
-  protect,
-  authorize("admin"),
-  controller.deleteIntegration
-);
+/*
+================================
+SAFE FALLBACK FOR UNKNOWN WEBHOOKS
+================================
+*/
+
+router.all("/webhooks/*", (req, res) => {
+  return res.status(404).json({
+    success: false,
+    message: "Webhook route not found",
+  });
+});
 
 module.exports = router;
