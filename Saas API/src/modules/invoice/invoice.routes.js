@@ -51,29 +51,36 @@ router.get("/download/:invoiceId", protect, async (req, res) => {
       });
     }
 
-    // rebuild HTML
-    const html = InvoiceTemplate.build(invoice);
+    // =========================
+    // CHECK FILE EXISTS
+    // =========================
+    const fs = require("fs");
 
-    // generate buffer
-    const pdfBuffer = await PDFGenerator.generate(html);
-
-    if (!Buffer.isBuffer(pdfBuffer)) {
-      return res.status(500).json({
+    if (!invoice.filePath || !fs.existsSync(invoice.filePath)) {
+      return res.status(404).json({
         success: false,
-        message: "Invalid PDF buffer",
+        message: "PDF file not found",
       });
     }
 
-    // VERY IMPORTANT HEADERS
-    res.writeHead(200, {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename=${invoice.invoiceId}.pdf`,
-      "Content-Length": pdfBuffer.length,
-    });
+    // =========================
+    // READ FILE BUFFER
+    // =========================
+    const fileBuffer = fs.readFileSync(invoice.filePath);
 
-    return res.end(pdfBuffer);
+    // =========================
+    // SEND PDF
+    // =========================
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=${invoice.invoiceId}.pdf`
+    );
+
+    return res.end(fileBuffer);
+
   } catch (err) {
-    console.error("DOWNLOAD ERROR:", err);
+    console.error("🔥 DOWNLOAD ERROR:", err);
 
     return res.status(500).json({
       success: false,
@@ -81,6 +88,7 @@ router.get("/download/:invoiceId", protect, async (req, res) => {
     });
   }
 });
+
 
 // ======================================================
 // GET SINGLE INVOICE (PREVIEW DATA)

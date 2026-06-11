@@ -1,23 +1,46 @@
 const pdf = require("html-pdf-node");
+const fs = require("fs");
+const path = require("path");
 
-const generate = async (html) => {
-  if (!html) throw new Error("HTML required");
+const generate = async (html, invoiceId) => {
+  try {
+    const fileName = `${invoiceId}.pdf`;
+    const filePath = path.join(
+      process.cwd(),
+      "uploads",
+      "invoices",
+      fileName
+    );
 
-  const file = { content: html };
+    const file = { content: html };
 
-  const options = {
-    format: "A4",
-    printBackground: true,
-  };
+    const options = {
+      format: "A4",
+      printBackground: true,
+    };
 
-  const buffer = await pdf.generatePdf(file, options);
+    const buffer = await pdf.generatePdf(file, options);
 
-  // safety check
-  if (!buffer || buffer.length === 0) {
-    throw new Error("PDF buffer empty");
+    console.log("PDF BUFFER TYPE:", typeof buffer);
+    console.log("PDF BUFFER LENGTH:", buffer?.length);
+
+    // 🔥 STRICT VALIDATION
+    if (!buffer || !Buffer.isBuffer(buffer)) {
+      throw new Error("Invalid PDF buffer generated");
+    }
+
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, buffer);
+
+    return {
+      fileName,
+      filePath,
+    };
+
+  } catch (err) {
+    console.error("🔥 PDF GENERATION ERROR:", err);
+    throw err;
   }
-
-  return buffer;
 };
 
 module.exports = { generate };
