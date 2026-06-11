@@ -56,96 +56,152 @@ class InvoiceTemplate {
     });
   }
 
-  toHTML(inv) {
-    return `
+ toHTML(inv) {
+  const statusColor =
+    inv.paymentStatus === "PAID"
+      ? "#16a34a"
+      : inv.paymentStatus === "PENDING"
+      ? "#f59e0b"
+      : "#ef4444";
+
+  const watermark = inv.paymentStatus || "INVOICE";
+
+  return `
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-
 <title>${inv.invoice.invoiceId}</title>
 
 <style>
 
 body{
-  font-family:Arial,sans-serif;
-  color:#222;
-  padding:40px;
-  line-height:1.5;
+  font-family: Arial, sans-serif;
+  background:#eef2ff;
+  padding:30px;
 }
 
+/* WATERMARK */
+.watermark{
+  position:fixed;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%) rotate(-30deg);
+  font-size:120px;
+  font-weight:900;
+  color:rgba(99,102,241,0.07);
+  z-index:0;
+}
+
+/* CONTAINER */
+.invoice{
+  background:#fff;
+  padding:25px;
+  border-radius:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.08);
+  position:relative;
+  z-index:2;
+}
+
+/* HEADER */
 .header{
-  display:flex;
-  justify-content:space-between;
-  margin-bottom:30px;
-}
-
-.company{
-  width:60%;
-}
-
-.invoice-info{
-  text-align:right;
-}
-
-.status{
-  display:inline-block;
-  padding:8px 16px;
-  border-radius:5px;
-  font-weight:bold;
-  background:${
-    inv.paymentStatus === "PAID"
-      ? "#d1fae5"
-      : "#fef3c7"
-  };
-}
-
-.section{
-  margin-top:20px;
-}
-
-table{
   width:100%;
   border-collapse:collapse;
-  margin-top:15px;
+  background:#0f172a;
+  color:white;
+  border-radius:12px;
+  overflow:hidden;
 }
 
-th{
-  background:#f3f4f6;
+/* LOGO */
+.logo{
+  width:90px;
+  height:90px;
+  background:white;
+  border-radius:10px;
+  padding:6px;
+  object-fit:contain;
 }
 
-th,td{
-  border:1px solid #ddd;
-  padding:10px;
-}
-
-.summary{
-  width:400px;
-  margin-left:auto;
-  margin-top:25px;
-}
-
-.summary td{
-  padding:8px;
-}
-
-.total{
+/* COMPANY */
+.company h2{
+  margin:0;
   font-size:18px;
-  font-weight:bold;
-}
-
-.footer{
-  margin-top:60px;
 }
 
 .small{
-  color:#666;
   font-size:12px;
+  opacity:0.85;
 }
 
-.signature{
-  margin-top:40px;
-  text-align:right;
+/* STATUS */
+.status{
+  display:inline-block;
+  padding:6px 14px;
+  border-radius:999px;
+  background:${statusColor};
+  color:white;
+  font-size:12px;
+  margin-top:6px;
+}
+
+/* SECTION */
+.section{
+  margin-top:18px;
+  padding:14px;
+  border:1px solid #e5e7eb;
+  border-radius:10px;
+  background:#fff;
+}
+
+/* TABLE */
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:10px;
+}
+
+th{
+  background:#4f46e5;
+  color:white;
+  padding:10px;
+  font-size:13px;
+}
+
+td{
+  padding:10px;
+  border-bottom:1px solid #eee;
+  font-size:13px;
+}
+
+/* SUMMARY */
+.summary{
+  width:350px;
+  margin-left:auto;
+  margin-top:20px;
+  border:1px solid #e5e7eb;
+  border-radius:10px;
+  padding:10px;
+  background:#f9fafb;
+}
+
+.total{
+  font-weight:700;
+  color:#4f46e5;
+  font-size:16px;
+}
+
+/* BANK */
+.bank{
+  background:#f1f5f9;
+}
+
+/* FOOTER */
+.footer{
+  text-align:center;
+  margin-top:30px;
+  font-size:11px;
+  color:#64748b;
 }
 
 </style>
@@ -153,190 +209,115 @@ th,td{
 
 <body>
 
-<div class="header">
+<div class="watermark">${watermark}</div>
 
-<div class="company">
+<div class="invoice">
 
-<h1>${inv.company.name || ""}</h1>
-
-<p>${inv.company.address || ""}</p>
-
-<p>Email: ${inv.company.email || ""}</p>
-
-<p>Phone: ${inv.company.phone || ""}</p>
-
-<p>GSTIN: ${inv.company.gstin || "-"}</p>
-
-<p>PAN: ${inv.company.pan || "-"}</p>
-
-<p>Website: ${inv.company.website || "-"}</p>
-
-</div>
-
-<div class="invoice-info">
-
-<h2>TAX INVOICE</h2>
-
-<p><b>Invoice No:</b> ${inv.invoice.invoiceId}</p>
-
-<p><b>Order Date:</b> ${this.formatDate(inv.invoice.orderDate)}</p>
-
-<p><b>Purchase Date:</b> ${this.formatDate(inv.invoice.purchaseDate)}</p>
-
-<p><b>Payment Date:</b> ${this.formatDate(inv.invoice.paymentDate)}</p>
-
-<p><b>Due Date:</b> ${this.formatDate(inv.invoice.dueDate)}</p>
-
-<div class="status">
-${inv.paymentStatus}
-</div>
-
-</div>
-
-</div>
-
-<hr>
-
-<div class="section">
-
-<h3>Bill To</h3>
-
-<p>
-<b>${inv.customer.name}</b><br>
-${inv.customer.email || ""}<br>
-${inv.customer.phone || ""}<br>
-${inv.customer.address || ""}<br>
-GSTIN: ${inv.customer.gstin || "-"}
-</p>
-
-</div>
-
-<table>
-
-<thead>
+<!-- HEADER -->
+<table class="header">
 <tr>
-<th>#</th>
-<th>Description</th>
-<th>HSN/SAC</th>
-<th>Qty</th>
-<th>Price</th>
-<th>Total</th>
+
+  <!-- LOGO -->
+  <td style="width:120px; padding:15px;">
+    ${
+      inv.company.logo
+        ? `<img class="logo" src="${inv.company.logo}" />`
+        : `<div style="color:black;">LOGO</div>`
+    }
+  </td>
+
+  <!-- COMPANY -->
+  <td>
+    <h2>${inv.company.name}</h2>
+    <div class="small">${inv.company.address}</div>
+    <div class="small">${inv.company.email}</div>
+    <div class="small">${inv.company.phone}</div>
+  </td>
+
+  <!-- INVOICE INFO -->
+  <td style="text-align:right; padding:15px;">
+    <h3>TAX INVOICE</h3>
+
+    <div class="small">Invoice: ${inv.invoice.invoiceId}</div>
+    <div class="small">Order: ${new Date(inv.invoice.orderDate).toLocaleDateString("en-IN")}</div>
+    <div class="small">Purchase: ${new Date(inv.invoice.purchaseDate).toLocaleDateString("en-IN")}</div>
+    <div class="small">Due: ${new Date(inv.invoice.dueDate).toLocaleDateString("en-IN")}</div>
+
+    <div class="status">${inv.paymentStatus}</div>
+  </td>
+
 </tr>
-</thead>
+</table>
 
-<tbody>
+<!-- CUSTOMER -->
+<div class="section">
+<h3>Bill To</h3>
+<b>${inv.customer.name}</b><br>
+${inv.customer.email}<br>
+${inv.customer.phone}<br>
+${inv.customer.address}<br>
+GSTIN: ${inv.customer.gstin || "-"}
+</div>
 
-${inv.items.map((item,index)=>`
+<!-- ITEMS -->
+<div class="section">
+<table>
 <tr>
-<td>${index+1}</td>
-<td>${item.name}</td>
-<td>${item.hsn || "998314"}</td>
-<td>${item.qty}</td>
-<td>₹${this.money(item.price)}</td>
-<td>₹${this.money(item.qty * item.price)}</td>
+<th>#</th><th>Item</th><th>HSN</th><th>Qty</th><th>Price</th><th>Total</th>
+</tr>
+
+${inv.items.map((i, idx)=>`
+<tr>
+<td>${idx+1}</td>
+<td>${i.name}</td>
+<td>${i.hsn || "998314"}</td>
+<td>${i.qty}</td>
+<td>₹${i.price}</td>
+<td>₹${i.qty * i.price}</td>
 </tr>
 `).join("")}
 
-</tbody>
-
 </table>
+</div>
 
+<!-- SUMMARY -->
 <div class="summary">
-
 <table>
-
-<tr>
-<td>Subtotal</td>
-<td>₹${this.money(inv.totals.subtotal)}</td>
-</tr>
-
-<tr>
-<td>Discount</td>
-<td>₹${this.money(inv.totals.discountAmount)}</td>
-</tr>
-
-<tr>
-<td>Taxable Amount</td>
-<td>₹${this.money(inv.totals.taxable)}</td>
-</tr>
-
-<tr>
-<td>CGST</td>
-<td>₹${this.money(inv.totals.cgst)}</td>
-</tr>
-
-<tr>
-<td>SGST</td>
-<td>₹${this.money(inv.totals.sgst)}</td>
-</tr>
-
-<tr>
-<td>IGST</td>
-<td>₹${this.money(inv.totals.igst)}</td>
-</tr>
-
-<tr class="total">
-<td>Grand Total</td>
-<td>₹${this.money(inv.totals.total)}</td>
-</tr>
-
+<tr><td>Subtotal</td><td>₹${inv.totals.subtotal}</td></tr>
+<tr><td>Discount</td><td>₹${inv.totals.discountAmount}</td></tr>
+<tr><td>CGST</td><td>₹${inv.totals.cgst}</td></tr>
+<tr><td>SGST</td><td>₹${inv.totals.sgst}</td></tr>
+<tr><td>IGST</td><td>₹${inv.totals.igst}</td></tr>
+<tr class="total"><td>Total</td><td>₹${inv.totals.total}</td></tr>
 </table>
-
 </div>
 
-<div class="section">
-
+<!-- BANK -->
+<div class="section bank">
 <h3>Bank Details</h3>
-
-<p>
-Account Name: ${inv.bank.accountName || "-"}<br>
-Bank: ${inv.bank.bankName || "-"}<br>
-A/C No: ${inv.bank.accountNumber || "-"}<br>
-IFSC: ${inv.bank.ifsc || "-"}
-</p>
-
+Account: ${inv.bank.accountName}<br>
+Bank: ${inv.bank.bankName}<br>
+A/C: ${inv.bank.accountNumber}<br>
+IFSC: ${inv.bank.ifsc}
 </div>
 
+<!-- NOTES -->
 <div class="section">
-
 <h3>Notes</h3>
-
-<p>${inv.notes || "-"}</p>
-
+${inv.notes}
 </div>
 
-<div class="section">
-
-<h3>Terms & Conditions</h3>
-
-<ul>
-${(inv.terms || [])
-.map(term => `<li>${term}</li>`)
-.join("")}
-</ul>
-
+<!-- FOOTER -->
+<div class="footer">
+Generated by SaaS Billing Engine • ReadyTechSolutions
 </div>
-
-<div class="signature">
-
-<p>Authorized Signatory</p>
-
-<br><br>
-
-<b>${inv.company.name}</b>
-
-</div>
-
-<div class="footer small">
-
-Generated by ReadyTechSolutions SaaS Billing Engine
 
 </div>
 
 </body>
 </html>
 `;
-  }
+}
 }
 
 module.exports = new InvoiceTemplate();
