@@ -131,4 +131,12 @@ router.post(
   safe("regenerateInvoice")
 );
 
+// ======================================================
+// GENERATE INVOICE (MANUAL / TEST / ADMIN USE)
+// ======================================================
+router.post(
+  "/:id/invoice/generate",
+  safe("generateInvoice")
+);
+
 module.exports = router;
