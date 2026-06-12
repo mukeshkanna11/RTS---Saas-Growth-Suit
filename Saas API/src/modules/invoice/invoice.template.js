@@ -1,4 +1,6 @@
 class InvoiceTemplate {
+
+  // ================= SAFE UTIL =================
   num(v) {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
@@ -10,96 +12,137 @@ class InvoiceTemplate {
 
   formatDate(date) {
     if (!date) return "-";
-    return new Date(date).toLocaleDateString("en-IN");
+    const d = new Date(date);
+    return isNaN(d.getTime()) ? "-" : d.toLocaleDateString("en-IN");
   }
 
+  resolveDate(data, key) {
+    // Universal safe resolver (fixes ALL missing date issues)
+    return (
+      data?.[key] ||
+      data?.[`${key}_date`] ||
+      data?.[key.replace(/Date/, "_date")] ||
+      data?.createdAt ||
+      null
+    );
+  }
+
+  safeDate(...dates) {
+  for (const d of dates) {
+    if (!d) continue;
+
+    const date = new Date(d);
+    if (!isNaN(date.getTime())) return date;
+  }
+  return null;
+}
+
+  // ================= BUILD =================
   build(data = {}) {
+
+  const {
+    company = {},
+    customer = {},
+    items = [],
+    totals = {},
+    discount = {},
+    tax = {},
+    bank = {},
+
+    invoiceId = `INV-${Date.now()}`,
+    paymentStatus = "PENDING",
+    notes = "",
+    terms = []
+  } = data;
+
+  // 🔥 SAFE DATE RESOLUTION (FIXED)
+  const orderDate = this.safeDate(data.orderDate, data.order_date, data.createdAt);
+  const purchaseDate = this.safeDate(data.purchaseDate, data.purchase_date, data.createdAt);
+  const paymentDate = this.safeDate(data.paymentDate, data.payment_date);
+  const dueDate = this.safeDate(data.dueDate, data.due_date);
+
+  const invoice = {
+    invoiceId,
+    orderDate,
+    purchaseDate,
+    paymentDate,
+    dueDate
+  };
+
+  return this.toHTML({
+    company,
+    customer,
+    items,
+    totals,
+    discount,
+    tax,
+    bank,
+    notes,
+    terms,
+    invoice,
+    paymentStatus
+  });
+}
+
+  // ================= HTML =================
+  toHTML(data = {}) {
+
     const {
       company = {},
       customer = {},
       items = [],
       totals = {},
-
-      invoiceId = `INV-${Date.now()}`,
-
-      orderDate,
-      purchaseDate,
-      paymentDate,
-      dueDate,
-
       paymentStatus = "PENDING",
-
-      notes = "",
-      terms = [],
-
-      bank = {}
+      invoice = {}
     } = data;
 
-    return this.toHTML({
-      company,
-      customer,
-      items,
-      totals,
-      notes,
-      terms,
-      bank,
+   const {
+  invoiceId,
+  orderDate,
+  purchaseDate,
+  paymentDate,
+  dueDate
+} = data;
 
-      invoice: {
-        invoiceId,
-        orderDate,
-        purchaseDate,
-        paymentDate,
-        dueDate
-      },
+    const statusColor =
+      paymentStatus === "PAID"
+        ? "#16a34a"
+        : paymentStatus === "PENDING"
+        ? "#f59e0b"
+        : "#ef4444";
 
-      paymentStatus
-    });
-  }
+    const money = (v) => this.money(v);
 
-toHTML(inv) {
+    const safeItems = Array.isArray(items) ? items : [];
 
-  const statusColor =
-    inv.paymentStatus === "PAID"
-      ? "#16a34a"
-      : inv.paymentStatus === "PENDING"
-      ? "#f59e0b"
-      : "#ef4444";
+    const rows = safeItems.map((i, idx) => `
+      <tr>
+        <td>${idx + 1}</td>
+        <td>${i.name || "-"}</td>
+        <td>${i.hsn || "998314"}</td>
+        <td>${i.qty || 0}</td>
+        <td>₹${money(i.price)}</td>
+        <td>₹${money((i.qty || 0) * (i.price || 0))}</td>
+      </tr>
+    `).join("");
 
-  const invoiceId = inv.invoiceId || "N/A";
-  const orderDate = inv.orderDate
-    ? new Date(inv.orderDate).toLocaleDateString("en-IN")
-    : "-";
-
-  const dueDate = inv.dueDate
-    ? new Date(inv.dueDate).toLocaleDateString("en-IN")
-    : "-";
-
-  const items = Array.isArray(inv.items) ? inv.items : [];
-  const totals = inv.totals || {};
-
-  return `
+    return `
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<title>${invoiceId}</title>
+<title>${invoiceId || "Invoice"}</title>
 
 <style>
-
-@page {
-  size: A4;
-  margin: 15mm;
-}
+@page { size: A4; margin: 15mm; }
 
 body{
   font-family: Arial, sans-serif;
   background:#f6f7fb;
   margin:0;
-  padding:0;
   color:#0f172a;
 }
 
-/* MAIN CARD */
 .invoice{
   background:#fff;
   padding:24px;
@@ -107,7 +150,6 @@ body{
   border:1px solid #e5e7eb;
 }
 
-/* HEADER */
 .header{
   width:100%;
   border-collapse:collapse;
@@ -117,41 +159,33 @@ body{
   border:1px solid #e5e7eb;
 }
 
-.company h2{
-  margin:0;
-  font-size:18px;
-}
+.company h2{ margin:0; font-size:18px; }
 
 .small{
   font-size:12px;
   color:#64748b;
 }
 
-/* STATUS BADGE */
 .status{
   display:inline-block;
   padding:5px 12px;
   border-radius:999px;
   background:${statusColor};
-  color:white;
+  color:#fff;
   font-size:12px;
   margin-top:6px;
 }
 
-/* SECTION */
 .section{
   margin-top:14px;
   padding:14px;
   border:1px solid #e5e7eb;
   border-radius:10px;
-  background:#fff;
 }
 
-/* TABLE */
 table{
   width:100%;
   border-collapse:collapse;
-  margin-top:10px;
 }
 
 th{
@@ -159,17 +193,14 @@ th{
   padding:10px;
   font-size:12px;
   text-align:left;
-  color:#1e293b;
 }
 
 td{
   padding:10px;
   font-size:12px;
   border-bottom:1px solid #f1f5f9;
-  color:#334155;
 }
 
-/* SUMMARY BOX */
 .summary{
   width:320px;
   margin-left:auto;
@@ -183,10 +214,8 @@ td{
 .total{
   font-weight:700;
   color:#4f46e5;
-  font-size:14px;
 }
 
-/* FOOTER */
 .footer{
   text-align:center;
   margin-top:20px;
@@ -194,12 +223,10 @@ td{
   color:#64748b;
 }
 
-/* PDF SAFE */
 *{
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
-
 </style>
 </head>
 
@@ -213,20 +240,22 @@ td{
 
       <td style="padding:14px;">
         <div class="company">
-          <h2>${inv.company?.name || "-"}</h2>
-          <div class="small">${inv.company?.address || ""}</div>
-          <div class="small">${inv.company?.email || ""} | ${inv.company?.phone || ""}</div>
+          <h2>${company?.name || "-"}</h2>
+          <div class="small">${company?.address || ""}</div>
+          <div class="small">${company?.email || ""} | ${company?.phone || ""}</div>
         </div>
       </td>
 
       <td style="text-align:right; padding:14px;">
         <div style="font-weight:700;">TAX INVOICE</div>
 
-        <div class="small">Invoice: ${invoiceId}</div>
-        <div class="small">Order: ${orderDate}</div>
-        <div class="small">Due: ${dueDate}</div>
+        <div class="small">Invoice: ${invoiceId || "-"}</div>
+        <div class="small">Order Date: ${this.formatDate(orderDate)}</div>
+        <div class="small">Purchase Date: ${this.formatDate(purchaseDate)}</div>
+        <div class="small">Payment Date: ${this.formatDate(paymentDate)}</div>
+        <div class="small">Due Date: ${this.formatDate(dueDate)}</div>
 
-        <div class="status">${inv.paymentStatus || "-"}</div>
+        <div class="status">${paymentStatus}</div>
       </td>
 
     </tr>
@@ -235,11 +264,11 @@ td{
   <!-- CUSTOMER -->
   <div class="section">
     <h3 style="margin:0 0 6px 0;">Bill To</h3>
-    <b>${inv.customer?.name || "-"}</b><br>
-    <div class="small">${inv.customer?.email || ""}</div>
-    <div class="small">${inv.customer?.phone || ""}</div>
-    <div class="small">${inv.customer?.address || ""}</div>
-    <div class="small">GSTIN: ${inv.customer?.gstin || "-"}</div>
+    <b>${customer?.name || "-"}</b><br>
+    <div class="small">${customer?.email || ""}</div>
+    <div class="small">${customer?.phone || ""}</div>
+    <div class="small">${customer?.address || ""}</div>
+    <div class="small">GSTIN: ${customer?.gstin || "-"}</div>
   </div>
 
   <!-- ITEMS -->
@@ -253,33 +282,21 @@ td{
         <th>Price</th>
         <th>Total</th>
       </tr>
-
-      ${items.map((i, idx) => `
-        <tr>
-          <td>${idx + 1}</td>
-          <td>${i.name || "-"}</td>
-          <td>${i.hsn || "998314"}</td>
-          <td>${i.qty || 0}</td>
-          <td>₹${i.price || 0}</td>
-          <td>₹${(i.qty || 0) * (i.price || 0)}</td>
-        </tr>
-      `).join("")}
-
+      ${rows}
     </table>
   </div>
 
   <!-- SUMMARY -->
   <div class="summary">
     <table>
-      <tr><td>Subtotal</td><td>₹${totals.subtotal || 0}</td></tr>
-      <tr><td>Discount</td><td>₹${totals.discountAmount || 0}</td></tr>
-      <tr><td>CGST</td><td>₹${totals.cgst || 0}</td></tr>
-      <tr><td>SGST</td><td>₹${totals.sgst || 0}</td></tr>
-      <tr class="total"><td>Total</td><td>₹${totals.total || 0}</td></tr>
+      <tr><td>Subtotal</td><td>₹${money(totals.subtotal)}</td></tr>
+      <tr><td>Discount</td><td>₹${money(totals.discountAmount)}</td></tr>
+      <tr><td>CGST</td><td>₹${money(totals.cgst)}</td></tr>
+      <tr><td>SGST</td><td>₹${money(totals.sgst)}</td></tr>
+      <tr class="total"><td>Total</td><td>₹${money(totals.total)}</td></tr>
     </table>
   </div>
 
-  <!-- FOOTER -->
   <div class="footer">
     Generated by ReadyTechSolutions • SaaS Billing Engine
   </div>
@@ -289,7 +306,7 @@ td{
 </body>
 </html>
 `;
-}
+  }
 }
 
 module.exports = new InvoiceTemplate();
