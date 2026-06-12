@@ -206,6 +206,51 @@ const refreshInvoices = async () => {
   }
 };
 
+const updateInvoiceStatus = async (invoiceId, newStatus) => {
+  try {
+    // ================= OPTIMISTIC UI UPDATE =================
+    setInvoices((prev) =>
+      prev.map((inv) =>
+        inv.invoiceId === invoiceId
+          ? {
+              ...inv,
+              paymentStatus: newStatus,
+              status:
+                newStatus === "paid"
+                  ? "generated"
+                  : inv.status,
+            }
+          : inv
+      )
+    );
+
+    // ================= API CALL =================
+    const res = await API.patch(
+      `/invoice/${invoiceId}/status`,
+      {
+        paymentStatus: newStatus,
+      }
+    );
+
+    const updated = res?.data?.data;
+
+    if (updated) {
+      // ================= HARD SYNC (IMPORTANT) =================
+      setInvoices((prev) =>
+        prev.map((inv) =>
+          inv.invoiceId === invoiceId ? updated : inv
+        )
+      );
+    }
+
+  } catch (err) {
+    console.error(err);
+
+    // rollback
+    refreshInvoices();
+  }
+};
+
   // ================= DOWNLOAD INVOICE (SAFE VERSION) =================
 const downloadInvoice = async (invoiceId) => {
   try {
@@ -265,6 +310,25 @@ const downloadInvoice = async (invoiceId) => {
         i?.customer?.name?.toLowerCase().includes(s)
     );
   }, [invoices, search]);
+
+  const statusStyle = (status) => {
+  switch (status) {
+    case "paid":
+      return "bg-green-500/10 text-green-400 border-green-500";
+
+    case "pending":
+      return "bg-yellow-500/10 text-yellow-400 border-yellow-500";
+
+    case "draft":
+      return "bg-slate-500/10 text-slate-300 border-slate-500";
+
+    case "failed":
+      return "bg-red-500/10 text-red-400 border-red-500";
+
+    default:
+      return "bg-slate-500/10 text-slate-400 border-slate-500";
+  }
+};
 
   return (
     <div className="min-h-screen p-6 text-white bg-slate-950">
@@ -329,50 +393,82 @@ const downloadInvoice = async (invoiceId) => {
         </div>
       )}
 
-      {/* TABLE */}
-      <div className="overflow-hidden border rounded-2xl border-slate-800">
-        <table className="w-full">
-          <thead className="bg-slate-900">
-            <tr>
-              <th className="p-4">Invoice</th>
-              <th>Customer</th>
-              <th>Amount</th>
-              <th>Status</th>
-              <th>Date</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
+      
+{/* TABLE */}
+<div className="overflow-hidden border shadow-xl rounded-2xl border-slate-800 bg-slate-950">
+  <table className="w-full text-sm">
 
-          <tbody>
-            {filtered.map((invoice) => (
-              <tr key={invoice._id} className="border-t border-slate-800">
-                <td className="p-4">{invoice.invoiceId}</td>
-                <td>{invoice.customer?.name}</td>
-                <td>₹{invoice?.totals?.total || 0}</td>
-                <td>{invoice.paymentStatus}</td>
-                <td>
-                  {new Date(invoice.createdAt).toLocaleDateString()}
-                </td>
-                <td className="flex gap-2 p-2">
-                  <button
-                    onClick={() => downloadInvoice(invoice.invoiceId)}
-                    className="p-2 bg-green-600 rounded-lg"
-                  >
-                    <Download size={16} />
-                  </button>
+    {/* HEADER */}
+    <thead className="text-xs tracking-wider uppercase bg-slate-900 text-slate-400">
+      <tr>
+        <th className="p-4 text-left">Invoice</th>
+        <th className="text-left">Customer</th>
+        <th className="text-left">Amount</th>
+        <th className="text-left">Status</th>
+        <th className="text-left">Date</th>
+        <th className="text-left">Actions</th>
+      </tr>
+    </thead>
 
-                  <button
-                    onClick={() => deleteInvoice(invoice.invoiceId)}
-                    className="p-2 bg-red-600 rounded-lg"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    {/* BODY */}
+    <tbody>
+      {filtered.map((invoice) => (
+        <tr
+          key={invoice._id}
+          className="transition border-t border-slate-800 hover:bg-slate-900/50"
+        >
+          {/* Invoice ID */}
+          <td className="p-4 font-medium text-white">
+            {invoice.invoiceId}
+          </td>
+
+          {/* Customer */}
+          <td className="text-slate-300">
+            {invoice.customer?.name || "—"}
+          </td>
+
+          {/* Amount */}
+          <td className="font-semibold text-slate-200">
+            ₹{invoice?.totals?.total || 0}
+          </td>
+
+          {/* STATUS BADGE */}
+          <td>
+            <span
+              className={`px-3 py-1 rounded-full border text-xs capitalize ${statusStyle(
+                invoice.paymentStatus
+              )}`}
+            >
+              {invoice.paymentStatus}
+            </span>
+          </td>
+
+          {/* DATE */}
+          <td className="text-slate-400">
+            {new Date(invoice.createdAt).toLocaleDateString()}
+          </td>
+
+          {/* ACTIONS */}
+          <td className="flex gap-2 p-2">
+            <button
+              onClick={() => downloadInvoice(invoice.invoiceId)}
+              className="p-2 transition rounded-lg bg-emerald-600 hover:bg-emerald-500"
+            >
+              ⬇
+            </button>
+
+            <button
+              onClick={() => deleteInvoice(invoice.invoiceId)}
+              className="p-2 transition bg-red-600 rounded-lg hover:bg-red-500"
+            >
+              🗑
+            </button>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
 
       {showCreate && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-lg">

@@ -28,6 +28,15 @@ export default function ClientDashboard() {
 
   const [error, setError] =
     useState(null);
+    
+const [supportMessage, setSupportMessage] = useState("");
+const [sending, setSending] = useState(false);
+const [successMsg, setSuccessMsg] = useState("");
+const [chatOpen, setChatOpen] = useState(false);
+
+
+  
+
 
   const loadDashboard =
     async () => {
@@ -342,7 +351,8 @@ export default function ClientDashboard() {
       [whatsapp]
     );
 
-  const dashboardData = {
+  const dashboardData = useMemo(
+  () => ({
     metrics,
     budgetData,
     funnelData,
@@ -351,20 +361,39 @@ export default function ClientDashboard() {
     activeCampaigns,
     latestLeads,
     leadStats,
-    bestCampaign:
-      topCampaign,
+    bestCampaign: topCampaign,
     notificationStats,
     notifications,
     alertStats,
     alerts,
     emailStats,
     whatsappStats,
-  };
+  }),
+  [
+    metrics,
+    budgetData,
+    funnelData,
+    channels,
+    campaignStats,
+    activeCampaigns,
+    latestLeads,
+    leadStats,
+    topCampaign,
+    notificationStats,
+    notifications,
+    alertStats,
+    alerts,
+    emailStats,
+    whatsappStats,
+  ]
+);
 
+useEffect(() => {
   console.log(
     "Dashboard Data:",
     dashboardData
   );
+}, [dashboardData]);
 
 const Info = ({
   label,
@@ -419,6 +448,37 @@ const PremiumCard = ({
 
   </div>
 );
+
+const sendSupportRequest = async () => {
+  try {
+    if (!supportMessage.trim()) {
+      return alert("Please enter your message");
+    }
+
+    setSending(true);
+
+    const res = await API.post(
+      "/client/support/contact",
+      {
+        message: supportMessage,
+      }
+    );
+
+    setSuccessMsg(
+      res.data.message ||
+        "Support request submitted successfully"
+    );
+
+    setSupportMessage("");
+  } catch (err) {
+    alert(
+      err?.response?.data?.message ||
+        "Failed to send request"
+    );
+  } finally {
+    setSending(false);
+  }
+};
 
 const StatRow = ({
   label,
@@ -1628,11 +1688,165 @@ const StatRow = ({
 
     </div>
 
+    
+
   </div>
 
+
+<div className="fixed z-50 bottom-6 right-6">
+
+  <button
+    onClick={() => setChatOpen(true)}
+    className="w-16 h-16 text-2xl text-white transition-all duration-300 rounded-full shadow-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:scale-110"
+  >
+    💬
+  </button>
+
+</div>
+
+{
+  chatOpen && (
+    <div
+      className="
+      fixed
+      bottom-24
+      right-6
+      w-[400px]
+      max-w-[95vw]
+      h-[600px]
+      bg-[#0F172A]
+      rounded-3xl
+      overflow-hidden
+      shadow-[0_20px_60px_rgba(0,0,0,0.45)]
+      border
+      border-slate-700
+      z-50
+      backdrop-blur-xl
+      "
+    >
+      {/* Header */}
+
+      <div
+        className="flex items-center justify-between p-5 bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700"
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="flex items-center justify-center w-12 h-12 text-xl rounded-full bg-white/20"
+          >
+            🚀
+          </div>
+
+          <div>
+            <h3 className="text-lg font-bold text-white">
+              ReadyTech Support
+            </h3>
+
+            <p className="text-xs text-cyan-100">
+              Online • Response within 24 hrs
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setChatOpen(false)}
+          className="text-xl text-white transition-all hover:rotate-90"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Body */}
+
+      <div
+        className="
+        p-5
+        h-[420px]
+        overflow-y-auto
+        bg-[#0F172A]
+        "
+      >
+        <div
+          className="
+          bg-slate-800
+          text-slate-200
+          rounded-2xl
+          p-4
+          max-w-[85%]
+          "
+        >
+          👋 Welcome to ReadyTech Support.
+
+          <br />
+          <br />
+
+          Need help with:
+
+          <ul className="mt-2 space-y-1 text-sm">
+            <li>• Subscription Issues</li>
+            <li>• Invoice Problems</li>
+            <li>• CRM Assistance</li>
+            <li>• Automation Setup</li>
+          </ul>
+        </div>
+
+        {successMsg && (
+          <div
+            className="p-4 mt-4 border bg-emerald-500/15 border-emerald-500/30 text-emerald-300 rounded-2xl"
+          >
+            ✅ {successMsg}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+
+      <div
+        className="absolute bottom-0 left-0 right-0 p-4 border-t bg-slate-900 border-slate-700"
+      >
+        <textarea
+          rows={3}
+          value={supportMessage}
+          onChange={(e) =>
+            setSupportMessage(e.target.value)
+          }
+          placeholder="Type your message..."
+          className="w-full p-4 text-white border outline-none resize-none bg-slate-800 border-slate-700 placeholder-slate-400 rounded-2xl focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+        />
+
+        <button
+          onClick={sendSupportRequest}
+          disabled={sending}
+          className="
+          mt-3
+          w-full
+          py-3
+          rounded-2xl
+          bg-gradient-to-r
+          from-cyan-500
+          to-blue-600
+          text-white
+          font-semibold
+          hover:scale-[1.02]
+          transition-all
+          shadow-lg
+          "
+        >
+          {sending ? (
+            "Sending..."
+          ) : (
+            "Send Message →"
+          )}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 </div>
 
 </div>
+
+
 
     </div>
   )
