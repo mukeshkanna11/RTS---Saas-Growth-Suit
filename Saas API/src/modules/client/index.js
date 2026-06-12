@@ -30,4 +30,11 @@ router.use(
   require("./reports/report.routes")      
 );
 
+router.use(
+ "/support",
+ require(
+ "./integrations/support.routes"
+ )
+);
+
 module.exports = router;
