@@ -669,6 +669,10 @@ export default function Users() {
                     👨‍💻 Employee
                   </option>
 
+                  <option value="client">
+                    👨‍💼 Client 
+                  </option>
+
                 </select>
 
                 {/* STATUS */}
