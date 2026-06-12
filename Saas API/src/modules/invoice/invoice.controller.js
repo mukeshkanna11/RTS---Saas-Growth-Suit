@@ -1,7 +1,7 @@
 const InvoiceService = require("./invoice.service");
 
 // =========================
-// SAFE HELPERS
+// RESPONSE HELPERS
 // =========================
 const success = (res, message, data = null) => {
   return res.status(200).json({
@@ -19,7 +19,7 @@ const fail = (res, message, code = 500) => {
 };
 
 // =========================
-// VALIDATION (basic SaaS level)
+// VALIDATION
 // =========================
 const validateInvoiceRequest = (body) => {
   if (!body) return "Request body is required";
@@ -28,42 +28,83 @@ const validateInvoiceRequest = (body) => {
 
   if (!body.customer) return "Customer details required";
 
-  if (!Array.isArray(body.items)) {
-    return "Items must be an array";
-  }
+  if (!Array.isArray(body.items)) return "Items must be an array";
 
-  if (body.items.length === 0) {
-    return "At least one item is required";
-  }
+  if (body.items.length === 0) return "At least one item is required";
 
   return null;
 };
 
+// =========================
+// DOWNLOAD INVOICE (PDF)
+// =========================
 exports.downloadInvoice = async (req, res) => {
   try {
     const result = await InvoiceService.download(req.params.invoiceId, res);
+    return result;
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    console.error("🔥 DOWNLOAD ERROR:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
-
+// =========================
+// GENERATE INVOICE (FIXED VERSION)
+// =========================
 exports.generateInvoice = async (req, res) => {
   try {
-    const invoiceData = req.body;
+    const body = req.body;
 
-    const error = validateInvoiceRequest(invoiceData);
-    if (error) {
-      return fail(res, error, 400);
-    }
+    // =========================
+    // VALIDATE REQUEST
+    // =========================
+    const error = validateInvoiceRequest(body);
+    if (error) return fail(res, error, 400);
 
+    // =========================
+    // SAFE DATE NORMALIZATION (🔥 IMPORTANT FIX)
+    // =========================
+    const invoiceData = {
+      ...body,
+
+      orderDate:
+        body.orderDate || body.order_date || body.createdAt || null,
+
+      purchaseDate:
+        body.purchaseDate || body.purchase_date || body.createdAt || null,
+
+      paymentDate:
+        body.paymentDate || body.payment_date || null,
+
+      dueDate:
+        body.dueDate || body.due_date || null,
+    };
+
+    // =========================
+    // SAFE INVOICE ID
+    // =========================
     invoiceData.invoiceId =
-      invoiceData.invoiceId ||
+      body.invoiceId ||
       `INV-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+    console.log("🔥 FINAL CONTROLLER PAYLOAD:", invoiceData);
+
+    // =========================
+    // SERVICE CALL
+    // =========================
     const result = await InvoiceService.generateInvoice(invoiceData);
 
-    // SEND PDF DIRECTLY (BEST PRACTICE)
+    if (!result || !result.pdf) {
+      throw new Error("PDF generation failed in service layer");
+    }
+
+    // =========================
+    // PDF RESPONSE
+    // =========================
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
@@ -77,7 +118,7 @@ exports.generateInvoice = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: err.message,
+      message: err.message || "Internal Server Error",
     });
   }
 };

@@ -110,23 +110,14 @@ const calculateTotals = (
 
 
 
-// ======================================================
-// GENERATE INVOICE (PRODUCTION SAFE FIXED)
-// ======================================================
-
-
 const generateInvoice = async (invoiceData = {}) => {
   try {
+
     // =========================
     // VALIDATION
     // =========================
-    if (!invoiceData?.company) {
-      throw new Error("Company details required");
-    }
-
-    if (!invoiceData?.customer) {
-      throw new Error("Customer details required");
-    }
+    if (!invoiceData?.company) throw new Error("Company details required");
+    if (!invoiceData?.customer) throw new Error("Customer details required");
 
     if (!Array.isArray(invoiceData.items)) {
       invoiceData.items = [];
@@ -140,111 +131,127 @@ const generateInvoice = async (invoiceData = {}) => {
       `INV-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     // =========================
-    // DUPLICATE CHECK
+    // STATUS NORMALIZER (IMPORTANT)
     // =========================
-    const existing = await Invoice.findOne({ invoiceId });
+    const normalizeStatus = (status) => {
+      if (!status) return "pending";
 
-    if (existing) {
-      throw new Error("Invoice ID already exists. Try again.");
-    }
+      const s = status.toString().toLowerCase();
+
+      if (s === "paid") return "paid";
+      if (s === "pending") return "pending";
+      if (s === "failed") return "failed";
+
+      return "pending";
+    };
+
+    // =========================
+    // SAFE DATE NORMALIZATION
+    // =========================
+    const normalizedData = {
+      ...invoiceData,
+
+      invoiceId,
+
+      orderDate:
+        invoiceData.orderDate ||
+        invoiceData.order_date ||
+        invoiceData.createdAt,
+
+      purchaseDate:
+        invoiceData.purchaseDate ||
+        invoiceData.purchase_date ||
+        invoiceData.createdAt,
+
+      paymentDate:
+        invoiceData.paymentDate ||
+        invoiceData.payment_date ||
+        null,
+
+      dueDate:
+        invoiceData.dueDate ||
+        invoiceData.due_date ||
+        null,
+
+      paymentStatus: normalizeStatus(invoiceData.paymentStatus),
+
+      createdAt: new Date()
+    };
 
     // =========================
     // CALCULATIONS
     // =========================
     const totals = calculateTotals(
-      invoiceData.items,
-      invoiceData.discount,
-      invoiceData.tax
+      normalizedData.items,
+      normalizedData.discount,
+      normalizedData.tax
     );
 
-    // =========================
-    // BUILD TEMPLATE DATA
-    // =========================
-    const data = {
-      ...invoiceData,
-      invoiceId,
-      totals,
-      createdAt: new Date(),
-    };
+    normalizedData.totals = totals;
 
+    // =========================
+    // LOGO (SAFE)
+    // =========================
+    let logoBase64 = "";
     const logoPath = path.join(process.cwd(), "public", "logo.png");
 
-let logoBase64 = "";
-
-if (fs.existsSync(logoPath)) {
-  const file = fs.readFileSync(logoPath);
-  logoBase64 = file.toString("base64");
-}
-
-    // =========================
-    // GENERATE HTML
-    // =========================
-    const html = InvoiceTemplate.toHTML(data, logoBase64);
-
-    if (!html) {
-      throw new Error("HTML generation failed from template");
+    if (fs.existsSync(logoPath)) {
+      const file = fs.readFileSync(logoPath);
+      logoBase64 = file.toString("base64");
     }
+
+    // =========================
+    // HTML GENERATION
+    // =========================
+    const html = InvoiceTemplate.toHTML({
+      ...normalizedData,
+      logoBase64
+    });
+
+    if (!html) throw new Error("HTML generation failed");
 
     console.log("HTML GENERATED LENGTH:", html.length);
 
     // =========================
-    // CREATE UPLOAD DIR
+    // PDF GENERATION
     // =========================
-    const uploadDir = path.join(process.cwd(), "uploads", "invoices");
-    fs.mkdirSync(uploadDir, { recursive: true });
-
-    // =========================
-    // PDF GENERATION (IMPORTANT FIX AREA)
-    // =========================
-    let fileResult;
-
-    try {
-      fileResult = await PDFGenerator.generate(html, invoiceId);
-    } catch (pdfErr) {
-      console.error("🔥 PDF GENERATION REAL ERROR:");
-      console.error(pdfErr);
-
-      throw new Error(`PDF generation failed: ${pdfErr.message}`);
-    }
+    const fileResult = await PDFGenerator.generate(html, invoiceId);
 
     if (!fileResult?.filePath) {
-      throw new Error("PDF generation returned empty filePath");
+      throw new Error("PDF generation failed");
     }
 
     // =========================
-    // SAVE IN DB
+    // SAVE DB
     // =========================
     const savedInvoice = await Invoice.create({
       invoiceId,
-      company: invoiceData.company,
-      customer: invoiceData.customer,
-      items: invoiceData.items,
-      discount: invoiceData.discount || {},
-      tax: invoiceData.tax || {},
+      company: normalizedData.company,
+      customer: normalizedData.customer,
+      items: normalizedData.items,
+      discount: normalizedData.discount || {},
+      tax: normalizedData.tax || {},
       totals,
-      notes: invoiceData.notes || "",
+      notes: normalizedData.notes || "",
 
-      terms: Array.isArray(invoiceData.terms)
-        ? invoiceData.terms
-        : invoiceData.terms
-        ? [invoiceData.terms]
+      terms: Array.isArray(normalizedData.terms)
+        ? normalizedData.terms
+        : normalizedData.terms
+        ? [normalizedData.terms]
         : [],
 
       fileName: fileResult.fileName,
       filePath: fileResult.filePath,
 
       status: "generated",
-      paymentStatus: "pending",
+      paymentStatus: normalizedData.paymentStatus,
 
-      orderDate: invoiceData.orderDate,
-      purchaseDate: invoiceData.purchaseDate,
-      paymentDate: invoiceData.paymentDate,
-      dueDate: invoiceData.dueDate,
+      orderDate: normalizedData.orderDate,
+      purchaseDate: normalizedData.purchaseDate,
+      paymentDate: normalizedData.paymentDate,
+      dueDate: normalizedData.dueDate,
     });
 
-    // =========================
-    // FINAL RESPONSE
-    // =========================
     return {
       success: true,
       message: "Invoice generated successfully",
@@ -253,8 +260,7 @@ if (fs.existsSync(logoPath)) {
     };
 
   } catch (error) {
-    console.error("🔥 INVOICE SERVICE ERROR:");
-    console.error(error);
+    console.error("🔥 INVOICE SERVICE ERROR:", error);
 
     return {
       success: false,
@@ -262,8 +268,6 @@ if (fs.existsSync(logoPath)) {
     };
   }
 };
-
-module.exports = { generateInvoice };
 
 
 // ======================================================
@@ -540,6 +544,8 @@ const updateInvoiceStatus =
     return invoice;
   };
 
+
+  
 // ======================================================
 // DASHBOARD STATS
 // ======================================================
