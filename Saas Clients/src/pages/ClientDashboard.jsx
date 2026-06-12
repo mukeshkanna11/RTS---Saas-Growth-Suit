@@ -457,20 +457,35 @@ const sendSupportRequest = async () => {
 
     setSending(true);
 
-    const res = await API.post(
-      "/client/support/contact",
+    const token =
+      localStorage.getItem("token");
+
+    const res = await axios.post(
+      "https://rts-saas-growth-suit-1.onrender.com/api/v1/client/support/contact",
       {
-        message: supportMessage,
+        message: supportMessage.trim(),
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type":
+            "application/json",
+        },
       }
     );
 
     setSuccessMsg(
-      res.data.message ||
-        "Support request submitted successfully"
+      res?.data?.message ||
+        "Thank you for contacting ReadyTech Solutions. Our team will reach out within 24 hours."
     );
 
     setSupportMessage("");
   } catch (err) {
+    console.error(
+      "Support Error:",
+      err?.response?.data || err
+    );
+
     alert(
       err?.response?.data?.message ||
         "Failed to send request"
