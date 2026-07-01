@@ -1,12 +1,9 @@
-<<<<<<< HEAD
 # Secrets — never commit
 .env
 .env.local
 .env.*.local
 .env.production
 
-=======
->>>>>>> ade4fece41a073615a127e6fc0da3d2b04542245
 # Logs
 logs
 *.log

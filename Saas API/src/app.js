@@ -181,7 +181,6 @@ const clientRoutes = require("./modules/client");
 const integrationRoutes = require("./modules/client/integrations/integration.routes");
 const webhookRoutes = require("./modules/client/integrations/webhook.routes");
 const invoiceRoutes = require("./modules/invoice/invoice.routes");
-<<<<<<< HEAD
 const seoroutes = require("./modules/marketing/routes/seo.routes");
 const aiRoutes = require("./modules/ai/ai.routes");
 
@@ -194,8 +193,6 @@ try {
   // swagger-ui-express not yet installed — run: npm install swagger-ui-express
 }
 
-=======
->>>>>>> ade4fece41a073615a127e6fc0da3d2b04542245
 
 // =======================================================
 // ROOT ROUTE
@@ -257,7 +254,6 @@ app.use("/api/v1/webhooks", webhookRoutes);
 
 app.use("/api/v1/invoice", invoiceRoutes);
 
-<<<<<<< HEAD
 app.use("/api/v1/seo", seoroutes);
 app.use("/api/v1/ai", aiRoutes);
 
@@ -276,8 +272,6 @@ if (swaggerUi && swaggerSpec) {
   app.get("/api/v1/docs.json", (req, res) => res.json(swaggerSpec));
 }
 
-=======
->>>>>>> ade4fece41a073615a127e6fc0da3d2b04542245
 // =======================================================
 // 404 HANDLER
 // =======================================================

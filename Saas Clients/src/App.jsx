@@ -22,11 +22,8 @@ import Invoice from "./pages/Invoice";
 import Users from "./pages/Users";
 
 import ClientDashboard from "./pages/ClientDashboard";
-<<<<<<< HEAD
 import AIContent from "./pages/AIContent";
 import SEOTool from "./pages/SEOTool";
-=======
->>>>>>> ade4fece41a073615a127e6fc0da3d2b04542245
 
 import MainLayout from "./layouts/MainLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -90,14 +87,9 @@ export default function App() {
   <Route path="users" element={<Users />} />
   <Route path="subscription" element={<Subscription />} />
 
-<<<<<<< HEAD
   <Route path="invoice" element={<Invoice />} />
   <Route path="ai-content" element={<AIContent />} />
   <Route path="seo-tool" element={<SEOTool />} />
-=======
-  {/* NEW */}
-  <Route path="invoice" element={<Invoice />} />
->>>>>>> ade4fece41a073615a127e6fc0da3d2b04542245
 </Route>
         
 
@@ -116,11 +108,8 @@ export default function App() {
           <Route path="campaigns" element={<Campaigns />} />
           <Route path="automation" element={<Automation />} />
           <Route path="analytics" element={<Analytics />} />
-<<<<<<< HEAD
           <Route path="ai-content" element={<AIContent />} />
           <Route path="seo-tool" element={<SEOTool />} />
-=======
->>>>>>> ade4fece41a073615a127e6fc0da3d2b04542245
         </Route>
 
         {/* EMPLOYEE */}
