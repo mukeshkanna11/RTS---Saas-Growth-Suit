@@ -1,6 +1,7 @@
 const asyncHandler = require("../../utils/asyncHandler");
 const { sendSuccess, sendError } = require("../../utils/apiResponse");
 const aiService = require("./services/ai.service");
+const { ping } = require("../../services/claude.service");
 
 // ── Core Generation ───────────────────────────────────────────────────────────
 
@@ -85,6 +86,12 @@ const getCostBreakdown = asyncHandler(async (req, res) => {
   );
 });
 
+// GET /api/v1/ai/health — verifies the Anthropic key is valid and callable
+const healthCheck = asyncHandler(async (req, res) => {
+  const result = await ping();
+  return sendSuccess(res, result, "Anthropic API connection healthy");
+});
+
 module.exports = {
   generate,
   getHistory,
@@ -95,4 +102,5 @@ module.exports = {
   getTopFeatures,
   getTopUsers,
   getCostBreakdown,
+  healthCheck,
 };

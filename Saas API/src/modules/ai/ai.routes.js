@@ -18,10 +18,16 @@ const {
   getTopFeatures,
   getTopUsers,
   getCostBreakdown,
+  healthCheck,
 } = require("./ai.controller");
 
 // All routes require authentication
 router.use(protect);
+
+/* =========================
+   HEALTH CHECK
+========================= */
+router.get("/health", authorize("admin", "manager"), healthCheck);
 
 /* =========================
    GENERATION
