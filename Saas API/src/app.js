@@ -181,6 +181,18 @@ const clientRoutes = require("./modules/client");
 const integrationRoutes = require("./modules/client/integrations/integration.routes");
 const webhookRoutes = require("./modules/client/integrations/webhook.routes");
 const invoiceRoutes = require("./modules/invoice/invoice.routes");
+const seoroutes = require("./modules/marketing/routes/seo.routes");
+const aiRoutes = require("./modules/ai/ai.routes");
+
+// Swagger UI — only in non-production or when explicitly enabled
+let swaggerUi, swaggerSpec;
+try {
+  swaggerUi = require("swagger-ui-express");
+  swaggerSpec = require("./docs/swagger");
+} catch (_) {
+  // swagger-ui-express not yet installed — run: npm install swagger-ui-express
+}
+
 
 // =======================================================
 // ROOT ROUTE
@@ -241,6 +253,24 @@ app.use("/api/v1/integrations", integrationRoutes);
 app.use("/api/v1/webhooks", webhookRoutes);
 
 app.use("/api/v1/invoice", invoiceRoutes);
+
+app.use("/api/v1/seo", seoroutes);
+app.use("/api/v1/ai", aiRoutes);
+
+// =======================================================
+// SWAGGER UI  (available at /api/v1/docs)
+// =======================================================
+if (swaggerUi && swaggerSpec) {
+  app.use(
+    "/api/v1/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      customSiteTitle: "ReadyTech AI & SEO API Docs",
+      swaggerOptions: { persistAuthorization: true },
+    })
+  );
+  app.get("/api/v1/docs.json", (req, res) => res.json(swaggerSpec));
+}
 
 // =======================================================
 // 404 HANDLER

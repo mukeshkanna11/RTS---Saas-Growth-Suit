@@ -4,7 +4,8 @@
 
 require("dns").setDefaultResultOrder("ipv4first");
 
-require("dotenv").config();
+// Explicit path ensures .env loads correctly regardless of where `node` is invoked from
+require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
 
 const mongoose = require("mongoose");
 const http = require("http");

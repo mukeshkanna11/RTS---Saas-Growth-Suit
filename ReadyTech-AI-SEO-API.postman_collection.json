@@ -1,0 +1,382 @@
+{
+  "info": {
+    "_postman_id": "readytech-ai-seo-v1",
+    "name": "ReadyTech Growth Suite — AI & SEO API",
+    "description": "Complete AI Content and SEO API collection extracted from live source code.\n\nBase URL: http://localhost:5000\n\nSetup:\n1. Run the Login request first\n2. The token is auto-saved to the {{token}} variable\n3. All protected routes use Bearer {{token}} automatically",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "historyId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.success && res.data?.token) {",
+                  "  pm.collectionVariables.set('token', res.data.token);",
+                  "  console.log('Token saved:', res.data.token.slice(0, 20) + '...');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@yourcompany.com\",\n  \"password\": \"Admin123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "login"] }
+          }
+        },
+        {
+          "name": "Register (New Tenant)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Admin\",\n  \"email\": \"admin@yourcompany.com\",\n  \"password\": \"Admin123\",\n  \"companyName\": \"Your Company Ltd\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "register"] }
+          }
+        },
+        {
+          "name": "Get Current User (Me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/me", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "me"] }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/logout", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "logout"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Marketing AI (Simple — No History)",
+      "description": "Direct AI generation via /api/v1/marketing. No usage tracking. No rate limit middleware. Suitable for quick one-off generations.",
+      "item": [
+        {
+          "name": "Generate AI Content — Blog Post",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contentType\": \"blog\",\n  \"topic\": \"How AI is transforming small business marketing in 2026\",\n  \"tone\": \"Professional\",\n  \"context\": \"Focus on practical tools and ROI metrics\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/marketing/ai-content", "host": ["{{baseUrl}}"], "path": ["api", "v1", "marketing", "ai-content"] }
+          }
+        },
+        {
+          "name": "Generate AI Content — Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contentType\": \"email\",\n  \"topic\": \"Product launch announcement for our new CRM tool\",\n  \"tone\": \"Excited\",\n  \"context\": \"Targeting SaaS founders who manage sales teams\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/marketing/ai-content", "host": ["{{baseUrl}}"], "path": ["api", "v1", "marketing", "ai-content"] }
+          }
+        },
+        {
+          "name": "Generate AI Content — Social Media",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contentType\": \"social\",\n  \"topic\": \"5 ways our SaaS platform saves 10 hours per week\",\n  \"tone\": \"Conversational\",\n  \"context\": \"Target audience: startup founders and SMB owners\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/marketing/ai-content", "host": ["{{baseUrl}}"], "path": ["api", "v1", "marketing", "ai-content"] }
+          }
+        },
+        {
+          "name": "Generate AI Content — Ad Copy",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contentType\": \"ad\",\n  \"topic\": \"ReadyTech CRM — Manage leads and close deals faster\",\n  \"tone\": \"Persuasive\",\n  \"context\": \"Google Ads campaign targeting B2B decision makers\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/marketing/ai-content", "host": ["{{baseUrl}}"], "path": ["api", "v1", "marketing", "ai-content"] }
+          }
+        },
+        {
+          "name": "Generate SEO Title Tags",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"keyword\": \"best CRM software for small business\",\n  \"tone\": \"Professional\",\n  \"targetAudience\": \"small business owners\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/marketing/seo-title", "host": ["{{baseUrl}}"], "path": ["api", "v1", "marketing", "seo-title"] }
+          }
+        },
+        {
+          "name": "Generate Meta Descriptions",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"keyword\": \"best CRM software for small business\",\n  \"tone\": \"Professional\",\n  \"targetAudience\": \"small business owners\",\n  \"type\": \"meta_description\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/marketing/seo-title", "host": ["{{baseUrl}}"], "path": ["api", "v1", "marketing", "seo-title"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. AI Module (Full-Featured — History + Rate Limit)",
+      "description": "Full AI generation via /api/v1/ai/generate. Tracks history in MongoDB. Enforces plan-based monthly limits (starter: 50, growth: 200, enterprise: unlimited). Saves output to AIHistory collection.",
+      "item": [
+        {
+          "name": "Generate — SEO Title Tags",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.success && res.data?.historyId) {",
+                  "  pm.collectionVariables.set('historyId', res.data.historyId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feature\": \"seo_title\",\n  \"keyword\": \"project management software for remote teams\",\n  \"tone\": \"professional\",\n  \"targetAudience\": \"remote team managers\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/ai/generate", "host": ["{{baseUrl}}"], "path": ["api", "v1", "ai", "generate"] }
+          }
+        },
+        {
+          "name": "Generate — Meta Descriptions",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feature\": \"meta_description\",\n  \"keyword\": \"project management software for remote teams\",\n  \"title\": \"Best Project Management Software for Remote Teams 2026\",\n  \"tone\": \"professional\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/ai/generate", "host": ["{{baseUrl}}"], "path": ["api", "v1", "ai", "generate"] }
+          }
+        },
+        {
+          "name": "Generate — Blog Outline",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feature\": \"blog_outline\",\n  \"topic\": \"How to build a high-performing remote sales team\",\n  \"tone\": \"professional\",\n  \"targetAudience\": \"sales managers\",\n  \"wordCount\": 2000\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/ai/generate", "host": ["{{baseUrl}}"], "path": ["api", "v1", "ai", "generate"] }
+          }
+        },
+        {
+          "name": "Generate — Full Blog Post",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feature\": \"blog\",\n  \"topic\": \"How to build a high-performing remote sales team\",\n  \"tone\": \"professional\",\n  \"targetAudience\": \"sales managers\",\n  \"wordCount\": 1500,\n  \"outline\": \"\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/ai/generate", "host": ["{{baseUrl}}"], "path": ["api", "v1", "ai", "generate"] }
+          }
+        },
+        {
+          "name": "Generate — Email Subject Lines",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feature\": \"email_subject\",\n  \"topic\": \"Announcing our new AI-powered lead scoring feature\",\n  \"tone\": \"professional\",\n  \"targetAudience\": \"existing customers\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/ai/generate", "host": ["{{baseUrl}}"], "path": ["api", "v1", "ai", "generate"] }
+          }
+        },
+        {
+          "name": "Generate — Email Body",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feature\": \"email\",\n  \"topic\": \"Announcing our new AI-powered lead scoring feature\",\n  \"goal\": \"Drive upgrades to the Growth plan\",\n  \"tone\": \"professional\",\n  \"targetAudience\": \"existing Starter plan customers\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/ai/generate", "host": ["{{baseUrl}}"], "path": ["api", "v1", "ai", "generate"] }
+          }
+        },
+        {
+          "name": "Generate — Social Media Posts",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feature\": \"social\",\n  \"topic\": \"We just hit 1000 customers! Here's what we learned\",\n  \"platform\": \"LinkedIn\",\n  \"tone\": \"authentic\",\n  \"includeHashtags\": true\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/ai/generate", "host": ["{{baseUrl}}"], "path": ["api", "v1", "ai", "generate"] }
+          }
+        },
+        {
+          "name": "Generate — Ad Copy",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feature\": \"ad_copy\",\n  \"product\": \"ReadyTech Growth Suite — CRM + Marketing + Analytics\",\n  \"platform\": \"Google Ads\",\n  \"goal\": \"Drive free trial signups\",\n  \"tone\": \"persuasive\",\n  \"targetAudience\": \"small business owners aged 30-50\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/ai/generate", "host": ["{{baseUrl}}"], "path": ["api", "v1", "ai", "generate"] }
+          }
+        },
+        {
+          "name": "Get AI History (All)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/history?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ai", "history"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get AI History — Filtered by Feature",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/history?feature=blog&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ai", "history"],
+              "query": [
+                { "key": "feature", "value": "blog" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get AI Usage (Admin/Manager only)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/ai/usage", "host": ["{{baseUrl}}"], "path": ["api", "v1", "ai", "usage"] }
+          }
+        },
+        {
+          "name": "Delete AI History Item",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ai/history/{{historyId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ai", "history", "{{historyId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. SEO Legacy Route",
+      "description": "Simple SEO route at /api/v1/seo. No authentication required. Minimal prompt. For basic SEO title generation only.",
+      "item": [
+        {
+          "name": "SEO Title (Legacy — No Auth)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"keyword\": \"email marketing automation tools\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/v1/seo/seo-title", "host": ["{{baseUrl}}"], "path": ["api", "v1", "seo", "seo-title"] }
+          }
+        }
+      ]
+    }
+  ]
+}

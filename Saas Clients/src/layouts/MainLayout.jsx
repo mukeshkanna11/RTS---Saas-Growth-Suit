@@ -18,7 +18,9 @@ import {
   Users,
   ShieldCheck,
   Bell,
-  Receipt,      // 👈 Add this
+  Receipt,
+  Sparkles,
+  Search,
 } from "lucide-react";
 
 import { logoutUser } from "../api/auth";
@@ -47,6 +49,8 @@ const [profileOpen, setProfileOpen] = useState(false);
   { label: "Campaigns", path: "/admin/campaigns", icon: <Activity size={18} /> },
   { label: "Automation", path: "/admin/automation", icon: <Layers size={18} /> },
   { label: "Analytics", path: "/admin/analytics", icon: <BarChart3 size={18} /> },
+  { label: "AI Content", path: "/admin/ai-content", icon: <Sparkles size={18} /> },
+  { label: "SEO Tool", path: "/admin/seo-tool", icon: <Search size={18} /> },
   { label: "Subscription", path: "/admin/subscription", icon: <CreditCard size={18} /> },
   { label: "Invoice", path: "/admin/invoice", icon: <Receipt size={18} /> },
 ],
@@ -56,6 +60,8 @@ const [profileOpen, setProfileOpen] = useState(false);
         { label: "Deals", path: "/manager/crm", icon: <Briefcase size={18} /> },
         { label: "Campaigns", path: "/manager/campaigns", icon: <Activity size={18} /> },
         { label: "Analytics", path: "/manager/analytics", icon: <BarChart3 size={18} /> },
+        { label: "AI Content", path: "/manager/ai-content", icon: <Sparkles size={18} /> },
+        { label: "SEO Tool", path: "/manager/seo-tool", icon: <Search size={18} /> },
       ],
 
       employee: [

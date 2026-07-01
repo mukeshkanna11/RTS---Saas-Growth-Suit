@@ -22,6 +22,8 @@ import Invoice from "./pages/Invoice";
 import Users from "./pages/Users";
 
 import ClientDashboard from "./pages/ClientDashboard";
+import AIContent from "./pages/AIContent";
+import SEOTool from "./pages/SEOTool";
 
 import MainLayout from "./layouts/MainLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -85,8 +87,9 @@ export default function App() {
   <Route path="users" element={<Users />} />
   <Route path="subscription" element={<Subscription />} />
 
-  {/* NEW */}
   <Route path="invoice" element={<Invoice />} />
+  <Route path="ai-content" element={<AIContent />} />
+  <Route path="seo-tool" element={<SEOTool />} />
 </Route>
         
 
@@ -105,6 +108,8 @@ export default function App() {
           <Route path="campaigns" element={<Campaigns />} />
           <Route path="automation" element={<Automation />} />
           <Route path="analytics" element={<Analytics />} />
+          <Route path="ai-content" element={<AIContent />} />
+          <Route path="seo-tool" element={<SEOTool />} />
         </Route>
 
         {/* EMPLOYEE */}

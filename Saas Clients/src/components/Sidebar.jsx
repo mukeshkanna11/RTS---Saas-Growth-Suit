@@ -11,7 +11,9 @@ import {
   BarChart3,
   Layers,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Sparkles,
+  Search,
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -27,6 +29,8 @@ export default function Sidebar() {
     { name: "CRM", path: `${base}/crm`, icon: <Briefcase size={18} /> },
     { name: "Automation", path: `${base}/automation`, icon: <Layers size={18} /> },
     { name: "Analytics", path: `${base}/analytics`, icon: <BarChart3 size={18} /> },
+    { name: "AI Content", path: `${base}/ai-content`, icon: <Sparkles size={18} /> },
+    { name: "SEO Tool", path: `${base}/seo-tool`, icon: <Search size={18} /> },
     { name: "Settings", path: `${base}/settings`, icon: <Settings size={18} /> },
   ];
 
