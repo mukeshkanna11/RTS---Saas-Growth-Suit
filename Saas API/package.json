@@ -4,11 +4,18 @@
   "description": "Production-ready SaaS backend API",
   "main": "server.js",
   "scripts": {
+<<<<<<< HEAD
     "dev": "nodemon src/server.js",
     "start": "node src/server.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
+=======
+    "dev": "nodemon server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+>>>>>>> ade4fece41a073615a127e6fc0da3d2b04542245
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
     "bull": "^1.1.3",
@@ -36,7 +43,10 @@
     "pdfkit": "^0.18.0",
     "rate-limiter-flexible": "^10.0.1",
     "resend": "^6.12.3",
+<<<<<<< HEAD
     "swagger-ui-express": "^5.0.1",
+=======
+>>>>>>> ade4fece41a073615a127e6fc0da3d2b04542245
     "zod": "^4.3.6"
   },
   "devDependencies": {
