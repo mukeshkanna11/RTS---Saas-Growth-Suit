@@ -1,3 +1,9 @@
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+.env.production
+
 # Logs
 logs
 *.log
