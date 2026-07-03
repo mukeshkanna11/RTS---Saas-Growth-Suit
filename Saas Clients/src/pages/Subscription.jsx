@@ -1448,8 +1448,10 @@ export default function Subscription() {
     } catch (err) {
       const { code, message } = parseError(err);
       const displayMsg =
-        code === 409
-          ? "A subscription is already active for this account."
+        code === 410
+          ? message || "Checkout session expired. Please select your plan again."
+          : code === 409
+          ? message || "A subscription conflict occurred. Please refresh and try again."
           : code === 429
           ? "Too many requests. Please wait a moment and try again."
           : code === 422

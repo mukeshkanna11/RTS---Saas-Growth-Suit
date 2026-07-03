@@ -214,16 +214,20 @@ exports.getMySubscription = async (req, res) => {
       ],
     };
 
-    const sub = await Subscription.findOne(query).sort({
-      createdAt: -1,
-    });
+    // Fetch recent subscriptions and prefer the active one.
+    // Sorting by createdAt desc alone would return a stale pending checkout doc
+    // instead of the existing active subscription after createIntent is called.
+    const subs = await Subscription.find(query).sort({ createdAt: -1 }).limit(10);
 
-    if (!sub) {
+    if (!subs.length) {
       return res.status(404).json({
         success: false,
         message: "No subscription found",
       });
     }
+
+    // Priority: active first, then most-recently-created as fallback
+    const sub = subs.find((s) => s.status === "active") ?? subs[0];
 
     return res.json({
       success: true,

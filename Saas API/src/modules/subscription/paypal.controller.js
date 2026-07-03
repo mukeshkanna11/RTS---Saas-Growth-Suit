@@ -69,9 +69,30 @@ exports.createOrder = asyncHandler(async (req, res) => {
   }
 
   if (sub.status !== "pending") {
+    if (sub.status === "active") {
+      return sendError(
+        res,
+        "This subscription is already active. To upgrade or change your plan, select the new plan from the Plans section and start a fresh checkout.",
+        409
+      );
+    }
+    if (sub.status === "cancelled" || sub.status === "expired") {
+      return sendError(
+        res,
+        "This checkout session is no longer valid — the subscription was cancelled or expired. Please select your plan again to start a new checkout.",
+        410
+      );
+    }
+    if (sub.status === "paused") {
+      return sendError(
+        res,
+        "This subscription is paused. Contact support to resume it, or select a new plan to start a fresh checkout.",
+        409
+      );
+    }
     return sendError(
       res,
-      `Cannot initiate payment for a subscription in '${sub.status}' status`,
+      `Subscription is not in a payable state (current status: '${sub.status}'). Please start a new checkout.`,
       409
     );
   }
