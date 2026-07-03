@@ -1,9 +1,10 @@
 const mongoose = require("mongoose");
 const Subscription = require("./subscription.model");
 const { getPlan } = require("./subscription.plans");
+const InvoiceService = require("../../services/invoice.service");
 
 // ======================================================
-// HELPERS (ENTERPRISE SAFE)
+// HELPERS
 // ======================================================
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -19,38 +20,6 @@ const throwError = (msg, code = 400) => {
 };
 
 const safe = (v) => (isNaN(Number(v)) ? 0 : Number(v));
-
-invoiceData.discount = invoiceData.discount || { type: "percent", value: 0 };
-invoiceData.tax = invoiceData.tax || {
-  type: "intra",
-  cgst: 9,
-  sgst: 9,
-  igst: 0,
-};
-
-const items = invoiceData.items || [];
-
-const subtotal = items.reduce((sum, item) => {
-  return sum + safe(item.qty) * safe(item.price);
-}, 0);
-
-// DISCOUNT
-let discountAmount = 0;
-
-if (invoiceData.discount.type === "percent") {
-  discountAmount = (subtotal * safe(invoiceData.discount.value)) / 100;
-} else {
-  discountAmount = safe(invoiceData.discount.value);
-}
-
-const taxable = subtotal - discountAmount;
-
-// TAX
-const cgst = (taxable * safe(invoiceData.tax.cgst)) / 100;
-const sgst = (taxable * safe(invoiceData.tax.sgst)) / 100;
-const igst = (taxable * safe(invoiceData.tax.igst)) / 100;
-
-const total = taxable + cgst + sgst + igst;
 
 const generateInvoice = async ({ subscriptionId, tax = {}, discount = {} }) => {
   if (!isValidId(subscriptionId)) {

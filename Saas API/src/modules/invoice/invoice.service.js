@@ -26,11 +26,19 @@ const calculateTotals = (
   discount = {},
   tax = {}
 ) => {
+  // Accept flat numeric discount (e.g. discount=10 means 10%)
+  if (typeof discount === "number") {
+    discount = { type: "percent", value: discount };
+  }
+
   discount = {
     type: "percent",
     value: 0,
-    ...discount,
+    ...(discount || {}),
   };
+
+  // Accept both flat { cgst:9, sgst:9 } and nested tax object
+  if (!tax || typeof tax !== "object") tax = {};
 
   tax = {
     type: "intra",
@@ -38,6 +46,10 @@ const calculateTotals = (
     sgst: 9,
     igst: 0,
     ...tax,
+    // Ensure individual rates are safe numbers
+    cgst: safe(tax.cgst != null ? tax.cgst : 9),
+    sgst: safe(tax.sgst != null ? tax.sgst : 9),
+    igst: safe(tax.igst != null ? tax.igst : 0),
   };
 
   const subtotal = round(
@@ -179,12 +191,32 @@ const generateInvoice = async (invoiceData = {}) => {
     };
 
     // =========================
+    // NORMALISE TAX + DISCOUNT
+    // Support both flat { cgst:9 } at top level and nested { tax:{ cgst:9 } }
+    // =========================
+    const rawTax = normalizedData.tax || {};
+    const resolvedTax = {
+      type:  rawTax.type  || invoiceData.taxType  || "intra",
+      cgst:  safe(rawTax.cgst  != null ? rawTax.cgst  : (invoiceData.cgst  != null ? invoiceData.cgst  : 9)),
+      sgst:  safe(rawTax.sgst  != null ? rawTax.sgst  : (invoiceData.sgst  != null ? invoiceData.sgst  : 9)),
+      igst:  safe(rawTax.igst  != null ? rawTax.igst  : (invoiceData.igst  != null ? invoiceData.igst  : 0)),
+    };
+
+    // Discount: accept number (percent), { value } or { type, value }
+    let resolvedDiscount = normalizedData.discount;
+    if (typeof resolvedDiscount === "number") {
+      resolvedDiscount = { type: "percent", value: resolvedDiscount };
+    } else if (!resolvedDiscount || typeof resolvedDiscount !== "object") {
+      resolvedDiscount = { type: "percent", value: 0 };
+    }
+
+    // =========================
     // CALCULATIONS
     // =========================
     const totals = calculateTotals(
       normalizedData.items,
-      normalizedData.discount,
-      normalizedData.tax
+      resolvedDiscount,
+      resolvedTax
     );
 
     normalizedData.totals = totals;
@@ -205,7 +237,10 @@ const generateInvoice = async (invoiceData = {}) => {
     // =========================
     const html = InvoiceTemplate.toHTML({
       ...normalizedData,
-      logoBase64
+      tax:      resolvedTax,
+      discount: resolvedDiscount,
+      totals,
+      logoBase64,
     });
 
     if (!html) throw new Error("HTML generation failed");
@@ -291,8 +326,6 @@ const downloadInvoice = async (invoiceId) => {
 
   return filePath;
 };
-
-module.exports = { downloadInvoice };
 
 // ======================================================
 // GET ALL INVOICES

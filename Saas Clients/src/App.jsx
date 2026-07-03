@@ -18,6 +18,8 @@ import Campaigns from "./pages/Campaigns";
 import Automation from "./pages/Automation";
 import Analytics from "./pages/Analytics";
 import Subscription from "./pages/Subscription";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentCancel from "./pages/PaymentCancel";
 import Invoice from "./pages/Invoice";
 import Users from "./pages/Users";
 
@@ -66,6 +68,10 @@ export default function App() {
 
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+
+        {/* PayPal return/cancel — top-level, auth checked inside the page */}
+        <Route path="/billing/payment-success" element={<PaymentSuccess />} />
+        <Route path="/billing/payment-cancel" element={<PaymentCancel />} />
 
         <Route path="/" element={<RoleRedirect />} />
 

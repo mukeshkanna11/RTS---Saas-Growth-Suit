@@ -37,8 +37,12 @@ app.disable("x-powered-by");
 
 // =======================================================
 // BODY PARSER
+// rawBody is saved for PayPal webhook signature verification.
 // =======================================================
-app.use(express.json({ limit: "20kb" }));
+app.use(express.json({
+  limit: "20kb",
+  verify: (req, _res, buf) => { req.rawBody = buf; },
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // =======================================================
@@ -183,6 +187,11 @@ const webhookRoutes = require("./modules/client/integrations/webhook.routes");
 const invoiceRoutes = require("./modules/invoice/invoice.routes");
 const seoroutes = require("./modules/marketing/routes/seo.routes");
 const aiRoutes = require("./modules/ai/ai.routes");
+const billingRoutes = require("./modules/billing/billing.routes");
+const revenueRoutes = require("./modules/admin/revenue.routes");
+
+// AI hooks — register CRM handlers at startup
+require("./modules/crm/crm.ai.hooks").register();
 
 // Swagger UI — only in non-production or when explicitly enabled
 let swaggerUi, swaggerSpec;
@@ -256,6 +265,8 @@ app.use("/api/v1/invoice", invoiceRoutes);
 
 app.use("/api/v1/seo", seoroutes);
 app.use("/api/v1/ai", aiRoutes);
+app.use("/api/v1/billing", billingRoutes);
+app.use("/api/v1/admin/revenue", revenueRoutes);
 
 // =======================================================
 // SWAGGER UI  (available at /api/v1/docs)

@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const path = require("path");
 
 const Subscription = require("./subscription.model");
-const { getPlan } = require("./subscription.plans");
+const { getPlan, getInrPrice } = require("./subscription.plans");
 const EmailService = require("../../services/email.service");
 const InvoiceService = require("../../services/invoice.service");
 const events = require("./subscription.events");
@@ -66,6 +66,17 @@ exports.createIntent = async (req, res) => {
       });
     }
 
+    // companyId must be a valid MongoDB ObjectId — a null or garbage value
+    // would cause the partial unique index to accept unlimited inserts since
+    // the index only covers non-null companyId documents.
+    if (!isValidId(companyId)) {
+      return res.status(400).json({
+        success: false,
+        message: "companyId must be a valid MongoDB ObjectId",
+        errorCode: "INVALID_COMPANY_ID",
+      });
+    }
+
     // ======================================================
     // GET PLAN
     // ======================================================
@@ -87,23 +98,33 @@ exports.createIntent = async (req, res) => {
         : selectedPlan.pricing.monthly;
 
     // ======================================================
-    // CREATE SUBSCRIPTION INTENT
+    // CREATE NEW PENDING SUBSCRIPTION
+    // Always create a fresh document per checkout session.
+    // Reusing an existing pending subscription via upsert caused
+    // cross-user data leakage: an old pending record belonging to a
+    // different billing contact (e.g. "Siva Admin") would be overwritten
+    // with the new contact's name/email at the DB level, but the invoice
+    // system would still show stale data from the populated userId field.
+    //
+    // Design: multiple pending subscriptions per companyId are intentional.
+    // They represent separate checkout attempts (possibly for different billing
+    // contacts). When any one of them is paid, captureOrder / confirmPayment
+    // cancels ALL others for the same company automatically.
+    // The partial unique index enforces ONE ACTIVE subscription per company.
     // ======================================================
     const subscription = await Subscription.create({
       companyId,
-      userId: req.user.id, // ✅ FIXED (NO _id)
+      userId:           req.user.id,
       clientName,
       clientEmail,
-      plan: selectedPlan.id,
+      plan:             selectedPlan.id,
       billingCycle,
       amount,
-
-      status: "pending",
-      paymentStatus: "pending",
-
+      status:           "pending",
+      paymentStatus:    "pending",
       projectsIncluded: selectedPlan.limits.projectsIncluded,
-      teamMembers: selectedPlan.limits.teamMembers,
-      modules: selectedPlan.modules,
+      teamMembers:      selectedPlan.limits.teamMembers,
+      modules:          selectedPlan.modules,
     });
 
     // ======================================================
@@ -138,13 +159,28 @@ exports.confirmPayment = async (req, res) => {
     const sub = await Subscription.findById(subscriptionId);
     if (!sub) return fail(res, "Subscription not found", 404);
 
+    const now = new Date();
+
+    // Cancel competing active/pending subs BEFORE activating to avoid E11000
+    await Subscription.updateMany(
+      { companyId: sub.companyId, status: { $in: ["pending", "active"] }, _id: { $ne: sub._id } },
+      { $set: { status: "cancelled", cancelledAt: now, autoRenew: false } }
+    );
+
     sub.paymentStatus = "paid";
     sub.status = "active";
     sub.transactionId = transactionId;
     sub.renewalDate = addRenewal(sub.billingCycle);
-    sub.lastPaymentDate = new Date();
+    sub.lastPaymentDate = now;
 
-    await sub.save();
+    try {
+      await sub.save();
+    } catch (saveErr) {
+      if (saveErr.code === 11000) {
+        return fail(res, "A concurrent payment already activated a subscription for this company. Refresh and try again.", 409);
+      }
+      throw saveErr;
+    }
 
     return success(res, "Payment confirmed", sub);
   } catch (err) {
@@ -278,15 +314,60 @@ exports.cancel = async (req, res) => {
 exports.reactivateSubscription = async (req, res) => {
   try {
     const sub = await Subscription.findById(req.params.id);
-    if (!sub) return fail(res, "Not found", 404);
+    if (!sub) return fail(res, "Subscription not found", 404);
 
-    sub.status = "active";
-    sub.reactivatedAt = new Date();
+    // Guard: only terminal statuses can be reactivated.
+    // A "pending" subscription hasn't paid yet — it should go through
+    // the normal payment flow, not the reactivation path.
+    if (sub.status === "active") {
+      return fail(res, "Subscription is already active", 409);
+    }
+    if (sub.status === "pending") {
+      return fail(res, "Subscription is pending payment — complete the payment flow instead", 409);
+    }
 
+    const now = new Date();
+
+    // Step 1 — cancel any currently active subscription for the same company.
+    // This moves competing docs OUT of the partial-unique-index scope BEFORE
+    // we try to insert this one INTO it. Without this step, saving sub.status="active"
+    // would collide with any pre-existing active document and produce E11000.
+    // updateMany is safe here: we only transition active→cancelled (never create docs).
+    await Subscription.updateMany(
+      {
+        companyId: sub.companyId,
+        status:    "active",
+        _id:       { $ne: sub._id },
+      },
+      {
+        $set: { status: "cancelled", cancelledAt: now, autoRenew: false },
+      }
+    );
+
+    // Step 2 — activate this subscription.
+    sub.status        = "active";
+    sub.reactivatedAt = now;
     await sub.save();
 
-    return success(res, "Reactivated", sub);
+    events.emit("subscription.reactivated", {
+      subscriptionId: sub._id,
+      plan:           sub.plan,
+      clientEmail:    sub.clientEmail,
+      clientName:     sub.clientName,
+      reactivatedAt:  now,
+    });
+
+    return success(res, "Subscription reactivated successfully", sub);
   } catch (err) {
+    // If the partial unique index fires despite Step 1 (e.g. race condition),
+    // return a clear message instead of an unhandled 500.
+    if (err.code === 11000) {
+      return fail(
+        res,
+        "Another active subscription exists for this company. Refresh and try again.",
+        409
+      );
+    }
     return fail(res, err.message);
   }
 };
@@ -349,38 +430,37 @@ exports.generateInvoice = async (req, res) => {
     const invoiceData = {
       invoiceId: generateInvoiceId(),
 
-      // ======================================================
-      // COMPANY (MANUAL FIXED DETAILS)
-      // ======================================================
+      // Company details read from env — invoice.service.js falls back to
+      // these same env vars if omitted, but passing them explicitly ensures
+      // the values are consistent regardless of service-layer defaults.
       company: {
-        name: "ReadyTechSolutions Pvt Ltd",
-        address: "Coimbatore, Tamil Nadu, India",
-        email: "support@readytechsolutions.in",
-        phone: "+91-9876543210",
-        gstin: "33ABCDE1234F1Z5",
-        logo: process.env.COMPANY_LOGO || null,
+        name:    process.env.COMPANY_NAME    || "ReadyTechSolutions Pvt Ltd",
+        address: process.env.COMPANY_ADDRESS || "Coimbatore, Tamil Nadu, India",
+        email:   process.env.COMPANY_MAIL    || "support@readytechsolutions.in",
+        phone:   process.env.COMPANY_PHONE   || "+91-9876543210",
+        gstin:   process.env.COMPANY_GSTIN   || "33ABCDE1234F1Z5",
+        logo:    process.env.COMPANY_LOGO    || null,
       },
 
-      // ======================================================
-      // CUSTOMER
-      // ======================================================
+      // clientName / clientEmail are the billing contact captured at
+      // intent creation time and must be the primary source.
       customer: {
-        name: subscription.userId?.name || subscription.clientName || "Unknown",
-        email: subscription.userId?.email || subscription.clientEmail || "N/A",
-        phone: subscription.userId?.phone || null,
+        name:    subscription.clientName  || subscription.userId?.name    || "Unknown",
+        email:   subscription.clientEmail || subscription.userId?.email   || "N/A",
+        phone:   subscription.userId?.phone   || null,
         address: subscription.userId?.address || "India",
-        gstin: subscription.userId?.gstin || null,
+        gstin:   subscription.userId?.gstin   || null,
       },
 
-      // ======================================================
-      // ITEMS (MANUAL CONTROLLED)
-      // ======================================================
+      // getInrPrice always returns the canonical INR plan price regardless of
+      // what currency was used for the PayPal order. sub.amount is NOT used
+      // here because createOrder may have overwritten it with the USD amount.
       items: [
         {
-          name: `${subscription.plan} Plan Subscription`,
+          name:        `${(subscription.plan || "").charAt(0).toUpperCase() + (subscription.plan || "").slice(1)} Plan Subscription`,
           description: `Billing Cycle: ${subscription.billingCycle}`,
-          qty: 1,
-          price: Number(subscription.amount || 0),
+          qty:         1,
+          price:       getInrPrice(subscription.plan, subscription.billingCycle),
         },
       ],
 
@@ -399,13 +479,15 @@ exports.generateInvoice = async (req, res) => {
       },
 
       // ======================================================
-      // GST CONFIG (MANUAL CONTROL)
+      // GST CONFIG
+      // intra-state: CGST 9% + SGST 9% (IGST = 0)
+      // inter-state: IGST 18% only   (CGST = SGST = 0)
       // ======================================================
       tax: {
-        type: req.body.taxType || "intra", // intra | inter
-        cgst: 9,
-        sgst: 9,
-        igst: 18,
+        type: req.body.taxType || "intra",
+        cgst: req.body.taxType === "inter" ? 0 : 9,
+        sgst: req.body.taxType === "inter" ? 0 : 9,
+        igst: req.body.taxType === "inter" ? 18 : 0,
       },
 
       // ======================================================
@@ -514,22 +596,25 @@ exports.downloadInvoice = async (req, res) => {
         generateInvoiceId(),
 
       company: {
-        name: "ReadyTechSolutions Pvt Ltd",
-        address: "Coimbatore, Tamil Nadu, India",
-        gstin: "33ABCDE1234F1Z5",
+        name:    process.env.COMPANY_NAME    || "ReadyTechSolutions Pvt Ltd",
+        address: process.env.COMPANY_ADDRESS || "Coimbatore, Tamil Nadu, India",
+        email:   process.env.COMPANY_MAIL    || "support@readytechsolutions.in",
+        phone:   process.env.COMPANY_PHONE   || "+91-9876543210",
+        gstin:   process.env.COMPANY_GSTIN   || "33ABCDE1234F1Z5",
       },
 
       customer: {
-        name: subscription.userId?.name || "Customer",
-        email: subscription.userId?.email || "N/A",
+        name:    subscription.clientName  || subscription.userId?.name  || "Customer",
+        email:   subscription.clientEmail || subscription.userId?.email || "N/A",
         address: "India",
       },
 
       items: [
         {
-          name: `${subscription.plan} Plan Subscription`,
-          qty: 1,
-          price: Number(subscription.amount || 0),
+          name:        `${(subscription.plan || "").charAt(0).toUpperCase() + (subscription.plan || "").slice(1)} Plan Subscription`,
+          description: `Billing Cycle: ${subscription.billingCycle}`,
+          qty:         1,
+          price:       getInrPrice(subscription.plan, subscription.billingCycle),
         },
       ],
 
@@ -647,6 +732,12 @@ exports.paymentWebhook = async (req, res) => {
     // UPDATE PAYMENT STATUS
     // ======================================================
     if (status === "success" || status === "paid") {
+      // Cancel competing active/pending subs BEFORE activating to avoid E11000
+      await Subscription.updateMany(
+        { companyId: sub.companyId, status: { $in: ["pending", "active"] }, _id: { $ne: sub._id } },
+        { $set: { status: "cancelled", cancelledAt: new Date(), autoRenew: false } }
+      );
+
       sub.paymentStatus = "paid";
       sub.status = "active";
       sub.transactionId = transactionId;
@@ -677,9 +768,6 @@ exports.paymentWebhook = async (req, res) => {
     });
   }
 };
-
-exports.analytics = async (req, res) => { try { const [total, active, cancelled, revenue] = await Promise.all([Subscription.countDocuments({ isDeleted: false }), Subscription.countDocuments({ status: "active" }), Subscription.countDocuments({ status: "cancelled" }), Subscription.aggregate([{ $group: { _id: null, totalRevenue: { $sum: "$amount" }, }, },]),]); return success(res, "Analytics fetched", { totalSubscriptions: total, activeSubscriptions: active, cancelledSubscriptions: cancelled, totalRevenue: revenue?.[0]?.totalRevenue || 0, }); } catch (err) { return error(res, err.message); } };
-
 
 // ======================================================
 // UPGRADE REQUEST
@@ -742,6 +830,75 @@ exports.upgradeRequest = async (req, res) => {
       success: false,
       message: err.message,
     });
+  }
+};
+
+// ======================================================
+// REGENERATE INVOICE (ADMIN)
+// POST /api/v1/subscription/:id/invoice/regenerate
+// ======================================================
+exports.regenerateInvoice = async (req, res) => {
+  try {
+    const subscription = await Subscription.findById(req.params.id).populate("userId");
+
+    if (!subscription) {
+      return res.status(404).json({ success: false, message: "Subscription not found" });
+    }
+
+    const paymentStatus = subscription.paymentStatus === "paid" ? "PAID" : "PENDING";
+
+    const invoiceData = {
+      company: {
+        name:    process.env.COMPANY_NAME    || "ReadyTechSolutions Pvt Ltd",
+        address: process.env.COMPANY_ADDRESS || "Coimbatore, Tamil Nadu, India",
+        email:   process.env.COMPANY_MAIL    || "support@readytechsolutions.in",
+        phone:   process.env.COMPANY_PHONE   || "+91-9876543210",
+        gstin:   process.env.COMPANY_GSTIN   || "33ABCDE1234F1Z5",
+      },
+      customer: {
+        name:    subscription.clientName  || subscription.userId?.name  || "Customer",
+        email:   subscription.clientEmail || subscription.userId?.email || "N/A",
+        address: "India",
+      },
+      subscription: {
+        plan:        subscription.plan,
+        billingCycle: subscription.billingCycle,
+        status:      subscription.status,
+        renewalDate: subscription.renewalDate,
+      },
+      items: [
+        {
+          name:        `${(subscription.plan || "").charAt(0).toUpperCase() + (subscription.plan || "").slice(1)} Plan Subscription`,
+          description: `Billing Cycle: ${subscription.billingCycle}`,
+          qty:         1,
+          price:       getInrPrice(subscription.plan, subscription.billingCycle),
+        },
+      ],
+      discount: 0,
+      cgst: 9,
+      sgst: 9,
+      igst: 0,
+      paymentStatus,
+      orderDate: subscription.createdAt,
+    };
+
+    const invoice = await InvoiceService.generateInvoice(invoiceData);
+
+    subscription.invoice = {
+      invoiceId: invoice.invoice.invoiceId,
+      url: `/uploads/invoices/${invoice.invoice.fileName}`,
+      generatedAt: new Date(),
+    };
+    await subscription.save();
+
+    return res.json({
+      success: true,
+      message: "Invoice regenerated successfully",
+      data: invoice,
+    });
+  } catch (err) {
+    console.error("Regenerate invoice error:", err);
+    return res.status(500).json({ success: false, message: err.message || "Invoice regeneration failed" });
   }
 };
 

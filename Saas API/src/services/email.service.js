@@ -443,6 +443,37 @@ class EmailService {
   };
 
   // ======================================================
+  // WELCOME EMAIL WITH CREDENTIALS (new customer provisioning)
+  // ======================================================
+
+  async sendWelcomeWithCredentials({ email, name, tenantId, tempPassword, plan }) {
+    return this.sendMail({
+      to: email,
+      subject: "🎉 Welcome to ReadyTech Solutions — Your Account is Ready",
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9fafb;border-radius:8px">
+          <div style="background:#1a3c5e;padding:20px;border-radius:8px 8px 0 0;text-align:center">
+            <h1 style="color:#fff;margin:0;font-size:22px">ReadyTech Solutions</h1>
+            <p style="color:#94b4cc;margin:4px 0 0">Enterprise SaaS Platform</p>
+          </div>
+          <div style="background:#fff;padding:24px;border-radius:0 0 8px 8px">
+            <h2 style="color:#1a3c5e">Welcome, ${name}! 👋</h2>
+            <p>Your <strong>${plan}</strong> subscription is now active. Here are your login credentials:</p>
+            <div style="background:#f0f4f8;border-left:4px solid #1a3c5e;padding:16px;border-radius:4px;margin:16px 0">
+              <p style="margin:4px 0"><strong>Email:</strong> ${email}</p>
+              <p style="margin:4px 0"><strong>Tenant ID:</strong> ${tenantId}</p>
+              <p style="margin:4px 0"><strong>Temporary Password:</strong> <code style="background:#e2e8f0;padding:2px 6px;border-radius:3px">${tempPassword}</code></p>
+            </div>
+            <p style="color:#e53e3e;font-size:13px">⚠️ Please change your password immediately after your first login.</p>
+            <p>If you have any questions, contact us at <a href="mailto:support@readytechsolutions.in">support@readytechsolutions.in</a></p>
+            <p style="margin-top:24px;color:#718096;font-size:12px">Thank you for choosing ReadyTech Solutions.</p>
+          </div>
+        </div>
+      `,
+    });
+  }
+
+  // ======================================================
   // HEALTH CHECK
   // ======================================================
 

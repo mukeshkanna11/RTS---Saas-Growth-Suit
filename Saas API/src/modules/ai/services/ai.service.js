@@ -1,6 +1,7 @@
 const { generateStructuredContent } = require("../../../services/claude.service");
 const AIHistory = require("../models/aiHistory.model");
 const AIUsage = require("../models/aiUsage.model");
+const tokenBilling = require("../../../services/tokenBilling.service");
 const { aiCache, buildCacheKey, isCacheable, CACHE_TTL } = require("../../../utils/cache");
 const { seoTitlePrompt, metaDescriptionPrompt } = require("../prompts/seo.prompts");
 const { blogOutlinePrompt, blogPostPrompt } = require("../prompts/blog.prompts");
@@ -90,6 +91,11 @@ async function generate(tenantId, userId, feature, inputData) {
     },
     { upsert: true, new: true }
   );
+
+  // ── Log token usage against billing budget (non-blocking, fail-open) ──────
+  tokenBilling.getTokenBalance(tenantId).catch((err) => {
+    console.error("[TokenBilling] Balance check failed:", err.message);
+  });
 
   return { output, historyId: history._id, cached: false, usage };
 }

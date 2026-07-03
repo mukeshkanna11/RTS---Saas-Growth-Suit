@@ -10,6 +10,7 @@ require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") }
 const mongoose = require("mongoose");
 const http = require("http");
 const app = require("./app");
+const { startRenewalJob } = require("./jobs/renewalJob");
 
 const PORT = process.env.PORT || 5000;
 
@@ -41,6 +42,28 @@ const connectDB = async () => {
 // =======================================================
 const startServer = async () => {
   await connectDB();
+
+  // PayPal credential check — logged by paypal.service at require() time.
+  // Re-confirm here so the startup summary is visible in sequence with other boot messages.
+  try {
+    const paypalService = require("./services/paypal.service");
+    const cfg = paypalService.getConfigStatus();
+    if (!cfg.configured) {
+      console.warn(
+        `[Server] PayPal NOT configured — payment routes will return 503.\n` +
+        `         Add PAYPAL_CLIENT_ID + PAYPAL_CLIENT_SECRET to .env and restart.`
+      );
+    } else {
+      console.log(
+        `[Server] PayPal ready — mode=${cfg.mode} | clientId=${cfg.clientIdPrefix} | currency=${cfg.currency}`
+      );
+    }
+  } catch (err) {
+    console.error("[Server] paypal.service failed to load:", err.message);
+  }
+
+  // Start background jobs (non-fatal — app runs even if Redis is unavailable)
+  await startRenewalJob();
 
   const server = http.createServer(app);
 

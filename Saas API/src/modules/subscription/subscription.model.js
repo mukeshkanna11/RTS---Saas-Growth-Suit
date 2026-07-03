@@ -141,6 +141,60 @@ const subscriptionSchema = new mongoose.Schema(
     },
 
     // ======================================================
+    // PAYPAL PAYMENT FIELDS
+    // ======================================================
+    paypalOrderId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+
+    paypalSubscriptionId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+
+    paypalCustomerId: {
+      type: String,
+      default: null,
+    },
+
+    // ======================================================
+    // TRIAL PERIOD
+    // ======================================================
+    isTrialActive: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
+    trialStartsAt: {
+      type: Date,
+      default: null,
+    },
+
+    trialEndsAt: {
+      type: Date,
+      default: null,
+    },
+
+    // ======================================================
+    // AI TOKEN BUDGET
+    // 0 = unlimited (enterprise); >0 = monthly token cap
+    // ======================================================
+    tokenBudget: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    tokensResetAt: {
+      type: Date,
+      default: null,
+    },
+
+    // ======================================================
     // INVOICE SYSTEM (SAFE STRUCTURE)
     // ======================================================
     invoice: {
@@ -171,6 +225,7 @@ const subscriptionSchema = new mongoose.Schema(
       automation: { type: Boolean, default: false },
       campaigns: { type: Boolean, default: false },
       erp: { type: Boolean, default: false },
+      ai: { type: Boolean, default: false },
     },
 
     // ======================================================
@@ -258,6 +313,31 @@ subscriptionSchema.index({ "upgradeRequest.isRequested": 1 });
 
 // soft delete filter
 subscriptionSchema.index({ isDeleted: 1 });
+
+// Only ONE active subscription per company at a time.
+// Pending subscriptions are intentionally excluded from this constraint:
+// each call to createIntent creates a fresh pending document (one per
+// checkout session / billing contact). Multiple pending docs are normal
+// and get cancelled automatically when any one of them is paid.
+// Cancelled, expired, and paused records are also excluded so history
+// accumulates freely.
+//
+// DEPLOYMENT NOTE: if the database still has the old index named
+// "unique_active_pending_per_company" (which covered both active and pending),
+// drop it before deploying:
+//   db.subscriptions.dropIndex("unique_active_pending_per_company")
+// The cleanup script (src/scripts/cleanupSubscriptions.js) does this automatically.
+subscriptionSchema.index(
+  { companyId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status:    "active",
+      isDeleted: false,
+    },
+    name: "unique_active_per_company",
+  }
+);
 
 /**
  * ======================================================
