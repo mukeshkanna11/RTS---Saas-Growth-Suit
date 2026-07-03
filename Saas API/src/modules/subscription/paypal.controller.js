@@ -56,7 +56,8 @@ exports.createOrder = asyncHandler(async (req, res) => {
   }
 
   // Load and verify ownership
-  const sub = await Subscription.findById(subscriptionId);
+  // `let` — may be reassigned below when stale-ID auto-redirect fires.
+  let sub = await Subscription.findById(subscriptionId);
   if (!sub) return sendError(res, "Subscription not found", 404);
 
   const isAdmin = ["admin", "superadmin"].includes(req.user.role);
@@ -69,14 +70,64 @@ exports.createOrder = asyncHandler(async (req, res) => {
   }
 
   console.log(
-    "[PayPal/createOrder] sub=%s status=%s plan=%s billingCycle=%s userId=%s companyId=%s",
+    "[PayPal/createOrder] LOADED sub=%s status=%s plan=%s billingCycle=%s userId=%s companyId=%s",
     sub._id, sub.status, sub.plan, sub.billingCycle, req.user.id, sub.companyId
   );
 
+  // ── STALE-ID AUTO-REDIRECT ────────────────────────────────────────────────────
+  // If the requested subscriptionId is for an ACTIVE subscription, look for a
+  // RECENT (< 15 min) pending subscription for the same company.
+  //
+  // WHY: the frontend always calls createIntent before createOrder (creating a
+  // new pending sub), then passes the new sub's _id to createOrder. In rare
+  // cases (stale sessionStorage, React state desync, race condition) it may
+  // accidentally pass the OLD active sub's _id instead. Silently redirecting to
+  // the most-recently-created pending sub recovers those cases without blocking
+  // a valid upgrade/renewal/fresh-subscription checkout.
+  //
+  // DUPLICATE GUARD: if no pending sub was created recently for the company,
+  // the request is a genuine duplicate-purchase attempt → block it.
+  if (sub.status === "active") {
+    const STALE_CUTOFF = new Date(Date.now() - 15 * 60 * 1000); // 15 minutes
+    const recentPending = await Subscription.findOne({
+      companyId: sub.companyId,
+      status:    "pending",
+      _id:       { $ne: sub._id },
+      createdAt: { $gte: STALE_CUTOFF },
+    }).sort({ createdAt: -1 });
+
+    if (recentPending) {
+      const pendingIsOwned =
+        isAdmin ||
+        recentPending.userId?.toString() === req.user.id ||
+        recentPending.clientEmail === req.user.email;
+
+      if (pendingIsOwned) {
+        console.warn(
+          "[PayPal/createOrder] STALE-ID auto-redirect — active sub=%s plan=%s → pending sub=%s plan=%s billingCycle=%s companyId=%s userId=%s",
+          sub._id, sub.plan,
+          recentPending._id, recentPending.plan, recentPending.billingCycle,
+          sub.companyId, req.user.id
+        );
+        sub = recentPending; // proceed with the pending subscription
+      } else {
+        console.warn(
+          "[PayPal/createOrder] BLOCKED auto-redirect ownership mismatch — active sub=%s, pending sub=%s pendingUserId=%s requestUserId=%s",
+          sub._id, recentPending._id, recentPending.userId, req.user.id
+        );
+      }
+    }
+  }
+
+  // ── STATUS GUARD ──────────────────────────────────────────────────────────────
+  // At this point `sub` is either the original pending sub (normal path) or the
+  // auto-redirected pending sub (stale-ID recovery). Any other status is invalid.
   if (sub.status !== "pending") {
     if (sub.status === "active") {
+      // Reaches here only when no recent pending sub exists for the company →
+      // genuine duplicate-purchase attempt on an already-active subscription.
       console.warn(
-        "[PayPal/createOrder] BLOCKED duplicate purchase — sub=%s status=active plan=%s billingCycle=%s userId=%s companyId=%s reason=subscription_already_active",
+        "[PayPal/createOrder] BLOCKED genuine duplicate — sub=%s status=active plan=%s billingCycle=%s userId=%s companyId=%s reason=no_recent_pending_found",
         sub._id, sub.plan, sub.billingCycle, req.user.id, sub.companyId
       );
       return sendError(
@@ -86,6 +137,9 @@ exports.createOrder = asyncHandler(async (req, res) => {
       );
     }
     if (sub.status === "cancelled" || sub.status === "expired") {
+      // A cancelled/expired sub ID was passed directly. For normal renewal/
+      // re-subscription flows, the frontend calls createIntent first (new
+      // pending sub), so this 410 only fires when someone passes a stale ID.
       console.warn(
         "[PayPal/createOrder] BLOCKED stale checkout — sub=%s status=%s plan=%s billingCycle=%s userId=%s companyId=%s reason=session_no_longer_valid",
         sub._id, sub.status, sub.plan, sub.billingCycle, req.user.id, sub.companyId
@@ -98,7 +152,7 @@ exports.createOrder = asyncHandler(async (req, res) => {
     }
     if (sub.status === "paused") {
       console.warn(
-        "[PayPal/createOrder] BLOCKED paused subscription — sub=%s plan=%s billingCycle=%s userId=%s companyId=%s reason=subscription_paused",
+        "[PayPal/createOrder] BLOCKED paused — sub=%s plan=%s billingCycle=%s userId=%s companyId=%s reason=subscription_paused",
         sub._id, sub.plan, sub.billingCycle, req.user.id, sub.companyId
       );
       return sendError(
@@ -117,6 +171,11 @@ exports.createOrder = asyncHandler(async (req, res) => {
       409
     );
   }
+
+  console.log(
+    "[PayPal/createOrder] PROCEEDING sub=%s status=pending plan=%s billingCycle=%s companyId=%s",
+    sub._id, sub.plan, sub.billingCycle, sub.companyId
+  );
 
   const planConfig = getPlan(sub.plan);
   if (!planConfig) return sendError(res, `Unknown plan: ${sub.plan}`, 400);
