@@ -118,4 +118,30 @@ export const useAuthStore = create((set, get) => ({
     set({ user: updated });
   },
 
+  // ===============================
+  // REFRESH USER (SILENT — no loading flash)
+  // Calls /auth/me and merges the fresh user into state without
+  // setting loading:true so the UI never flickers.
+  // Returns the fresh user object, or null on failure.
+  // ===============================
+
+  refreshUser: async () => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      if (!token) return null;
+
+      const res = await API.get("/auth/me");
+      const fresh = res?.data?.data;
+
+      if (fresh) {
+        localStorage.setItem("user", JSON.stringify(fresh));
+        set({ user: fresh });
+      }
+
+      return fresh || null;
+    } catch {
+      return null;
+    }
+  },
+
 }));

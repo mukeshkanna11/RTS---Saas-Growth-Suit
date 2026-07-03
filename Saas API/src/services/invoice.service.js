@@ -104,11 +104,11 @@ class InvoiceService {
     };
 
     const company = {
-      name:    esc(data.company?.name    || process.env.COMPANY_NAME    || "ReadyTech Solutions Pvt Ltd"),
+      name:    esc(data.company?.name    || process.env.COMPANY_NAME    || "ReadyTechSolutions Pvt Ltd"),
       address: esc(data.company?.address || process.env.COMPANY_ADDRESS || "Coimbatore, Tamil Nadu, India"),
-      email:   esc(data.company?.email   || process.env.COMPANY_MAIL    || "support@readytechsolutions.in"),
-      phone:   esc(data.company?.phone   || process.env.COMPANY_PHONE   || "+91-9876543210"),
-      website: esc(data.company?.website || process.env.COMPANY_WEBSITE || "https://readytechsolutions.com"),
+      email:   esc(data.company?.email   || process.env.COMPANY_MAIL    || "info@readytechsolutions.in"),
+      phone:   esc(data.company?.phone   || process.env.COMPANY_PHONE   || "70107 97721"),
+      website: esc(data.company?.website || process.env.COMPANY_WEBSITE || "https://readytechsolutions.in/"),
       gstin:   esc(data.company?.gstin   || process.env.COMPANY_GSTIN   || "33ABCDE1234F1Z5"),
       pan:     esc(data.company?.pan     || process.env.COMPANY_PAN     || ""),
       cin:     esc(data.company?.cin     || process.env.COMPANY_CIN     || ""),

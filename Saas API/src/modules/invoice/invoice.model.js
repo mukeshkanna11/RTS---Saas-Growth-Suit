@@ -17,12 +17,23 @@ const ItemSchema = new mongoose.Schema(
       default: "",
     },
 
+    hsn: {
+      type: String,
+      default: "998314",
+    },
+
     qty: {
       type: Number,
       default: 1,
     },
 
     price: {
+      type: Number,
+      default: 0,
+    },
+
+    // Per-item discount percentage (0–100). Applied before global discount.
+    discount: {
       type: Number,
       default: 0,
     },

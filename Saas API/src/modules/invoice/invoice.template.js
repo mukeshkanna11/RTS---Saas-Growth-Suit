@@ -48,9 +48,9 @@ const normaliseDiscount = (data) => {
 };
 
 // ── Calculate totals (exported for invoice.service.js) ───────────────────────
+// Supports per-item discount: each item may carry a `discount` field (percent).
+// The global discountArg is applied on top of the already-reduced subtotal.
 const calculateTotals = (items = [], discountArg = 0, taxArg = {}) => {
-  // Legacy signature: (items, discountObj, taxObj)
-  // New-style callers also accepted via the normalisation above.
   const taxData = {
     cgst: safeNum(taxArg.cgst ?? 9),
     sgst: safeNum(taxArg.sgst ?? 9),
@@ -64,7 +64,13 @@ const calculateTotals = (items = [], discountArg = 0, taxArg = {}) => {
     discountPct = safeNum(discountArg.value);
   }
 
-  const subtotal    = round2(items.reduce((s, i) => s + safeNum(i.qty || 1) * safeNum(i.price || 0), 0));
+  // Per-item discount applied first, then global discount on the subtotal.
+  const subtotal = round2(items.reduce((s, i) => {
+    const base     = safeNum(i.qty || 1) * safeNum(i.price || 0);
+    const itemDisc = safeNum(i.discount || 0);
+    return s + base * (1 - itemDisc / 100);
+  }, 0));
+
   const discountAmt = round2(Math.min((subtotal * discountPct) / 100, subtotal));
   const taxable     = round2(subtotal - discountAmt);
   const cgst        = round2((taxable * taxData.cgst) / 100);
@@ -146,7 +152,11 @@ const toHTML = (data = {}) => {
   };
 
   const safeItems = Array.isArray(items) ? items : [];
-  const itemRows = safeItems.map((item, i) => `
+  const itemRows = safeItems.map((item, i) => {
+    const base     = safeNum(item.qty || 1) * safeNum(item.price || 0);
+    const itemDisc = safeNum(item.discount || 0);
+    const lineAmt  = round2(base * (1 - itemDisc / 100));
+    return `
     <tr>
       <td style="text-align:center;color:#94a3b8;font-weight:600;font-size:11px">${i + 1}</td>
       <td>
@@ -156,8 +166,10 @@ const toHTML = (data = {}) => {
       <td style="text-align:center;color:#64748b;font-family:monospace;font-size:9.5px">${esc(item.hsn || "998314")}</td>
       <td style="text-align:center;font-weight:600">${safeNum(item.qty || 1)}</td>
       <td style="text-align:right">${fmtCur(item.price)}</td>
-      <td style="text-align:right;font-weight:700;color:#1a3c5e">${fmtCur(safeNum(item.qty || 1) * safeNum(item.price || 0))}</td>
-    </tr>`).join("");
+      <td style="text-align:center;font-size:10px;color:${itemDisc > 0 ? "#dc2626" : "#94a3b8"};font-weight:${itemDisc > 0 ? "700" : "400"}">${itemDisc > 0 ? `-${itemDisc}%` : "&#8212;"}</td>
+      <td style="text-align:right;font-weight:700;color:#1a3c5e">${fmtCur(lineAmt)}</td>
+    </tr>`;
+  }).join("");
 
   const qrEnc = encodeURIComponent(`Invoice:${invoiceId}|Amt:${totals.total}|Status:${payStatus}`);
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&format=png&data=${qrEnc}`;
@@ -275,12 +287,13 @@ ${payStatus !== "PAID" ? `<div class="wm">${payStatus}</div>` : ""}
     <table class="inv-tbl">
       <thead>
         <tr>
-          <th style="width:36px;text-align:center">#</th>
+          <th style="width:30px;text-align:center">#</th>
           <th>Description</th>
-          <th class="c" style="width:64px">HSN/SAC</th>
-          <th class="c" style="width:44px">Qty</th>
-          <th class="r" style="width:110px">Unit Price</th>
-          <th class="r" style="width:110px">Amount</th>
+          <th class="c" style="width:60px">HSN/SAC</th>
+          <th class="c" style="width:40px">Qty</th>
+          <th class="r" style="width:88px">Unit Price</th>
+          <th class="c" style="width:62px">Discount</th>
+          <th class="r" style="width:92px">Amount</th>
         </tr>
       </thead>
       <tbody>${itemRows}</tbody>

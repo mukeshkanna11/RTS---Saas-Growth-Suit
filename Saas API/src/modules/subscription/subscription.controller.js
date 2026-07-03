@@ -39,7 +39,7 @@ const generateInvoiceId = () => {
 exports.createIntent = async (req, res) => {
   try {
     const {
-      companyId,
+      companyId: bodyCompanyId,
       clientName,
       clientEmail,
       plan,
@@ -56,13 +56,24 @@ exports.createIntent = async (req, res) => {
       });
     }
 
+    // Use body companyId first; fall back to the middleware-resolved value.
+    // This handles the edge case where the frontend's cached session hadn't
+    // been refreshed yet and sent companyId as undefined.
+    const companyId = bodyCompanyId || req.user?.companyId || null;
+
     // ======================================================
     // VALIDATE INPUTS
     // ======================================================
-    if (!companyId || !clientName || !clientEmail || !plan) {
+    const missing = [];
+    if (!companyId)   missing.push("companyId");
+    if (!clientName)  missing.push("clientName");
+    if (!clientEmail) missing.push("clientEmail");
+    if (!plan)        missing.push("plan");
+    if (missing.length) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields",
+        message: `Missing required fields: ${missing.join(", ")}`,
+        errors: missing.map((f) => ({ field: f, message: `${f} is required` })),
       });
     }
 

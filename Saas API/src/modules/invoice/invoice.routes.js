@@ -1,249 +1,155 @@
-const router = require("express").Router();
-const path = require("path");
-const fs = require("fs");
-const PDFGenerator = require("./pdf.generator");
-const InvoiceTemplate = require("./invoice.template");
+const router   = require("express").Router();
+const fs       = require("fs");
 const InvoiceService = require("./invoice.service");
 const { protect } = require("../../middleware/auth.middleware");
-const Invoice = require("./invoice.model"); // OR correct path
+const Invoice  = require("./invoice.model");
+
 // ======================================================
-// GET ALL INVOICES
+// HEALTH  (must be before /:invoiceId to avoid wildcard)
 // ======================================================
 
-router.get(
-  "/",
-  protect,
-  async (req, res) => {
-    try {
-      const invoices =
-        await InvoiceService.getInvoices();
+router.get("/health", (req, res) => {
+  res.json({ success: true, service: "Invoice Service", status: "Running" });
+});
 
-      return res.status(200).json({
-        success: true,
-        count: invoices.length,
-        data: invoices,
-      });
-    } catch (err) {
-      console.error(err);
+// ======================================================
+// STATS  (must be before /:invoiceId)
+// ======================================================
 
-      return res.status(500).json({
-        success: false,
-        message: err.message,
-      });
-    }
+router.get("/stats", protect, async (req, res) => {
+  try {
+    const stats = await InvoiceService.getInvoiceStats();
+    return res.status(200).json({ success: true, data: stats });
+  } catch (err) {
+    console.error("STATS ERROR:", err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-);
+});
 
 // ======================================================
-// DOWNLOAD PDF  (MOVE THIS UP)
+// DOWNLOAD PDF  (must be before /:invoiceId)
 // ======================================================
 
 router.get("/download/:invoiceId", protect, async (req, res) => {
   try {
-    const invoice = await Invoice.findOne({
-      invoiceId: req.params.invoiceId,
-    });
+    const invoice = await Invoice.findOne({ invoiceId: req.params.invoiceId });
 
     if (!invoice) {
-      return res.status(404).json({
-        success: false,
-        message: "Invoice not found",
-      });
+      return res.status(404).json({ success: false, message: "Invoice not found" });
     }
-
-    // =========================
-    // CHECK FILE EXISTS
-    // =========================
-    const fs = require("fs");
 
     if (!invoice.filePath || !fs.existsSync(invoice.filePath)) {
-      return res.status(404).json({
-        success: false,
-        message: "PDF file not found",
-      });
+      return res.status(404).json({ success: false, message: "PDF file not found" });
     }
 
-    // =========================
-    // READ FILE BUFFER
-    // =========================
     const fileBuffer = fs.readFileSync(invoice.filePath);
-
-    // =========================
-    // SEND PDF
-    // =========================
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=${invoice.invoiceId}.pdf`
-    );
-
+    res.setHeader("Content-Disposition", `attachment; filename=${invoice.invoiceId}.pdf`);
     return res.end(fileBuffer);
-
   } catch (err) {
-    console.error("🔥 DOWNLOAD ERROR:", err);
-
-    return res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    console.error("DOWNLOAD ERROR:", err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
+// ======================================================
+// GET ALL INVOICES
+// ======================================================
+
+router.get("/", protect, async (req, res) => {
+  try {
+    const { page, limit, search } = req.query;
+    const result = await InvoiceService.getInvoices({ page, limit, search });
+    return res.status(200).json({
+      success: true,
+      data:       result.invoices,
+      pagination: result.pagination,
+    });
+  } catch (err) {
+    console.error("LIST ERROR:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 // ======================================================
 // GET SINGLE INVOICE (PREVIEW DATA)
 // ======================================================
 
-router.get(
-  "/:invoiceId",
-  protect,
-  async (req, res) => {
-    try {
-      const invoice =
-        await InvoiceService.getInvoiceById(
-          req.params.invoiceId
-        );
-
-      if (!invoice) {
-        return res.status(404).json({
-          success: false,
-          message: "Invoice not found",
-        });
-      }
-
-      return res.status(200).json({
-        success: true,
-        data: invoice,
-      });
-    } catch (err) {
-      console.error(err);
-
-      return res.status(500).json({
-        success: false,
-        message: err.message,
-      });
-    }
+router.get("/:invoiceId", protect, async (req, res) => {
+  try {
+    const invoice = await InvoiceService.getInvoiceById(req.params.invoiceId);
+    return res.status(200).json({ success: true, data: invoice });
+  } catch (err) {
+    console.error("GET ONE ERROR:", err);
+    const status = err.message === "Invoice not found" ? 404 : 500;
+    return res.status(status).json({ success: false, message: err.message });
   }
-);
+});
 
 // ======================================================
 // GENERATE INVOICE
 // ======================================================
 
-router.post(
-  "/generate",
-  protect,
-  async (req, res) => {
-    try {
-      const result =
-        await InvoiceService.generateInvoice(
-          req.body
-        );
+router.post("/generate", protect, async (req, res) => {
+  try {
+    const result = await InvoiceService.generateInvoice(req.body);
 
-      return res.status(201).json({
-        success: true,
-        message:
-          "Invoice generated successfully",
-        data: result,
-      });
-    } catch (err) {
-      console.error(err);
-
-      return res.status(500).json({
-        success: false,
-        message: err.message,
-      });
+    if (!result.success) {
+      return res.status(400).json({ success: false, message: result.message });
     }
+
+    return res.status(201).json({
+      success: true,
+      message: "Invoice generated successfully",
+      data:    result.invoice,
+    });
+  } catch (err) {
+    console.error("GENERATE ERROR:", err);
+    return res.status(500).json({ success: false, message: err.message });
   }
-);
-
-
+});
 
 // ======================================================
 // UPDATE INVOICE STATUS
 // ======================================================
 
-router.patch(
-  "/:invoiceId/status",
-  protect,
-  async (req, res) => {
-    try {
-      const { invoiceId } =
-        req.params;
-
-      const {
-        status,
-        paymentStatus,
-      } = req.body;
-
-      const invoice =
-        await InvoiceService.updateInvoiceStatus(
-          invoiceId,
-          status,
-          paymentStatus
-        );
-
-      return res.status(200).json({
-        success: true,
-        message:
-          "Invoice status updated successfully",
-        data: invoice,
-      });
-    } catch (err) {
-      console.error(err);
-
-      return res.status(500).json({
-        success: false,
-        message: err.message,
-      });
-    }
+router.patch("/:invoiceId/status", protect, async (req, res) => {
+  try {
+    const { status, paymentStatus } = req.body;
+    const invoice = await InvoiceService.updateInvoiceStatus(
+      req.params.invoiceId,
+      status,
+      paymentStatus
+    );
+    return res.status(200).json({
+      success: true,
+      message: "Invoice status updated successfully",
+      data:    invoice,
+    });
+  } catch (err) {
+    console.error("STATUS UPDATE ERROR:", err);
+    const status = err.message === "Invoice not found" ? 404 : 500;
+    return res.status(status).json({ success: false, message: err.message });
   }
-);
+});
 
 // ======================================================
 // DELETE INVOICE
 // ======================================================
 
-router.delete(
-  "/:invoiceId",
-  protect,
-  async (req, res) => {
-    try {
-      const result =
-        await InvoiceService.deleteInvoice(
-          req.params.invoiceId
-        );
-
-      return res.status(200).json({
-        success: true,
-        message:
-          "Invoice deleted successfully",
-        data: result,
-      });
-    } catch (err) {
-      console.error(err);
-
-      return res.status(500).json({
-        success: false,
-        message: err.message,
-      });
-    }
-  }
-);
-
-// ======================================================
-// HEALTH
-// ======================================================
-
-router.get(
-  "/health",
-  (req, res) => {
-    res.json({
+router.delete("/:invoiceId", protect, async (req, res) => {
+  try {
+    const result = await InvoiceService.deleteInvoice(req.params.invoiceId);
+    return res.status(200).json({
       success: true,
-      service: "Invoice Service",
-      status: "Running",
+      message: "Invoice deleted successfully",
+      data:    result,
     });
+  } catch (err) {
+    console.error("DELETE ERROR:", err);
+    const status = err.message === "Invoice not found" ? 404 : 500;
+    return res.status(status).json({ success: false, message: err.message });
   }
-);
+});
 
 module.exports = router;

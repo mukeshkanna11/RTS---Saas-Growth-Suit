@@ -101,8 +101,10 @@ exports.register = async (data) => {
   user.refreshToken = tokens.refreshToken;
   await user.save();
 
+  // Include companyId in the user payload so the frontend can start
+  // subscription checkout immediately without an extra /me round-trip.
   return {
-    user: sanitizeUser(user),
+    user: { ...sanitizeUser(user), companyId: company._id.toString() },
     company,
     token: tokens.token,
     refreshToken: tokens.refreshToken,
@@ -146,8 +148,32 @@ exports.login = async ({ email, password }) => {
   user.refreshToken = tokens.refreshToken;
   await user.save();
 
+  // Include companyId so the frontend can start subscription checkout
+  // immediately without a second /me round-trip.
+  // Auto-create the company if it doesn't exist (e.g. user was seeded directly).
+  let loginCompany = await Company.findOne(
+    { tenantId: user.tenantId, isDeleted: { $ne: true } },
+    { _id: 1 }
+  ).lean();
+
+  if (!loginCompany && user.tenantId) {
+    try {
+      loginCompany = await Company.create({
+        name:     process.env.COMPANY_NAME || "ReadyTechSolutions Pvt Ltd",
+        tenantId: user.tenantId,
+        owner:    user._id,
+      });
+    } catch (createErr) {
+      if (createErr.code === 11000) {
+        loginCompany = await Company.findOne({ tenantId: user.tenantId }, { _id: 1 }).lean();
+      } else {
+        console.error("[Auth/login] Company auto-create failed:", createErr.message);
+      }
+    }
+  }
+
   return {
-    user: sanitizeUser(user),
+    user: { ...sanitizeUser(user), companyId: loginCompany?._id?.toString() || null },
     token: tokens.token,
     refreshToken: tokens.refreshToken,
   };

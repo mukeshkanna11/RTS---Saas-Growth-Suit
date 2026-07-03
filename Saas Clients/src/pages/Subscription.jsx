@@ -129,11 +129,11 @@ function buildSubscriptionInvoiceHTML(sub = {}) {
   const invoiceId = sub.invoice?.invoiceId || `INV-${now.getFullYear()}-PREVIEW`;
 
   const co = {
-    name:    "ReadyTech Solutions Pvt Ltd",
+    name:    "ReadyTechSolutions Pvt Ltd",
     address: "Coimbatore, Tamil Nadu, India",
-    email:   "support@readytechsolutions.in",
-    phone:   "+91-9876543210",
-    website: "https://readytechsolutions.com",
+    email:   "info@readytechsolutions.in",
+    phone:   "70107 97721",
+    website: "https://readytechsolutions.in/",
     gstin:   "33ABCDE1234F1Z5",
   };
 
@@ -1321,6 +1321,7 @@ const NoSubscriptionBanner = () => (
 export default function Subscription() {
   const user = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);
+  const refreshUser = useAuthStore((s) => s.refreshUser);
 
   const [sub, setSub] = useState(null);
   const [auditLogs, setAuditLogs] = useState([]);
@@ -1417,20 +1418,26 @@ export default function Subscription() {
       return false;
     }
     if (!checkoutPlan) return false;
-    if (!user?.companyId) {
-      toast("Company profile not found. Please contact support.", "error");
-      return false;
+
+    // Resolve the active user. If companyId is missing from in-memory state
+    // (stale pre-fix session, or init() race), silently call /auth/me which
+    // will trigger the middleware to auto-create the company and return it.
+    // We never hard-block here — if companyId is still null after the refresh
+    // the backend resolves it from req.user.companyId and returns a clear error.
+    let activeUser = user;
+    if (!activeUser?.companyId) {
+      activeUser = (await refreshUser()) || user;
     }
 
     paymentInFlight.current = true;
     setCheckoutLoading(true);
 
     try {
-      // Step 1: Create intent
+      // Step 1: Create intent — passes companyId (may be null; backend has fallback)
       const intentRes = await createIntent({
-        companyId:   user.companyId,
-        clientName:  user.name  || user.email,
-        clientEmail: user.email,
+        companyId:   activeUser?.companyId,
+        clientName:  activeUser?.name  || activeUser?.email,
+        clientEmail: activeUser?.email,
         plan:        checkoutPlan,
         billingCycle,
       });
@@ -1472,7 +1479,7 @@ export default function Subscription() {
       paymentInFlight.current = false;
       return false;
     }
-  }, [checkoutPlan, billingCycle, user, toast]);
+  }, [checkoutPlan, billingCycle, user, refreshUser, toast]);
 
   // ── Cancel subscription ───────────────────────────────────────────────────────
   const openCancelDialog = useCallback(() => {

@@ -129,12 +129,11 @@ const validate = (schema) => (req, res, next) => {
 
 const schemas = {
   intent: Joi.object({
-    // Validate as a 24-character hex string (MongoDB ObjectId format).
-    // Rejecting garbage or null values here prevents documents with null
-    // companyId from ever reaching the database.
-    companyId:    Joi.string().pattern(/^[0-9a-fA-F]{24}$/).required().messages({
+    // companyId is optional here — if absent the controller resolves it from
+    // req.user.companyId (populated by auth middleware on every request).
+    // It is still validated when present so garbage values are rejected early.
+    companyId:    Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional().messages({
       "string.pattern.base": "companyId must be a valid MongoDB ObjectId (24-character hex string)",
-      "any.required":        "companyId is required",
     }),
     clientName:   Joi.string().min(2).max(100).required(),
     clientEmail:  Joi.string().email().required(),

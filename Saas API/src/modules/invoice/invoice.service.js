@@ -52,14 +52,13 @@ const calculateTotals = (
     igst: safe(tax.igst != null ? tax.igst : 0),
   };
 
+  // Per-item discount applied before summing, then global discount on the subtotal.
   const subtotal = round(
-    items.reduce(
-      (sum, item) =>
-        sum +
-        safe(item.qty) *
-          safe(item.price),
-      0
-    )
+    items.reduce((sum, item) => {
+      const base     = safe(item.qty) * safe(item.price);
+      const itemDisc = safe(item.discount || 0);
+      return sum + base * (1 - itemDisc / 100);
+    }, 0)
   );
 
   let discountAmount = 0;

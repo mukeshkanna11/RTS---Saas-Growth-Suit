@@ -68,8 +68,17 @@ exports.createOrder = asyncHandler(async (req, res) => {
     return sendError(res, "Access denied — you do not own this subscription", 403);
   }
 
+  console.log(
+    "[PayPal/createOrder] sub=%s status=%s plan=%s billingCycle=%s userId=%s companyId=%s",
+    sub._id, sub.status, sub.plan, sub.billingCycle, req.user.id, sub.companyId
+  );
+
   if (sub.status !== "pending") {
     if (sub.status === "active") {
+      console.warn(
+        "[PayPal/createOrder] BLOCKED duplicate purchase — sub=%s status=active plan=%s billingCycle=%s userId=%s companyId=%s reason=subscription_already_active",
+        sub._id, sub.plan, sub.billingCycle, req.user.id, sub.companyId
+      );
       return sendError(
         res,
         "This subscription is already active. To upgrade or change your plan, select the new plan from the Plans section and start a fresh checkout.",
@@ -77,6 +86,10 @@ exports.createOrder = asyncHandler(async (req, res) => {
       );
     }
     if (sub.status === "cancelled" || sub.status === "expired") {
+      console.warn(
+        "[PayPal/createOrder] BLOCKED stale checkout — sub=%s status=%s plan=%s billingCycle=%s userId=%s companyId=%s reason=session_no_longer_valid",
+        sub._id, sub.status, sub.plan, sub.billingCycle, req.user.id, sub.companyId
+      );
       return sendError(
         res,
         "This checkout session is no longer valid — the subscription was cancelled or expired. Please select your plan again to start a new checkout.",
@@ -84,12 +97,20 @@ exports.createOrder = asyncHandler(async (req, res) => {
       );
     }
     if (sub.status === "paused") {
+      console.warn(
+        "[PayPal/createOrder] BLOCKED paused subscription — sub=%s plan=%s billingCycle=%s userId=%s companyId=%s reason=subscription_paused",
+        sub._id, sub.plan, sub.billingCycle, req.user.id, sub.companyId
+      );
       return sendError(
         res,
         "This subscription is paused. Contact support to resume it, or select a new plan to start a fresh checkout.",
         409
       );
     }
+    console.warn(
+      "[PayPal/createOrder] BLOCKED invalid state — sub=%s status=%s plan=%s billingCycle=%s userId=%s companyId=%s reason=not_in_payable_state",
+      sub._id, sub.status, sub.plan, sub.billingCycle, req.user.id, sub.companyId
+    );
     return sendError(
       res,
       `Subscription is not in a payable state (current status: '${sub.status}'). Please start a new checkout.`,
