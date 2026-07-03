@@ -681,20 +681,22 @@ const PaymentSummary = memo(({ plan, billingCycle, onConfirm, onCancel, loading 
 });
 
 // ── Plan Card ─────────────────────────────────────────────────────────────────
-const PlanCard = memo(({ planKey, billingCycle, currentPlanKey, onSelect, isProcessing }) => {
+const PlanCard = memo(({ planKey, billingCycle, activePlanKey, subscriptionStatus, onSelect, isProcessing }) => {
   const meta = PLAN_META[planKey];
   const prices = PLAN_PRICES[planKey];
   if (!meta || !prices) return null;
 
   const base = billingCycle === "yearly" ? prices.yearly : prices.monthly;
   const PlanIcon = meta.icon;
-  const isCurrent = currentPlanKey === planKey;
+  const isCurrent = activePlanKey === planKey;
   const isPopular = meta.popular;
 
-  const currentIdx = PLAN_ORDER.indexOf(currentPlanKey);
+  const activeIdx = PLAN_ORDER.indexOf(activePlanKey);
   const thisIdx = PLAN_ORDER.indexOf(planKey);
-  const isUpgrade = currentIdx >= 0 && thisIdx > currentIdx;
-  const isDowngrade = currentIdx >= 0 && thisIdx < currentIdx;
+  const isUpgrade = activeIdx >= 0 && thisIdx > activeIdx;
+  const isDowngrade = activeIdx >= 0 && thisIdx < activeIdx;
+  const isRenew = !isCurrent && (subscriptionStatus === "cancelled" || subscriptionStatus === "expired");
+  const planLabel = planKey.charAt(0).toUpperCase() + planKey.slice(1);
 
   const yearlySaving =
     billingCycle === "yearly"
@@ -769,28 +771,32 @@ const PlanCard = memo(({ planKey, billingCycle, currentPlanKey, onSelect, isProc
         {isCurrent ? (
           <div className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-slate-400 font-semibold text-sm">
             <CheckCircle2 size={16} className="text-green-400" />
-            Active Plan
+            Current Plan
           </div>
         ) : (
           <button
             onClick={() => onSelect(planKey)}
             disabled={isProcessing}
             className="flex items-center justify-center w-full gap-2 py-4 font-bold text-black transition-all rounded-2xl bg-cyan-400 hover:bg-cyan-300 hover:scale-[1.02] shadow-lg shadow-cyan-500/20 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
-            aria-label={`${isUpgrade ? "Upgrade" : isDowngrade ? "Downgrade" : "Select"} to ${planKey} plan`}
+            aria-label={`${isUpgrade ? `Upgrade to ${planLabel}` : isDowngrade ? `Switch to ${planLabel}` : isRenew ? "Renew subscription" : `Get started with ${planLabel}`}`}
           >
             {isProcessing ? (
               <Loader2 size={18} className="animate-spin" />
             ) : isUpgrade ? (
               <ArrowUpCircle size={18} />
+            ) : isRenew ? (
+              <RotateCcw size={18} />
             ) : (
               <ArrowRight size={18} />
             )}
             {isProcessing
               ? "Processing..."
               : isUpgrade
-              ? "Upgrade Plan"
+              ? `Upgrade to ${planLabel}`
               : isDowngrade
-              ? "Downgrade Plan"
+              ? `Downgrade to ${planLabel}`
+              : isRenew
+              ? "Renew Subscription"
               : "Get Started"}
           </button>
         )}
@@ -1396,9 +1402,13 @@ export default function Subscription() {
 
   // ── Select plan → open checkout ───────────────────────────────────────────────
   const handleSelectPlan = useCallback((planKey) => {
+    if (sub?.status === "active" && sub?.plan === planKey) {
+      toast("This is your current active plan.", "info");
+      return;
+    }
     setCheckoutPlan(planKey);
     setShowCheckout(true);
-  }, []);
+  }, [sub, toast]);
 
   // ── Full PayPal checkout flow ─────────────────────────────────────────────────
   const handleCheckoutConfirm = useCallback(async () => {
@@ -1739,7 +1749,8 @@ export default function Subscription() {
                 <PlanCard
                   planKey={key}
                   billingCycle={billingCycle}
-                  currentPlanKey={currentPlanKey}
+                  activePlanKey={currentPlanKey}
+                  subscriptionStatus={sub?.status || null}
                   onSelect={handleSelectPlan}
                   isProcessing={checkoutLoading && checkoutPlan === key}
                 />
