@@ -54,9 +54,13 @@ const CURRENCY = getPayPalCurrency();
 // Snapshot credentials at module load so we can reference them without
 // re-reading process.env on every request. Also lets us detect "undefined"
 // string values that some misconfigured dotenv setups can produce.
-const _CLIENT_ID     = process.env.PAYPAL_CLIENT_ID;
-const _CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
-const _WEBHOOK_ID    = process.env.PAYPAL_WEBHOOK_ID;
+//
+// Trim at load time: a leading/trailing space (or stray \r from Windows CRLF)
+// in .env passes _isPresent() but silently corrupts the Base64 Basic-auth
+// header sent to PayPal's /oauth2/token, causing a 401 invalid_client.
+const _CLIENT_ID     = typeof process.env.PAYPAL_CLIENT_ID     === "string" ? process.env.PAYPAL_CLIENT_ID.trim().replace(/\r/g, "")     : undefined;
+const _CLIENT_SECRET = typeof process.env.PAYPAL_CLIENT_SECRET === "string" ? process.env.PAYPAL_CLIENT_SECRET.trim().replace(/\r/g, "") : undefined;
+const _WEBHOOK_ID    = typeof process.env.PAYPAL_WEBHOOK_ID    === "string" ? process.env.PAYPAL_WEBHOOK_ID.trim().replace(/\r/g, "")    : undefined;
 
 // A value is "present" only if it is a non-empty string that is not the
 // literal text "undefined" or a placeholder template like <...>
