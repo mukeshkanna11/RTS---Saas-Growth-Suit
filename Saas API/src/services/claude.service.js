@@ -58,7 +58,7 @@ function handleAnthropicError(err) {
         `Anthropic API key is invalid or revoked.${detail} ` +
         "Go to Render Dashboard → Environment → update ANTHROPIC_API_KEY with a fresh key from console.anthropic.com/settings/keys."
       ),
-      { code: "CLAUDE_AUTH_ERROR", status: 401 }
+      { code: "CLAUDE_AUTH_ERROR", status: 502 }
     );
   }
   if (err.status === 403) {

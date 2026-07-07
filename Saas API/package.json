@@ -8,7 +8,7 @@
     "start": "node src/server.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.105.0",
+    "@anthropic-ai/sdk": "^0.110.0",
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
     "bull": "^1.1.3",

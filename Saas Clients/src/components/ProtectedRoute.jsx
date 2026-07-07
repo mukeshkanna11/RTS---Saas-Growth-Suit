@@ -37,7 +37,6 @@ export default function ProtectedRoute({
     token,
     loading,
     initialized,
-    init,
   } = useAuthStore();
 
   // ===============================
@@ -47,19 +46,10 @@ export default function ProtectedRoute({
   const [booting, setBooting] = useState(true);
 
   useEffect(() => {
-    const runInit = async () => {
-      try {
-        await init(); // 🔥 IMPORTANT FIX
-      } catch (err) {
-        console.error("AUTH INIT ERROR:", err);
-      } finally {
-        setBooting(false);
-      }
-    };
-
-    runInit();
-  }, [init]);
-
+  if (initialized) {
+    setBooting(false);
+  }
+}, [initialized]);
   // ===============================
   // LOADING STATE
   // ===============================

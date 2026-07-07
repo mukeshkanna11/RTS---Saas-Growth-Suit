@@ -352,7 +352,7 @@ export default function AIContent() {
       </AnimatePresence>
 
       {/* Ambient glows */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-1/4 w-[700px] h-[500px] bg-violet-500/[0.06] rounded-full blur-[130px]" />
         <div className="absolute bottom-0 left-1/4 w-[600px] h-[500px] bg-purple-500/[0.05] rounded-full blur-[120px]" />
         <div className="absolute top-1/3 left-0 w-[400px] h-[400px] bg-pink-500/[0.03] rounded-full blur-[100px]" />
@@ -369,21 +369,21 @@ export default function AIContent() {
           <motion.div
             animate={{ y: [-10, 8, -10], rotate: [0, 4, 0] }}
             transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-8 right-12 hidden lg:flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 border border-violet-500/20 backdrop-blur-xl"
+            className="absolute items-center justify-center hidden w-12 h-12 border top-8 right-12 lg:flex rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 border-violet-500/20 backdrop-blur-xl"
           >
             <Sparkles size={20} className="text-violet-400" />
           </motion.div>
           <motion.div
             animate={{ y: [6, -10, 6], rotate: [0, -5, 0] }}
             transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1.2 }}
-            className="absolute top-20 right-40 hidden lg:flex items-center justify-center w-9 h-9 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/20 backdrop-blur-xl"
+            className="absolute items-center justify-center hidden border top-20 right-40 lg:flex w-9 h-9 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border-cyan-500/20 backdrop-blur-xl"
           >
             <Brain size={14} className="text-cyan-400" />
           </motion.div>
           <motion.div
             animate={{ y: [-6, 10, -6] }}
             transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-            className="absolute top-6 right-64 hidden xl:flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-pink-500/20 to-rose-500/20 border border-pink-500/20 backdrop-blur-xl"
+            className="absolute items-center justify-center hidden w-8 h-8 border top-6 right-64 xl:flex rounded-xl bg-gradient-to-br from-pink-500/20 to-rose-500/20 border-pink-500/20 backdrop-blur-xl"
           >
             <PenLine size={13} className="text-pink-400" />
           </motion.div>
@@ -412,7 +412,7 @@ export default function AIContent() {
               className="text-[2rem] lg:text-[2.6rem] font-extrabold leading-[1.15] tracking-tight mb-4"
             >
               Create High-Converting{" "}
-              <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <span className="text-transparent bg-gradient-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text">
                 Content in Seconds
               </span>
             </motion.h1>
@@ -421,7 +421,7 @@ export default function AIContent() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.18 }}
-              className="text-gray-400 text-base leading-relaxed mb-7 max-w-xl"
+              className="max-w-xl text-base leading-relaxed text-gray-400 mb-7"
             >
               Generate blogs, emails, social posts, ad copies and marketing assets using Claude AI.
               Trusted by 10,000+ marketers and content creators worldwide.
@@ -447,8 +447,8 @@ export default function AIContent() {
                   className="flex items-center gap-2"
                 >
                   <s.icon size={13} className={s.color} />
-                  <span className="font-bold text-white text-sm">{s.value}</span>
-                  <span className="text-gray-500 text-xs">{s.label}</span>
+                  <span className="text-sm font-bold text-white">{s.value}</span>
+                  <span className="text-xs text-gray-500">{s.label}</span>
                 </motion.div>
               ))}
             </motion.div>
@@ -459,7 +459,7 @@ export default function AIContent() {
             KPI CARDS
         ══════════════════════════════════════════════════════════════════ */}
         <section className="px-6 lg:px-10 py-6 border-b border-white/[0.06]">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {KPI_STATS.map((stat, i) => {
               const Icon = stat.icon;
               const bars = [3, 5, 4, 7, 6, 8, 7, 9, 8, 10];
@@ -515,7 +515,7 @@ export default function AIContent() {
             </div>
             <span className="text-xs text-gray-600">Click to auto-fill topic</span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {TEMPLATES.map((tmpl, i) => {
               const Icon = tmpl.icon;
               const isActive = selectedTemplate === tmpl.id;
@@ -541,7 +541,7 @@ export default function AIContent() {
                   <div className={`w-fit p-1.5 rounded-lg mb-2.5 ${isActive ? "bg-violet-500/20" : "bg-white/[0.04]"}`}>
                     <Icon size={13} className={isActive ? "text-violet-400" : "text-gray-400"} />
                   </div>
-                  <p className="text-xs font-semibold text-gray-200 leading-tight">{tmpl.label}</p>
+                  <p className="text-xs font-semibold leading-tight text-gray-200">{tmpl.label}</p>
                   <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">{tmpl.desc}</p>
                 </motion.button>
               );
@@ -553,10 +553,10 @@ export default function AIContent() {
             MAIN CONTENT AREA
         ══════════════════════════════════════════════════════════════════ */}
         <section className="px-6 lg:px-10 py-7">
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
 
             {/* ── Left + center (2/3) ───────────────────────────────────── */}
-            <div className="xl:col-span-2 space-y-5">
+            <div className="space-y-5 xl:col-span-2">
 
               {/* Content Type Cards */}
               <motion.div
@@ -567,7 +567,7 @@ export default function AIContent() {
                 <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-widest mb-3">
                   Content Type
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                   {CONTENT_TYPES.map((type, i) => {
                     const Icon = type.icon;
                     const isActive = contentType === type.id;
@@ -615,7 +615,7 @@ export default function AIContent() {
               >
                 <button
                   onClick={() => setShowSmartSettings(!showSmartSettings)}
-                  className="w-full flex items-center justify-between px-5 py-4"
+                  className="flex items-center justify-between w-full px-5 py-4"
                 >
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20">
@@ -641,7 +641,7 @@ export default function AIContent() {
                       <div className="px-5 pb-5 border-t border-white/[0.06] pt-4 space-y-4">
 
                         {/* Row 1: Audience + Industry */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                           <div>
                             <label className="flex items-center gap-1.5 text-[10px] font-extrabold text-gray-500 uppercase tracking-widest mb-2">
                               <Users size={9} className="text-violet-400" />
@@ -671,7 +671,7 @@ export default function AIContent() {
                                   <option key={ind} value={ind} className="bg-gray-900">{ind}</option>
                                 ))}
                               </select>
-                              <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                              <ChevronDown size={12} className="absolute text-gray-500 -translate-y-1/2 pointer-events-none right-3 top-1/2" />
                             </div>
                           </div>
                         </div>
@@ -700,7 +700,7 @@ export default function AIContent() {
                         </div>
 
                         {/* Row 2: Keywords + CTA */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                           <div>
                             <label className="flex items-center gap-1.5 text-[10px] font-extrabold text-gray-500 uppercase tracking-widest mb-2">
                               <Key size={9} className="text-violet-400" />
@@ -754,7 +754,7 @@ export default function AIContent() {
                 <div className="p-5 space-y-4">
                   <div>
                     <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-widest mb-2">
-                      Topic / Prompt <span className="text-red-400 normal-case font-normal">*</span>
+                      Topic / Prompt <span className="font-normal text-red-400 normal-case">*</span>
                     </label>
                     <textarea
                       value={topic}
@@ -774,7 +774,7 @@ export default function AIContent() {
                   <div>
                     <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-widest mb-2">
                       Additional Context{" "}
-                      <span className="normal-case font-normal text-gray-700">(optional)</span>
+                      <span className="font-normal text-gray-700 normal-case">(optional)</span>
                     </label>
                     <input
                       type="text"
@@ -828,16 +828,16 @@ export default function AIContent() {
                 disabled={loading || !topic.trim()}
                 whileHover={{ scale: loading ? 1 : 1.01 }}
                 whileTap={{ scale: 0.99 }}
-                className="relative w-full py-4 rounded-xl font-bold text-sm overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed group"
+                className="relative w-full py-4 overflow-hidden text-sm font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed group"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-violet-500 via-purple-500 to-pink-600" />
-                <div className="absolute inset-0 bg-gradient-to-r from-violet-400 via-purple-400 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-0 transition-opacity opacity-0 bg-gradient-to-r from-violet-400 via-purple-400 to-pink-500 group-hover:opacity-100" />
                 <div className="absolute inset-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]" />
                 <div className="relative flex items-center justify-center gap-2 text-white">
                   {loading ? (
                     <><Loader2 size={16} className="animate-spin" />Generating {selectedType?.label} with Claude AI…</>
                   ) : (
-                    <><Sparkles size={16} />Generate {selectedType?.label}<ArrowRight size={15} className="group-hover:translate-x-1 transition-transform" /></>
+                    <><Sparkles size={16} />Generate {selectedType?.label}<ArrowRight size={15} className="transition-transform group-hover:translate-x-1" /></>
                   )}
                 </div>
               </motion.button>
@@ -861,7 +861,7 @@ export default function AIContent() {
                           />
                         ))}
                       </div>
-                      <span className="text-sm text-violet-300 font-semibold">
+                      <span className="text-sm font-semibold text-violet-300">
                         Claude AI is crafting your {selectedType?.output}…
                       </span>
                     </div>
@@ -896,7 +896,7 @@ export default function AIContent() {
                             }`}>
                               {step.label}{isActive && <span className="animate-pulse">…</span>}
                             </span>
-                            {isDone && <Check size={11} className="ml-auto text-emerald-400 flex-shrink-0" />}
+                            {isDone && <Check size={11} className="flex-shrink-0 ml-auto text-emerald-400" />}
                           </motion.div>
                         );
                       })}
@@ -971,15 +971,15 @@ export default function AIContent() {
                         </div>
                         <span className="text-xs font-semibold text-violet-400">AI Generated</span>
                       </div>
-                      <span className="text-gray-700 text-xs">·</span>
+                      <span className="text-xs text-gray-700">·</span>
                       <span className="text-xs text-gray-500">{wordCount.toLocaleString()} words</span>
-                      <span className="text-gray-700 text-xs">·</span>
+                      <span className="text-xs text-gray-700">·</span>
                       <span className="text-xs text-gray-500">{readingTime} min read</span>
-                      <span className="text-gray-700 text-xs">·</span>
-                      <span className="text-xs capitalize text-gray-500">{selectedType?.output} · {tone}</span>
+                      <span className="text-xs text-gray-700">·</span>
+                      <span className="text-xs text-gray-500 capitalize">{selectedType?.output} · {tone}</span>
                       {usage && (
                         <>
-                          <span className="text-gray-700 text-xs">·</span>
+                          <span className="text-xs text-gray-700">·</span>
                           <span className="text-xs text-gray-500">{usage.totalTokens?.toLocaleString()} tokens</span>
                         </>
                       )}
@@ -1004,11 +1004,11 @@ export default function AIContent() {
                     >
                       <div className="flex items-center gap-2 mb-3">
                         <Activity size={13} className="text-violet-400" />
-                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+                        <span className="text-xs font-semibold tracking-widest text-gray-400 uppercase">
                           Content Insights
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         {insightMetrics.map((metric, i) => {
                           const MIcon = metric.icon;
                           return (
@@ -1052,11 +1052,11 @@ export default function AIContent() {
                     exit={{ opacity: 0 }}
                     className="rounded-2xl border border-white/[0.06] bg-white/[0.01] backdrop-blur-xl"
                   >
-                    <div className="py-16 px-8 text-center">
+                    <div className="px-8 py-16 text-center">
                       {/* Illustration */}
-                      <div className="relative w-28 h-28 mx-auto mb-6">
+                      <div className="relative mx-auto mb-6 w-28 h-28">
                         <div className="absolute inset-0 bg-gradient-to-br from-violet-500/20 to-purple-500/20 rounded-3xl" />
-                        <div className="absolute inset-2 bg-gradient-to-br from-violet-500/10 to-purple-500/10 rounded-2xl border border-violet-500/20" />
+                        <div className="absolute border inset-2 bg-gradient-to-br from-violet-500/10 to-purple-500/10 rounded-2xl border-violet-500/20" />
                         <div className="absolute inset-0 flex items-center justify-center">
                           <Sparkles size={44} className="text-violet-400/70" />
                         </div>
@@ -1065,7 +1065,7 @@ export default function AIContent() {
                           transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
                           className="absolute inset-0"
                         >
-                          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-violet-400/60" />
+                          <div className="absolute top-0 w-2 h-2 -translate-x-1/2 rounded-full left-1/2 bg-violet-400/60" />
                         </motion.div>
                         <motion.div
                           animate={{ rotate: -360 }}
@@ -1076,8 +1076,8 @@ export default function AIContent() {
                         </motion.div>
                       </div>
 
-                      <h3 className="text-xl font-bold text-white mb-2">Start Creating Amazing Content</h3>
-                      <p className="text-sm text-gray-500 max-w-sm mx-auto leading-relaxed">
+                      <h3 className="mb-2 text-xl font-bold text-white">Start Creating Amazing Content</h3>
+                      <p className="max-w-sm mx-auto text-sm leading-relaxed text-gray-500">
                         Choose a template above and describe your content idea. Claude AI generates high-quality,
                         ready-to-use marketing content in seconds.
                       </p>
@@ -1126,7 +1126,7 @@ export default function AIContent() {
                   <div className="p-1 rounded-lg bg-amber-500/10">
                     <Lightbulb size={13} className="text-amber-400" />
                   </div>
-                  <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Writing Tips</span>
+                  <span className="text-xs font-semibold tracking-wider uppercase text-amber-400">Writing Tips</span>
                 </div>
                 <div className="p-4 space-y-3">
                   {AI_WRITING_TIPS.map((tip, i) => (
@@ -1138,7 +1138,7 @@ export default function AIContent() {
                       className="flex items-start gap-2.5"
                     >
                       <CheckCircle2 size={12} className="text-emerald-400 flex-shrink-0 mt-0.5" />
-                      <p className="text-xs text-gray-400 leading-relaxed">{tip}</p>
+                      <p className="text-xs leading-relaxed text-gray-400">{tip}</p>
                     </motion.div>
                   ))}
                 </div>
@@ -1155,7 +1155,7 @@ export default function AIContent() {
                   <div className="p-1 rounded-lg bg-rose-500/10">
                     <TrendingUp size={13} className="text-rose-400" />
                   </div>
-                  <span className="text-xs font-semibold text-rose-400 uppercase tracking-wider">Trending Topics</span>
+                  <span className="text-xs font-semibold tracking-wider uppercase text-rose-400">Trending Topics</span>
                 </div>
                 <div className="p-3 space-y-1">
                   {TRENDING_TOPICS.map((t, i) => (
@@ -1168,9 +1168,9 @@ export default function AIContent() {
                       whileHover={{ x: 3 }}
                       className="w-full flex items-center gap-2 p-2.5 rounded-lg hover:bg-white/[0.04] text-left group transition-all"
                     >
-                      <Hash size={10} className="text-gray-700 flex-shrink-0 group-hover:text-violet-400 transition-colors" />
-                      <span className="text-xs text-gray-500 group-hover:text-gray-200 transition-colors leading-snug">{t}</span>
-                      <ChevronRight size={10} className="ml-auto text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      <Hash size={10} className="flex-shrink-0 text-gray-700 transition-colors group-hover:text-violet-400" />
+                      <span className="text-xs leading-snug text-gray-500 transition-colors group-hover:text-gray-200">{t}</span>
+                      <ChevronRight size={10} className="flex-shrink-0 ml-auto text-gray-700 transition-opacity opacity-0 group-hover:opacity-100" />
                     </motion.button>
                   ))}
                 </div>
@@ -1187,7 +1187,7 @@ export default function AIContent() {
                   <div className="p-1 rounded-lg bg-blue-500/10">
                     <BarChart2 size={13} className="text-blue-400" />
                   </div>
-                  <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Best Performing</span>
+                  <span className="text-xs font-semibold tracking-wider text-blue-400 uppercase">Best Performing</span>
                 </div>
                 <div className="p-4 space-y-3.5">
                   {BEST_CONTENT.map((item, i) => (
@@ -1221,18 +1221,18 @@ export default function AIContent() {
                     <div className="p-1 rounded-lg bg-gray-500/10">
                       <Clock size={13} className="text-gray-400" />
                     </div>
-                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Recent</span>
+                    <span className="text-xs font-semibold tracking-wider text-gray-400 uppercase">Recent</span>
                   </div>
                   <span className="text-[10px] font-bold text-gray-600">{history.length}/10</span>
                 </div>
 
                 {history.length === 0 ? (
                   <div className="px-4 py-8 text-center">
-                    <Clock size={22} className="text-gray-700 mx-auto mb-2" />
+                    <Clock size={22} className="mx-auto mb-2 text-gray-700" />
                     <p className="text-xs text-gray-600">Generations appear here</p>
                   </div>
                 ) : (
-                  <div className="p-2 space-y-1 max-h-64 overflow-y-auto">
+                  <div className="p-2 space-y-1 overflow-y-auto max-h-64">
                     {history.map((item) => {
                       const typeConf = CONTENT_TYPES.find((t) => t.id === item.contentType);
                       const TypeIcon = typeConf?.icon || FileText;
@@ -1254,7 +1254,7 @@ export default function AIContent() {
                           </div>
                           <button
                             onClick={(e) => { e.stopPropagation(); setHistory((h) => h.filter((i) => i.id !== item.id)); }}
-                            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-all flex-shrink-0"
+                            className="flex-shrink-0 p-1 text-gray-600 transition-all rounded-lg opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-400/10"
                           >
                             <Trash2 size={11} />
                           </button>
@@ -1276,8 +1276,8 @@ export default function AIContent() {
                   <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
                   <span className="text-xs font-semibold text-violet-400">Claude AI · Online</span>
                 </div>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  Model: <span className="text-gray-300 font-medium">claude-sonnet-4-6</span>
+                <p className="text-xs leading-relaxed text-gray-500">
+                  Model: <span className="font-medium text-gray-300">claude-sonnet-4-6</span>
                   <br />Optimised for long-form marketing content and high-converting copy.
                 </p>
               </motion.div>
